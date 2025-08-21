@@ -1,0 +1,6 @@
+{
+  "assume_risk_for_major_bumps": "yes but only for runtime dependencies, not dev-tools pinned by Nx",
+  "allow_deprecated_replacements": "prefer maintained forks if API-compatible",
+  "test_command_customization": "use defaults in scenario.yaml",
+  "accept_namespace_migration_codemods": "yes"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "ze-benchmarks",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm -w packages/harness run build",
+    "dev": "npm -w packages/harness run dev"
+  },
+  "engines": { "node": ">=18" }
+}

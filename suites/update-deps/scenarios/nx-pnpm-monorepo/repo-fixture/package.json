@@ -1,0 +1,9 @@
+{
+  "name": "nx-pnpm-monorepo-fixture",
+  "private": true,
+  "packageManager": "pnpm@9.1.0",
+  "devDependencies": {
+    "nx": "~20.0.0",
+    "typescript": "^5.5.4"
+  }
+}

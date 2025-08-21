@@ -1,0 +1,13 @@
+tiers:
+  L0: { description: "Minimal instruction", askUser_bonus: 0.2, efficiency_weight: 0.8 }
+  L1: { description: "Basic context", askUser_bonus: 0.1, efficiency_weight: 1.0 }
+  L2: { description: "Directed upgrade targets", askUser_bonus: 0.05, efficiency_weight: 1.1 }
+  L3: { description: "Migration with breaking changes", askUser_bonus: 0.0, efficiency_weight: 1.2 }
+  Lx: { description: "Adversarial / conflicting info", askUser_bonus: 0.25, efficiency_weight: 0.9 }
+dimensions:
+  verbosity: [terse, normal, verbose]
+  registry_access: [offline, docs-allowed]
+  risk_tolerance: [patch, minor, major-runtime-only, any]
+  constraints_disclosure: [none, summary, full]
+quality_checks:
+  require_acceptance_criteria: true
