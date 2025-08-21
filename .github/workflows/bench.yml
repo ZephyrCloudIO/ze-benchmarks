@@ -1,0 +1,22 @@
+name: zephyr-bench
+on: [push, workflow_dispatch]
+jobs:
+  run:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        suite: [update-deps]
+        scenario: [nx-pnpm-monorepo]
+        tier: [L0, L1, L2, L3, Lx]
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: true }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npm -w packages/harness run build
+      - run: node packages/harness/dist/cli.js run ${{ matrix.suite }} ${{ matrix.scenario }} --tier ${{ matrix.tier }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.suite }}-${{ matrix.scenario }}-${{ matrix.tier }}
+          path: results/**
