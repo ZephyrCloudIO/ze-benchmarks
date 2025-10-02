@@ -1,5 +1,16 @@
-export type AgentRequest = { messages: { role: 'system' | 'user' | 'assistant'; content: string }[] };
-export type AgentResponse = { content: string; tokensIn?: number; tokensOut?: number; costUsd?: number };
+export type AgentRequest = {
+	messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
+	workspaceDir?: string;
+	maxTurns?: number;
+};
+
+export type AgentResponse = {
+	content: string;
+	tokensIn?: number;
+	tokensOut?: number;
+	costUsd?: number;
+	toolCalls?: number;
+};
 
 export interface AgentAdapter {
 	name: string;
@@ -13,3 +24,5 @@ export class EchoAgent implements AgentAdapter {
 		return { content: last };
 	}
 }
+
+export { ClaudeCodeAdapter } from './claude-code.js';

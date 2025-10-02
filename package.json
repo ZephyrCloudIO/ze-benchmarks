@@ -6,8 +6,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm -w packages/harness run build",
+    "build": "npm -w packages/evaluators run build && npm -w packages/harness run build",
+    "build:evals": "npm -w packages/evaluators run build",
     "dev": "npm -w packages/harness run dev"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }
