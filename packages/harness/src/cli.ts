@@ -6,6 +6,8 @@ import YAML from 'yaml';
 import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/dist/index.js';
 import { runValidationCommands } from './runtime/validation.js';
 import { buildDiffArtifacts } from './runtime/diff.js';
+import { Oracle } from './runtime/oracle.js';
+import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.js';
 
 function computeWeightedTotals(
 	scores: Record<string, number>,
@@ -192,8 +194,20 @@ async function run() {
 			const agentAdapter = createAgentAdapter(agent, model, maxTurns);
 			console.log(`Using agent: ${agentAdapter.name}`);
 			
-			// Build the request
-			const request = {
+			// Load oracle if available
+			let oracle: Oracle | undefined;
+			const oracleFile = scenarioCfg.oracle?.answers_file;
+			if (oracleFile) {
+				const scenarioDir = getScenarioDir(suite, scenario);
+				const oraclePath = join(scenarioDir, oracleFile);
+				if (existsSync(oraclePath)) {
+					oracle = new Oracle(oraclePath);
+					console.log('Oracle loaded from:', oraclePath);
+				}
+			}
+			
+			// Build the request with askUser tool if oracle is available
+			const request: any = {
 				messages: [
 					{
 						role: 'system' as const,
@@ -208,6 +222,15 @@ async function run() {
 				maxTurns
 			};
 
+			// Add askUser tool if oracle is available and agent supports tools
+			if (oracle && agent === 'anthropic') {
+				request.tools = [createAskUserToolDefinition()];
+				request.toolHandlers = new Map([
+					['askUser', createAskUserHandler(oracle)]
+				]);
+				console.log('askUser tool enabled with oracle integration');
+			}
+
 			// Execute agent request
 			console.log('Sending request to agent...');
 			const response = await agentAdapter.send(request);
@@ -218,6 +241,19 @@ async function run() {
 			result.telemetry.tokens.out = response.tokensOut || 0;
 			result.telemetry.cost_usd = response.costUsd || 0;
 			result.telemetry.toolCalls = response.toolCalls ?? 0;
+			
+			// Log oracle usage if available
+			if (oracle) {
+				const questionLog = oracle.getQuestionLog();
+				if (questionLog.length > 0) {
+					console.log(`Oracle answered ${questionLog.length} question(s):`);
+					questionLog.forEach(({ question, answer }) => {
+						console.log(`  Q: ${question}`);
+						console.log(`  A: ${answer}`);
+					});
+					(result as any).oracle_questions = questionLog;
+				}
+			}
 			
 			console.log('Agent response received');
 			console.log('Tokens in:', result.telemetry.tokens.in);
