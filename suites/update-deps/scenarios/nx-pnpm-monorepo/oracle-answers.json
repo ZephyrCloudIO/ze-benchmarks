@@ -4,6 +4,8 @@
   "test_command_customization": "Use defaults in scenario.yaml",
   "accept_namespace_migration_codemods": "Yes",
   "should i update to react 19": "No, stay on React 18.x for now. Update to the latest React 18.x version (18.3.x) and align @types/react accordingly. Also ensure typescript (^5.5.4) and nx (~20.0.0) are added to ALL workspace packages (apps/app and libs/util) that are missing them.",
+  "upgrade react and its types from v18 to v19": "No, do NOT upgrade to React 19. Keep React at 18.x (update to 18.3.x if available). The main priority is to add typescript@^5.5.4 and nx@~20.0.0 to devDependencies in apps/app/package.json and libs/util/package.json.",
+  "major version update": "No, avoid major version updates. Stay on current major versions and only do minor/patch updates. Focus on adding missing dependencies (typescript and nx) to workspace packages.",
   "update to latest react 18.x": "Yes, update React to 18.3.x and @types/react to compatible 18.x version. Also ensure typescript (^5.5.4) and nx (~20.0.0) are added to all workspace packages.",
   "which approach would you prefer": "Option 1: Update to latest React 18.x (18.3.x) and aligned @types/react 18.x. This is the safer approach. IMPORTANT: Also add typescript (^5.5.4) and nx (~20.0.0) to devDependencies in apps/app/package.json and libs/util/package.json - they are currently missing these required dependencies.",
   "add typescript and nx to workspace packages": "Yes, add typescript: ^5.5.4 and nx: ~20.0.0 to devDependencies in both apps/app/package.json and libs/util/package.json. These are required dependencies for the monorepo."

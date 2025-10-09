@@ -1,134 +1,213 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { MessageCreateParams, Message, ContentBlock, TextBlock, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages";
 import type { AgentAdapter, AgentRequest, AgentResponse, ToolDefinition } from "./index.js";
+
+
+interface ToolResult {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+}
+
+
+interface ConversationTurn {
+  role: 'assistant' | 'user';
+  content: ContentBlock[] | ToolResult[];
+}
 
 export class AnthropicAdapter implements AgentAdapter {
   name = "anthropic";
-  private client: Anthropic;
+  private readonly client: Anthropic;
+  private readonly DEFAULT_MAX_TURNS = 30;
+  private readonly DEFAULT_MAX_TOKENS = 8192;
+  private readonly DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
   
   constructor(apiKey = process.env.ANTHROPIC_API_KEY!) {
-    if (!apiKey) throw new Error("Missing ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      throw new Error(
+        "Missing ANTHROPIC_API_KEY environment variable. " +
+        "Get your API key from: https://console.anthropic.com/settings/keys"
+      );
+    }
     this.client = new Anthropic({ apiKey });
   }
   
   async send(request: AgentRequest): Promise<AgentResponse> {
-    const system = request.messages.find(m => m.role === "system")?.content;
-    const userMessages = request.messages.filter(m => m.role === "user" || m.role === "assistant")
-      .map(m => (m.role === "user" ? { type: "text" as const, text: m.content } : { type: "text" as const, text: `Assistant: ${m.content}` }));
-    
-    // Build API request with tools if provided
-    const apiRequest: any = {
-      model: process.env.CLAUDE_MODEL || "claude-3-7-sonnet-20250219",
-      system,
-      messages: [{ role: "user" as const, content: userMessages.length ? userMessages : [{ type: "text" as const, text: "" }] }],
-      max_tokens: 8192
-    };
-
-    // Add tools if provided
-    if (request.tools && request.tools.length > 0) {
-      apiRequest.tools = request.tools;
-      // Tell Claude it can use tools automatically
-      apiRequest.tool_choice = { type: "auto" };
-    }
+    const apiRequest = this.buildInitialRequest(request);
+    const maxTurns = request.maxTurns || this.DEFAULT_MAX_TURNS;
 
     let totalToolCalls = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    const conversationHistory: any[] = [];
+    const conversationHistory: ConversationTurn[] = [];
 
-    // Multi-turn conversation with tool calling (increased from 10 to 30)
-    const maxTurns = request.maxTurns || 30;
+    // Multi-turn conversation loop
     for (let turn = 0; turn < maxTurns; turn++) {
-      const resp = await this.client.messages.create(apiRequest);
-      console.log(`[Anthropic] Turn ${turn + 1}/${maxTurns}: ${resp.stop_reason}`);
+      const response = await this.client.messages.create(apiRequest);
       
-      totalInputTokens += resp.usage.input_tokens;
-      totalOutputTokens += resp.usage.output_tokens;
+      // Type guard: ensure we got a Message, not a Stream
+      if (!('content' in response)) {
+        throw new Error('Unexpected streaming response');
+      }
+      
+      console.log(`[Anthropic] Turn ${turn + 1}/${maxTurns}: ${response.stop_reason}`);
+      
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
 
-      // Check if Claude wants to use tools
-      const toolUses = resp.content.filter((block: any) => block.type === 'tool_use');
+      // Extract tool uses from response
+      const toolUses = this.extractToolUses(response.content);
       
+      // If no tools requested, we're done
       if (toolUses.length === 0) {
-        // No tools used, return final response
-        const textContent = resp.content.find((block: any) => block.type === 'text');
-        const content = textContent && 'text' in textContent ? (textContent as any).text : JSON.stringify(resp);
-        
-        return {
-          content,
-          tokensIn: totalInputTokens,
-          tokensOut: totalOutputTokens,
-          costUsd: this.estimateCost(totalInputTokens, totalOutputTokens),
-          toolCalls: totalToolCalls
-        };
+        const content = this.extractTextContent(response.content);
+        return this.buildResponse(content, totalInputTokens, totalOutputTokens, totalToolCalls);
       }
 
-      // Process tool calls
+      // Process all tool calls
       totalToolCalls += toolUses.length;
-      const toolResults: any[] = [];
-      console.log(`[Anthropic] Processing ${toolUses.length} tool call(s)...`);
+      const toolResults = await this.executeTools(toolUses, request.toolHandlers);
 
-      for (const toolUse of toolUses) {
-        const toolUseAny = toolUse as any;
-        console.log(`[Anthropic] Tool: ${toolUseAny.name}`, toolUseAny.input);
-        const handler = request.toolHandlers?.get(toolUseAny.name);
-        let result: string;
+      // Add to conversation history
+      conversationHistory.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: toolResults }
+      );
 
-        if (handler) {
-          try {
-            result = await handler(toolUseAny.input);
-            console.log(`[Anthropic] Tool result: ${result.substring(0, 200)}${result.length > 200 ? '...' : ''}`);
-          } catch (error) {
-            result = `Error: ${error instanceof Error ? error.message : String(error)}`;
-            console.error(`[Anthropic] Tool error:`, error);
-          }
-        } else {
-          result = `Tool '${toolUseAny.name}' is not available`;
-          console.warn(`[Anthropic] ${result}`);
-        }
-
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolUseAny.id,
-          content: result
-        });
-      }
-
-      // Continue conversation with tool results
-      conversationHistory.push({
-        role: 'assistant',
-        content: resp.content
-      });
-      conversationHistory.push({
-        role: 'user',
-        content: toolResults
-      });
-
-      // Update messages for next turn
+      // Update request for next turn
       apiRequest.messages = [
-        apiRequest.messages[0], // Original user message
+        apiRequest.messages[0], // Keep original user message
         ...conversationHistory
       ];
     }
 
-    // If we exhausted turns, return last response
-    const lastResponse = conversationHistory[conversationHistory.length - 2]?.content || [];
-    const textContent = lastResponse.find((block: any) => block.type === 'text');
-    const content = textContent ? textContent.text : 'Max tool calling iterations reached';
-
-    return {
-      content,
-      tokensIn: totalInputTokens,
-      tokensOut: totalOutputTokens,
-      costUsd: this.estimateCost(totalInputTokens, totalOutputTokens),
-      toolCalls: totalToolCalls
-    };
+    // Max turns reached
+    const finalContent = this.extractFinalContent(conversationHistory);
+    return this.buildResponse(finalContent, totalInputTokens, totalOutputTokens, totalToolCalls);
   }
   
-  private estimateCost(inputTokens?: number, outputTokens?: number): number {
-    if (!inputTokens || !outputTokens) return 0;
-    // Claude 3.5 Sonnet pricing (as of 2024): $3/1M input, $15/1M output
-    const inputCost = (inputTokens / 1000000) * 3;
-    const outputCost = (outputTokens / 1000000) * 15;
+  /**
+   * Build the initial API request from agent request
+   */
+  private buildInitialRequest(request: AgentRequest): MessageCreateParams {
+    const system = request.messages.find(m => m.role === "system")?.content;
+    const userMessages = request.messages
+      .filter(m => m.role === "user" || m.role === "assistant")
+      .map(m => ({
+        type: "text" as const,
+        text: m.role === "user" ? m.content : `Assistant: ${m.content}`
+      }));
+
+    const params: MessageCreateParams = {
+      model: process.env.CLAUDE_MODEL || this.DEFAULT_MODEL,
+      max_tokens: this.DEFAULT_MAX_TOKENS,
+      messages: [{
+        role: "user",
+        content: userMessages.length > 0 ? userMessages : [{ type: "text", text: "" }]
+      }],
+      stream: false // Explicitly disable streaming for type safety
+    };
+
+    if (system) {
+      params.system = system;
+    }
+
+    if (request.tools && request.tools.length > 0) {
+      params.tools = request.tools as MessageCreateParams['tools'];
+      params.tool_choice = { type: "auto" };
+    }
+
+    return params;
+  }
+
+  
+  private extractToolUses(content: ContentBlock[]): ToolUseBlock[] {
+    return content.filter((block): block is ToolUseBlock => block.type === 'tool_use');
+  }
+
+
+  private extractTextContent(content: ContentBlock[]): string {
+    const textBlock = content.find((block): block is TextBlock => block.type === 'text');
+    return textBlock?.text || '';
+  }
+
+  
+  private async executeTools(
+    toolUses: ToolUseBlock[],
+    toolHandlers?: Map<string, (input: unknown) => Promise<string> | string>
+  ): Promise<ToolResult[]> {
+    console.log(`[Anthropic] Processing ${toolUses.length} tool call(s)...`);
+
+    const results: ToolResult[] = [];
+
+    for (const toolUse of toolUses) {
+      console.log(`[Anthropic] Tool: ${toolUse.name}`, toolUse.input);
+      
+      const handler = toolHandlers?.get(toolUse.name);
+      let resultContent: string;
+
+      if (handler) {
+        try {
+          resultContent = await handler(toolUse.input);
+          const preview = resultContent.length > 200 
+            ? resultContent.substring(0, 200) + '...' 
+            : resultContent;
+          console.log(`[Anthropic] Tool result: ${preview}`);
+        } catch (error) {
+          resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(`[Anthropic] Tool error:`, error);
+        }
+      } else {
+        resultContent = `Tool '${toolUse.name}' is not available`;
+        console.warn(`[Anthropic] ${resultContent}`);
+      }
+
+      results.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: resultContent
+      });
+    }
+
+    return results;
+  }
+
+  
+  private extractFinalContent(history: ConversationTurn[]): string {
+    if (history.length < 2) {
+      return 'Max tool calling iterations reached';
+    }
+
+    const lastAssistantTurn = history[history.length - 2];
+    if (lastAssistantTurn && lastAssistantTurn.role === 'assistant') {
+      const content = lastAssistantTurn.content as ContentBlock[];
+      return this.extractTextContent(content);
+    }
+
+    return 'Max tool calling iterations reached';
+  }
+
+ 
+  private buildResponse(
+    content: string,
+    tokensIn: number,
+    tokensOut: number,
+    toolCalls: number
+  ): AgentResponse {
+    return {
+      content,
+      tokensIn,
+      tokensOut,
+      costUsd: this.estimateCost(tokensIn, tokensOut),
+      toolCalls
+    };
+  }
+
+  
+  private estimateCost(inputTokens: number, outputTokens: number): number {
+    // Claude 3.7 Sonnet pricing: $3/1M input, $15/1M output
+    const inputCost = (inputTokens / 1_000_000) * 3;
+    const outputCost = (outputTokens / 1_000_000) * 15;
     return inputCost + outputCost;
-    // need to find costs API for create one for all of this so that when we work with southern glazers it won't be an issue.
   }
 }
