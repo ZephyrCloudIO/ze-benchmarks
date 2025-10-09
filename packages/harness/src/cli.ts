@@ -8,6 +8,7 @@ import { runValidationCommands } from './runtime/validation.js';
 import { buildDiffArtifacts } from './runtime/diff.js';
 import { Oracle } from './runtime/oracle.js';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.js';
+import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.js';
 
 function computeWeightedTotals(
 	scores: Record<string, number>,
@@ -206,12 +207,29 @@ async function run() {
 				}
 			}
 			
-			// Build the request with askUser tool if oracle is available
+			// Build system prompt with tool usage guidance
+			const systemPrompt = agent === 'anthropic' 
+				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
+
+IMPORTANT: You are working in the directory: ${workspaceDir}
+This is a prepared workspace with the files you need to modify.
+
+Available Tools:
+- readFile: Read any file in the workspace
+- writeFile: Modify files (e.g., package.json files)
+- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
+- listFiles: Explore directory structure
+- askUser: Ask questions when you need clarification or approval for major changes
+
+Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
+				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
+			
+			// Build the request
 			const request: any = {
 				messages: [
 					{
 						role: 'system' as const,
-						content: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`
+						content: systemPrompt
 					},
 					{
 						role: 'user' as const,
@@ -222,13 +240,26 @@ async function run() {
 				maxTurns
 			};
 
-			// Add askUser tool if oracle is available and agent supports tools
-			if (oracle && agent === 'anthropic') {
-				request.tools = [createAskUserToolDefinition()];
-				request.toolHandlers = new Map([
-					['askUser', createAskUserHandler(oracle)]
-				]);
-				console.log('askUser tool enabled with oracle integration');
+			// Add tools if agent supports them (currently only Anthropic)
+			if (agent === 'anthropic' && workspaceDir) {
+				// Create workspace tool handlers
+				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
+				
+				// Start with workspace tools
+				const tools = getAllWorkspaceTools();
+				const toolHandlers = workspaceHandlers;
+				
+				// Add askUser tool if oracle is available
+				if (oracle) {
+					tools.push(createAskUserToolDefinition());
+					toolHandlers.set('askUser', createAskUserHandler(oracle));
+					console.log('Enabled tools: readFile, writeFile, runCommand, listFiles, askUser (with oracle)');
+				} else {
+					console.log('Enabled tools: readFile, writeFile, runCommand, listFiles');
+				}
+				
+				request.tools = tools;
+				request.toolHandlers = toolHandlers;
 			}
 
 			// Execute agent request

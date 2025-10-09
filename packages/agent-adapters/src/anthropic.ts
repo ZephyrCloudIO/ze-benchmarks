@@ -20,12 +20,14 @@ export class AnthropicAdapter implements AgentAdapter {
       model: process.env.CLAUDE_MODEL || "claude-3-7-sonnet-20250219",
       system,
       messages: [{ role: "user" as const, content: userMessages.length ? userMessages : [{ type: "text" as const, text: "" }] }],
-      max_tokens: 4096
+      max_tokens: 8192
     };
 
     // Add tools if provided
     if (request.tools && request.tools.length > 0) {
       apiRequest.tools = request.tools;
+      // Tell Claude it can use tools automatically
+      apiRequest.tool_choice = { type: "auto" };
     }
 
     let totalToolCalls = 0;
@@ -33,9 +35,11 @@ export class AnthropicAdapter implements AgentAdapter {
     let totalOutputTokens = 0;
     const conversationHistory: any[] = [];
 
-    // Multi-turn conversation with tool calling
-    for (let turn = 0; turn < 10; turn++) {
+    // Multi-turn conversation with tool calling (increased from 10 to 30)
+    const maxTurns = request.maxTurns || 30;
+    for (let turn = 0; turn < maxTurns; turn++) {
       const resp = await this.client.messages.create(apiRequest);
+      console.log(`[Anthropic] Turn ${turn + 1}/${maxTurns}: ${resp.stop_reason}`);
       
       totalInputTokens += resp.usage.input_tokens;
       totalOutputTokens += resp.usage.output_tokens;
@@ -60,20 +64,25 @@ export class AnthropicAdapter implements AgentAdapter {
       // Process tool calls
       totalToolCalls += toolUses.length;
       const toolResults: any[] = [];
+      console.log(`[Anthropic] Processing ${toolUses.length} tool call(s)...`);
 
       for (const toolUse of toolUses) {
         const toolUseAny = toolUse as any;
+        console.log(`[Anthropic] Tool: ${toolUseAny.name}`, toolUseAny.input);
         const handler = request.toolHandlers?.get(toolUseAny.name);
         let result: string;
 
         if (handler) {
           try {
             result = await handler(toolUseAny.input);
+            console.log(`[Anthropic] Tool result: ${result.substring(0, 200)}${result.length > 200 ? '...' : ''}`);
           } catch (error) {
             result = `Error: ${error instanceof Error ? error.message : String(error)}`;
+            console.error(`[Anthropic] Tool error:`, error);
           }
         } else {
           result = `Tool '${toolUseAny.name}' is not available`;
+          console.warn(`[Anthropic] ${result}`);
         }
 
         toolResults.push({
