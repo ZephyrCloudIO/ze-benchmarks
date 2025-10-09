@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { EchoAgent, ClaudeCodeAdapter, type AgentAdapter } from '../../agent-adapters/dist/index.js';
+import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/dist/index.js';
 import { runValidationCommands } from './runtime/validation.js';
 import { buildDiffArtifacts } from './runtime/diff.js';
 
@@ -105,6 +105,8 @@ function loadPrompt(suite: string, scenario: string, tier: string): string | nul
 
 function createAgentAdapter(agentName: string, model?: string, maxTurns?: number): AgentAdapter {
 	switch (agentName) {
+		case 'anthropic':
+			return new AnthropicAdapter();
 		case 'claude-code':
 			return new ClaudeCodeAdapter(model, maxTurns ?? 10);
 		case 'echo':
@@ -143,7 +145,7 @@ function parseArgs(argv: string[]) {
 async function run() {
 	const { cmd, suite, scenario, tier, agent, model, maxTurns } = parseArgs(process.argv);
 	if (cmd !== 'run' || !suite || !scenario) {
-		console.error('Usage: ze-bench run <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|claude-code] [--model <model>]');
+		console.error('Usage: ze-bench run <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|anthropic|claude-code] [--model <model>]');
 		process.exit(1);
 	}
 	

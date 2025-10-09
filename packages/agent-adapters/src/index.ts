@@ -26,3 +26,4 @@ export class EchoAgent implements AgentAdapter {
 }
 
 export { ClaudeCodeAdapter } from './claude-code.js';
+export { AnthropicAdapter } from './anthropic.js';
