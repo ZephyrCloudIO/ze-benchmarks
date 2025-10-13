@@ -16,8 +16,13 @@ packages/
 │   │   ├── evaluators/
 │   │   │   ├── install.ts
 │   │   │   ├── test.ts
+│   │   │   ├── build.ts
+│   │   │   ├── lint.ts
+│   │   │   ├── typecheck.ts
 │   │   │   ├── package-manager.ts
 │   │   │   ├── dependency-targets.ts
+│   │   │   ├── companion-alignment.ts
+│   │   │   ├── namespace-migration.ts
 │   │   │   └── integrity-guard.ts
 │   │   └── utils/
 │   │       ├── package-json.ts
@@ -92,11 +97,16 @@ The baseline implementation produces a deterministic score card with the followi
 | ----------------------- | --------------------------------- | ------------------------------------------------------------- |
 | `install_success`       | `InstallEvaluator`                | Exit status from the scenario's install command.              |
 | `tests_nonregression`   | `TestEvaluator`                   | Exit status from the configured test command.                 |
+| `build_success`         | `BuildEvaluator`                  | Exit status from the configured build command.                |
+| `lint_success`          | `LintEvaluator`                   | Exit status from the configured lint command.                 |
+| `typecheck_success`     | `TypecheckEvaluator`              | Exit status from the configured typecheck command.            |
 | `manager_correctness`   | `PackageManagerEvaluator`         | Presence of the expected package-manager artifacts (e.g. pnpm). |
 | `dependency_targets`    | `DependencyTargetsEvaluator`      | Adherence to required dependency ranges defined in the scenario. |
+| `companion_alignment`   | `CompanionAlignmentEvaluator`     | Version alignment of companion packages (e.g. react ↔ @types/react). |
+| `namespace_migrations`  | `NamespaceMigrationEvaluator`     | Completeness of namespace migrations (e.g. xterm → @xterm/xterm). |
 | `integrity_guard`       | `IntegrityGuardEvaluator`         | Safeguards against integrity regressions (e.g. skipped tests, relaxed lint). |
 
-Each metric returns a normalized value in `[0, 1]` and is combined into a weighted total (see below). Additional categories such as build success, lint/type safety, semantic quality, or agent efficiency remain on the roadmap and are documented later in this file.
+Each metric returns a normalized value in `[0, 1]` and is combined into a weighted total (see below).
 
 ### 3. Scoring System
 
@@ -108,8 +118,13 @@ weighted = clamp0to10(
 const baseWeights = {
   install_success: 1.5,
   tests_nonregression: 2.5,
+  build_success: 1.0,
+  lint_success: 1.0,
+  typecheck_success: 1.0,
   manager_correctness: 1.0,
   dependency_targets: 2.0,
+  companion_alignment: 0.7,
+  namespace_migrations: 0.7,
   integrity_guard: 1.5,
 };
 
@@ -124,12 +139,13 @@ The harness calls `computeWeightedTotals`, which applies the base weights (or sc
 - `Evaluator` interface, shared types, and registry (`packages/evaluators/src/index.ts`).
 - Diff and dependency delta capture (`packages/harness/src/runtime/diff.ts`).
 - Command log capture for install/test/lint/typecheck (`runtime/validation.ts`).
-- Implemented evaluators: `InstallEvaluator`, `TestEvaluator`, `PackageManagerEvaluator`, `DependencyTargetsEvaluator`, `IntegrityGuardEvaluator`.
+- Implemented evaluators: `InstallEvaluator`, `TestEvaluator`, `BuildEvaluator`, `LintEvaluator`, `TypecheckEvaluator`, `PackageManagerEvaluator`, `DependencyTargetsEvaluator`, `CompanionAlignmentEvaluator`, `NamespaceMigrationEvaluator`, `IntegrityGuardEvaluator`.
 - Weighted aggregation in the harness (`computeWeightedTotals`).
 
-### Phase 2: Advanced Analysis (🚧 Planned)
-- Additional deterministic checks: build/lint/typecheck evaluators, richer dependency insights.
-- Companion alignment and namespace migration evaluators that consume diff artifacts.
+### Phase 2: Advanced Analysis (✅ Complete)
+- ✅ Build/lint/typecheck evaluators for tooling validation.
+- ✅ Companion alignment evaluator for package version pairing.
+- ✅ Namespace migration evaluator that consumes diff artifacts.
 - Enhanced diff/metrics tooling (JSON deltas, per-file stats) for downstream use.
 
 ### Phase 3: Intelligence Layer (🚧 Planned)
@@ -159,12 +175,17 @@ node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L1 --a
   "scores": {
     "install_success": 1,
     "tests_nonregression": 1,
+    "build_success": 1,
+    "lint_success": 1,
+    "typecheck_success": 1,
     "manager_correctness": 1,
     "dependency_targets": 0.3333333333,
+    "companion_alignment": 1,
+    "namespace_migrations": 1,
     "integrity_guard": 1
   },
   "totals": {
-    "weighted": 8.0952,
+    "weighted": 8.83,
     "max": 10
   },
   "telemetry": {
@@ -175,7 +196,15 @@ node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L1 --a
   },
   "evaluator_results": [
     { "name": "InstallEvaluator", "score": 1, "details": "Install succeeded" },
-    { "name": "TestEvaluator", "score": 1, "details": "Tests passed (or none present)" }
+    { "name": "TestEvaluator", "score": 1, "details": "Tests passed (or none present)" },
+    { "name": "BuildEvaluator", "score": 1, "details": "No build command configured" },
+    { "name": "LintEvaluator", "score": 1, "details": "Lint passed" },
+    { "name": "TypecheckEvaluator", "score": 1, "details": "Typecheck passed" },
+    { "name": "PackageManagerEvaluator", "score": 1, "details": "Correct manager artifacts" },
+    { "name": "DependencyTargetsEvaluator", "score": 0.33, "details": "apps\\app\\package.json:typescript@missing !-> >=5.5 <6; apps\\app\\package.json:nx@missing !-> ~20.0" },
+    { "name": "CompanionAlignmentEvaluator", "score": 1, "details": "All companions aligned" },
+    { "name": "NamespaceMigrationEvaluator", "score": 1, "details": "All namespace migrations completed" },
+    { "name": "IntegrityGuardEvaluator", "score": 1, "details": "No integrity issues detected" }
   ],
   "diff_summary": [
     { "file": "pnpm-lock.yaml", "changeType": "added" }
@@ -396,11 +425,238 @@ class IntegrityGuardEvaluator implements Evaluator {
 }
 ```
 
+#### BuildEvaluator
+Validates that the build command (if configured) succeeds.
+
+```typescript
+class BuildEvaluator implements Evaluator {
+  meta = { name: 'BuildEvaluator' } as const;
+
+  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    const entry = (ctx.commandLog || []).find((command) => command.type === 'build');
+    if (!entry) {
+      return { name: this.meta.name, score: 1, details: 'No build command configured' };
+    }
+    const ok = entry.exitCode === 0;
+    const details = ok ? 'Build succeeded' : `Build failed: exit=${entry.exitCode}`;
+    return { name: this.meta.name, score: ok ? 1 : 0, details };
+  }
+}
+```
+
+#### LintEvaluator
+Validates that the lint command (if configured) passes.
+
+```typescript
+class LintEvaluator implements Evaluator {
+  meta = { name: 'LintEvaluator' } as const;
+
+  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    const entry = (ctx.commandLog || []).find((command) => command.type === 'lint');
+    if (!entry) {
+      return { name: this.meta.name, score: 1, details: 'No lint command configured' };
+    }
+    const ok = entry.exitCode === 0;
+    const details = ok ? 'Lint passed' : `Lint failed: exit=${entry.exitCode}`;
+    return { name: this.meta.name, score: ok ? 1 : 0, details };
+  }
+}
+```
+
+#### TypecheckEvaluator
+Validates that the typecheck command (if configured) succeeds.
+
+```typescript
+class TypecheckEvaluator implements Evaluator {
+  meta = { name: 'TypecheckEvaluator' } as const;
+
+  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    const entry = (ctx.commandLog || []).find((command) => command.type === 'typecheck');
+    if (!entry) {
+      return { name: this.meta.name, score: 1, details: 'No typecheck command configured' };
+    }
+    const ok = entry.exitCode === 0;
+    const details = ok ? 'Typecheck passed' : `Typecheck failed: exit=${entry.exitCode}`;
+    return { name: this.meta.name, score: ok ? 1 : 0, details };
+  }
+}
+```
+
+#### CompanionAlignmentEvaluator
+Ensures companion packages (e.g., `react` and `@types/react`) have aligned major versions.
+
+```typescript
+function getMajorVersion(version: string | undefined): number | null {
+  if (!version) return null;
+  const cleaned = version.trim().replace(/^[^0-9]*/, '');
+  const match = cleaned.match(/^(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+class CompanionAlignmentEvaluator implements Evaluator {
+  meta = { name: 'CompanionAlignmentEvaluator' } as const;
+
+  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    const companionRules = ctx.scenario.constraints?.companion_versions || [];
+    if (!companionRules.length) {
+      return { name: this.meta.name, score: 1, details: 'No companion version rules defined' };
+    }
+
+    const pkgPaths = getAllPackageJsonPaths(ctx.workspaceDir);
+    let total = 0;
+    let aligned = 0;
+    const misalignments: string[] = [];
+
+    for (const pkgPath of pkgPaths) {
+      const rel = relative(ctx.workspaceDir, pkgPath) || '.';
+      const pkg = readJson(pkgPath);
+
+      for (const rule of companionRules) {
+        const mainVersion =
+          pkg.dependencies?.[rule.main] ??
+          pkg.devDependencies?.[rule.main] ??
+          pkg.peerDependencies?.[rule.main];
+
+        if (!mainVersion) continue;
+
+        const mainMajor = getMajorVersion(mainVersion);
+
+        for (const companion of rule.companions) {
+          total++;
+          const companionVersion =
+            pkg.dependencies?.[companion.name] ??
+            pkg.devDependencies?.[companion.name] ??
+            pkg.peerDependencies?.[companion.name];
+
+          const companionMajor = getMajorVersion(companionVersion);
+
+          if (companion.rule === 'major must match') {
+            if (mainMajor !== null && companionMajor !== null && mainMajor === companionMajor) {
+              aligned++;
+            } else {
+              misalignments.push(
+                `${rel}: ${rule.main}@${mainVersion} vs ${companion.name}@${companionVersion ?? 'missing'} (major mismatch)`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    const score = total > 0 ? aligned / total : 1;
+    return {
+      name: this.meta.name,
+      score,
+      details: misalignments.length ? misalignments.join('; ') : 'All companions aligned',
+    };
+  }
+}
+```
+
+Configuration example in `scenario.yaml`:
+```yaml
+constraints:
+  companion_versions:
+    - main: node
+      companions:
+        - name: '@types/node'
+          rule: 'major must match'
+    - main: react
+      companions:
+        - name: '@types/react'
+          rule: 'major must match'
+```
+
+#### NamespaceMigrationEvaluator
+Verifies namespace migrations are complete in both dependencies and code imports.
+
+```typescript
+class NamespaceMigrationEvaluator implements Evaluator {
+  meta = { name: 'NamespaceMigrationEvaluator' } as const;
+
+  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    const migrations = ctx.scenario.constraints?.namespace_migrations || [];
+    if (!migrations.length) {
+      return { name: this.meta.name, score: 1, details: 'No namespace migrations defined' };
+    }
+
+    const pkgPaths = getAllPackageJsonPaths(ctx.workspaceDir);
+    let total = 0;
+    let completed = 0;
+    const issues: string[] = [];
+
+    for (const migration of migrations) {
+      total++;
+      let oldFound = false;
+      let newFound = false;
+      let codeIssues: string[] = [];
+
+      // Check package.json files
+      for (const pkgPath of pkgPaths) {
+        const rel = relative(ctx.workspaceDir, pkgPath) || '.';
+        const pkg = readJson(pkgPath);
+
+        const oldInDeps = 
+          pkg.dependencies?.[migration.from] ??
+          pkg.devDependencies?.[migration.from] ??
+          pkg.peerDependencies?.[migration.from];
+
+        const newInDeps =
+          pkg.dependencies?.[migration.to] ??
+          pkg.devDependencies?.[migration.to] ??
+          pkg.peerDependencies?.[migration.to];
+
+        if (oldInDeps) {
+          oldFound = true;
+          issues.push(`${rel} still has ${migration.from}`);
+        }
+        if (newInDeps) {
+          newFound = true;
+        }
+      }
+
+      // Check code imports in diff
+      for (const diff of ctx.diffSummary || []) {
+        if (diff.textPatch?.includes(`from '${migration.from}'`) ||
+            diff.textPatch?.includes(`from "${migration.from}"`) ||
+            diff.textPatch?.includes(`require('${migration.from}')`)) {
+          codeIssues.push(`${diff.file} imports ${migration.from}`);
+        }
+      }
+
+      if (!oldFound && newFound && codeIssues.length === 0) {
+        completed++;
+      } else {
+        if (codeIssues.length) {
+          issues.push(...codeIssues);
+        }
+      }
+    }
+
+    const score = total > 0 ? completed / total : 1;
+    return {
+      name: this.meta.name,
+      score,
+      details: issues.length ? issues.join('; ') : 'All namespace migrations completed',
+    };
+  }
+}
+```
+
+Configuration example in `scenario.yaml`:
+```yaml
+constraints:
+  namespace_migrations:
+    - from: 'xterm'
+      to: '@xterm/xterm'
+    - from: '@nrwl/js'
+      to: '@nx/js'
+```
+
 ### Roadmap Evaluators
 - **EfficiencyEvaluator**: Would score turn count, duration, and tier bonuses once telemetry wiring lands.
-- **CompanionAlignmentEvaluator**: Pair companion packages (e.g., `@types/node` ↔ `node`).
-- **NamespaceMigrationEvaluator**: Verify namespace migrations in both dependencies and code imports.
 - **Diff/Security/Performance Evaluators**: Analyze diffs and external advisories for qualitative assessments.
+- **Semantic Quality Evaluators**: Agentic evaluators for code quality, upgrade strategy, and migration semantics (see Phase 3 below).
 
 ## Testing Strategy
 
