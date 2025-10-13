@@ -14,8 +14,13 @@ function computeWeightedTotals(
 	const baseWeights: Record<string, number> = {
 		install_success: 1.5,
 		tests_nonregression: 2.5,
-		manager_correctness: 1,
-		dependency_targets: 2,
+		build_success: 1.0,
+		lint_success: 1.0,
+		typecheck_success: 1.0,
+		manager_correctness: 1.0,
+		dependency_targets: 2.0,
+		companion_alignment: 0.7,
+		namespace_migrations: 0.7,
 		integrity_guard: 1.5,
 	};
 
@@ -165,8 +170,13 @@ async function run() {
 		scores: {
 			install_success: 0,
 			tests_nonregression: 0,
+			build_success: 0,
+			lint_success: 0,
+			typecheck_success: 0,
 			manager_correctness: 0,
 			dependency_targets: 0,
+			companion_alignment: 0,
+			namespace_migrations: 0,
 			integrity_guard: 0,
 		},
 		totals: { weighted: 0, max: 10 },
