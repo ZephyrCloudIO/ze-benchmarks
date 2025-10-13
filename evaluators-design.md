@@ -93,17 +93,17 @@ interface EvaluationResult {
 
 The baseline implementation produces a deterministic score card with the following metrics:
 
-| Metric key              | Source evaluator                  | What it measures                                              |
-| ----------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `install_success`       | `InstallEvaluator`                | Exit status from the scenario's install command.              |
-| `tests_nonregression`   | `TestEvaluator`                   | Exit status from the configured test command.                 |
-| `build_success`         | `BuildEvaluator`                  | Exit status from the configured build command.                |
-| `lint_success`          | `LintEvaluator`                   | Exit status from the configured lint command.                 |
-| `typecheck_success`     | `TypecheckEvaluator`              | Exit status from the configured typecheck command.            |
-| `manager_correctness`   | `PackageManagerEvaluator`         | Presence of the expected package-manager artifacts (e.g. pnpm). |
-| `dependency_targets`    | `DependencyTargetsEvaluator`      | Adherence to required dependency ranges defined in the scenario. |
-| `companion_alignment`   | `CompanionAlignmentEvaluator`     | Version alignment of companion packages (e.g. react ↔ @types/react). |
-| `namespace_migrations`  | `NamespaceMigrationEvaluator`     | Completeness of namespace migrations (e.g. xterm → @xterm/xterm). |
+| Metric key              | Source evaluator                  | What it measures                                                             |
+| ----------------------- | --------------------------------- | -----------------------------------------------------------------------------| 
+| `install_success`       | `InstallEvaluator`                | Exit status from the scenario's install command.                             |
+| `tests_nonregression`   | `TestEvaluator`                   | Exit status from the configured test command.                                |
+| `build_success`         | `BuildEvaluator`                  | Exit status from the configured build command.                               |
+| `lint_success`          | `LintEvaluator`                   | Exit status from the configured lint command.                                |
+| `typecheck_success`     | `TypecheckEvaluator`              | Exit status from the configured typecheck command.                           |
+| `manager_correctness`   | `PackageManagerEvaluator`         | Presence of the expected package-manager artifacts (e.g. pnpm).              |
+| `dependency_targets`    | `DependencyTargetsEvaluator`      | Adherence to required dependency ranges defined in the scenario.             |
+| `companion_alignment`   | `CompanionAlignmentEvaluator`     | Version alignment of companion packages (e.g. react ↔ @types/react).         |
+| `namespace_migrations`  | `NamespaceMigrationEvaluator`     | Completeness of namespace migrations (e.g. xterm → @xterm/xterm).            |
 | `integrity_guard`       | `IntegrityGuardEvaluator`         | Safeguards against integrity regressions (e.g. skipped tests, relaxed lint). |
 
 Each metric returns a normalized value in `[0, 1]` and is combined into a weighted total (see below).
