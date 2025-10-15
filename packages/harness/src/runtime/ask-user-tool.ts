@@ -1,4 +1,4 @@
-import type { Oracle } from './oracle.js';
+import type { Oracle } from './oracle.ts';
 
 export type ToolDefinition = {
 	name: string;

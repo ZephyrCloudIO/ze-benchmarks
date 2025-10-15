@@ -9,7 +9,9 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": [
     "src/**/*"

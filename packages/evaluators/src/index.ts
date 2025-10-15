@@ -1,10 +1,10 @@
-import type { EvaluationContext, Evaluator, EvaluatorResult, ScoreCard } from './types.js';
+import type { EvaluationContext, Evaluator, EvaluatorResult, ScoreCard } from './types.ts';
 
-import { DependencyTargetsEvaluator } from './evaluators/dependency-targets.js';
-import { InstallEvaluator } from './evaluators/install.js';
-import { IntegrityGuardEvaluator } from './evaluators/integrity-guard.js';
-import { PackageManagerEvaluator } from './evaluators/package-manager.js';
-import { TestEvaluator } from './evaluators/test.js';
+import { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
+import { InstallEvaluator } from './evaluators/install.ts';
+import { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
+import { PackageManagerEvaluator } from './evaluators/package-manager.ts';
+import { TestEvaluator } from './evaluators/test.ts';
 
 export async function runEvaluators(
 	ctx: EvaluationContext,
@@ -37,11 +37,11 @@ export async function runEvaluators(
 	return { results, scoreCard };
 }
 
-export * from './types.js';
-export type { EvaluatorResult as Result } from './types.js';
-export { DependencyTargetsEvaluator } from './evaluators/dependency-targets.js';
-export { InstallEvaluator } from './evaluators/install.js';
-export { IntegrityGuardEvaluator } from './evaluators/integrity-guard.js';
-export { PackageManagerEvaluator } from './evaluators/package-manager.js';
-export { TestEvaluator } from './evaluators/test.js';
+export * from './types.ts';
+export type { EvaluatorResult as Result } from './types.ts';
+export { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
+export { InstallEvaluator } from './evaluators/install.ts';
+export { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
+export { PackageManagerEvaluator } from './evaluators/package-manager.ts';
+export { TestEvaluator } from './evaluators/test.ts';
 

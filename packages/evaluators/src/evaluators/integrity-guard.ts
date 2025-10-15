@@ -1,4 +1,4 @@
-import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.js';
+import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 
 export class IntegrityGuardEvaluator implements Evaluator {
 	meta = { name: 'IntegrityGuardEvaluator' } as const;

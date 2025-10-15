@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParams, ContentBlock, TextBlock, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages";
-import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.js";
+import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
 
 
 interface ToolResult {

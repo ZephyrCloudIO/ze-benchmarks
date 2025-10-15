@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { AgentAdapter, AgentRequest, AgentResponse } from './index.js';
+import type { AgentAdapter, AgentRequest, AgentResponse } from './index.ts';
 
 type ParsedClaudeResponse = {
 	content: string;

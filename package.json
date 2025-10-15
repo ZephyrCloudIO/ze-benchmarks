@@ -9,7 +9,9 @@
     "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/harness run build",
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
-    "dev": "pnpm --filter @ze/harness run dev"
+    "dev": "pnpm --filter @ze/harness run dev",
+    "bench": "tsx packages/harness/src/cli.ts run",
+    "harness": "tsx packages/harness/src/cli.ts"
   },
   "engines": {
     "node": ">=18"

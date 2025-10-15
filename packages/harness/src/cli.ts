@@ -3,12 +3,12 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/dist/index.js';
-import { runValidationCommands } from './runtime/validation.js';
-import { buildDiffArtifacts } from './runtime/diff.js';
-import { Oracle } from './runtime/oracle.js';
-import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.js';
-import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.js';
+import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/src/index.ts';
+import { runValidationCommands } from './runtime/validation.ts';
+import { buildDiffArtifacts } from './runtime/diff.ts';
+import { Oracle } from './runtime/oracle.ts';
+import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
+import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
 
 function computeWeightedTotals(
 	scores: Record<string, number>,
