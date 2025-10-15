@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/src/index.ts';
+import { runEvaluators } from '../../evaluators/src/index.ts';
 import { runValidationCommands } from './runtime/validation.ts';
 import { buildDiffArtifacts } from './runtime/diff.ts';
 import { Oracle } from './runtime/oracle.ts';
@@ -310,34 +311,22 @@ Work efficiently: read files to understand the current state, make necessary cha
 	// Run evaluators (deterministic baseline)
 	try {
 		if (workspaceDir) {
-			// Dynamically import evaluators (built output)
-			let runEvaluators: any;
-			try {
-				({ runEvaluators } = await import('ze-evaluator'));
-			} catch (e1) {
-				try {
-					({ runEvaluators } = await import('../../evaluators/dist/index.js'));
-					console.warn('Evaluators package not linked; using local dist fallback');
-				} catch (e2) {
-					console.warn('Evaluators not available (package or dist). Skipping evaluation');
-				}
-			}
-			if (runEvaluators) {
-				const ctx = {
-					scenario: scenarioCfg,
-					workspaceDir,
-					agentResponse: result.agent_response,
-					commandLog,
-					diffSummary: diffArtifacts.diffSummary,
-					depsDelta: diffArtifacts.depsDelta,
-				};
-				const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx);
-				result.scores = { ...result.scores, ...scoreCard };
-				result.totals = computeWeightedTotals(result.scores, scenarioCfg);
-				(result as any).evaluator_results = evaluatorResults;
-				(result as any).diff_summary = diffArtifacts.diffSummary;
-				(result as any).deps_delta = diffArtifacts.depsDelta;
-			}
+			console.log('Running evaluators...');
+			const ctx = {
+				scenario: scenarioCfg,
+				workspaceDir,
+				agentResponse: result.agent_response,
+				commandLog,
+				diffSummary: diffArtifacts.diffSummary,
+				depsDelta: diffArtifacts.depsDelta,
+			};
+			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx);
+			result.scores = { ...result.scores, ...scoreCard };
+			result.totals = computeWeightedTotals(result.scores, scenarioCfg);
+			(result as any).evaluator_results = evaluatorResults;
+			(result as any).diff_summary = diffArtifacts.diffSummary;
+			(result as any).deps_delta = diffArtifacts.depsDelta;
+			console.log('Evaluators completed successfully');
 		}
 	} catch (e) {
 		console.warn('Evaluator run failed:', e);
