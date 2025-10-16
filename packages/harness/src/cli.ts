@@ -129,7 +129,14 @@ function writeResult(out: unknown, suite: string, scenario: string) {
 }
 
 function parseArgs(argv: string[]) {
-	const [_node, _bin, cmd, suite, scenario, ...rest] = argv;
+	// Skip node, script path - arguments are directly suite and scenario
+	const args = argv.slice(2); // Remove 'node' and script path
+	
+	const cmd = 'bench';
+	const suite = args[0];
+	const scenario = args[1];
+	const rest = args.slice(2);
+	
 	const tierIndex = rest.indexOf('--tier');
 	const tier = tierIndex !== -1 ? rest[tierIndex + 1] : 'L0';
 	
@@ -148,8 +155,8 @@ function parseArgs(argv: string[]) {
 
 async function run() {
 	const { cmd, suite, scenario, tier, agent, model, maxTurns } = parseArgs(process.argv);
-	if (cmd !== 'run' || !suite || !scenario) {
-		console.error('Usage: ze-bench run <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|anthropic|claude-code] [--model <model>]');
+	if (cmd !== 'bench' || !suite || !scenario) {
+		console.error('Usage: ze-bench bench <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|anthropic|claude-code] [--model <model>]');
 		process.exit(1);
 	}
 	

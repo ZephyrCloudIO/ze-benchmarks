@@ -10,7 +10,7 @@
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
     "dev": "pnpm --filter @ze/harness run dev",
-    "bench": "tsx packages/harness/src/cli.ts run",
+    "bench": "tsx packages/harness/src/cli.ts",
     "harness": "tsx packages/harness/src/cli.ts"
   },
   "engines": {
