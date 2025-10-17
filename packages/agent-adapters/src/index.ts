@@ -1,7 +1,21 @@
+export type ToolDefinition = {
+	name: string;
+	description: string;
+	input_schema: {
+		type: 'object';
+		properties: Record<string, any>;
+		required?: string[];
+	};
+};
+
+export type ToolHandler = (input: any) => Promise<string> | string;
+
 export type AgentRequest = {
 	messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
 	workspaceDir?: string;
 	maxTurns?: number;
+	tools?: ToolDefinition[];
+	toolHandlers?: Map<string, ToolHandler>;
 };
 
 export type AgentResponse = {
@@ -25,4 +39,5 @@ export class EchoAgent implements AgentAdapter {
 	}
 }
 
-export { ClaudeCodeAdapter } from './claude-code.js';
+export { ClaudeCodeAdapter } from './claude-code.ts';
+export { AnthropicAdapter } from './anthropic.ts';

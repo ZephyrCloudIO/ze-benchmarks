@@ -6,11 +6,17 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm -w packages/evaluators run build && npm -w packages/harness run build",
-    "build:evals": "npm -w packages/evaluators run build",
-    "dev": "npm -w packages/harness run dev"
+    "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/harness run build",
+    "build:evals": "pnpm --filter ze-evaluator run build",
+    "build:adapters": "pnpm --filter @ze/agent-adapters run build",
+    "dev": "pnpm --filter @ze/harness run dev",
+    "bench": "tsx packages/harness/src/cli.ts",
+    "harness": "tsx packages/harness/src/cli.ts"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }

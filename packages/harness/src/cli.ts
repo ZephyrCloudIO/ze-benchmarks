@@ -3,9 +3,13 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { EchoAgent, ClaudeCodeAdapter, type AgentAdapter } from '../../agent-adapters/dist/index.js';
-import { runValidationCommands } from './runtime/validation.js';
-import { buildDiffArtifacts } from './runtime/diff.js';
+import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/src/index.ts';
+import { runEvaluators } from '../../evaluators/src/index.ts';
+import { runValidationCommands } from './runtime/validation.ts';
+import { buildDiffArtifacts } from './runtime/diff.ts';
+import { Oracle } from './runtime/oracle.ts';
+import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
+import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
 
 function computeWeightedTotals(
 	scores: Record<string, number>,
@@ -105,6 +109,8 @@ function loadPrompt(suite: string, scenario: string, tier: string): string | nul
 
 function createAgentAdapter(agentName: string, model?: string, maxTurns?: number): AgentAdapter {
 	switch (agentName) {
+		case 'anthropic':
+			return new AnthropicAdapter();
 		case 'claude-code':
 			return new ClaudeCodeAdapter(model, maxTurns ?? 10);
 		case 'echo':
@@ -123,7 +129,14 @@ function writeResult(out: unknown, suite: string, scenario: string) {
 }
 
 function parseArgs(argv: string[]) {
-	const [_node, _bin, cmd, suite, scenario, ...rest] = argv;
+	// Skip node, script path - arguments are directly suite and scenario
+	const args = argv.slice(2); // Remove 'node' and script path
+	
+	const cmd = 'bench';
+	const suite = args[0];
+	const scenario = args[1];
+	const rest = args.slice(2);
+	
 	const tierIndex = rest.indexOf('--tier');
 	const tier = tierIndex !== -1 ? rest[tierIndex + 1] : 'L0';
 	
@@ -142,8 +155,8 @@ function parseArgs(argv: string[]) {
 
 async function run() {
 	const { cmd, suite, scenario, tier, agent, model, maxTurns } = parseArgs(process.argv);
-	if (cmd !== 'run' || !suite || !scenario) {
-		console.error('Usage: ze-bench run <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|claude-code] [--model <model>]');
+	if (cmd !== 'bench' || !suite || !scenario) {
+		console.error('Usage: ze-bench bench <suite> <scenario> [--tier L0|L1|L2|L3|Lx] [--agent echo|anthropic|claude-code] [--model <model>]');
 		process.exit(1);
 	}
 	
@@ -190,12 +203,41 @@ async function run() {
 			const agentAdapter = createAgentAdapter(agent, model, maxTurns);
 			console.log(`Using agent: ${agentAdapter.name}`);
 			
+			// Load oracle if available
+			let oracle: Oracle | undefined;
+			const oracleFile = scenarioCfg.oracle?.answers_file;
+			if (oracleFile) {
+				const scenarioDir = getScenarioDir(suite, scenario);
+				const oraclePath = join(scenarioDir, oracleFile);
+				if (existsSync(oraclePath)) {
+					oracle = new Oracle(oraclePath);
+					console.log('Oracle loaded from:', oraclePath);
+				}
+			}
+			
+			// Build system prompt with tool usage guidance
+			const systemPrompt = agent === 'anthropic' 
+				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
+
+IMPORTANT: You are working in the directory: ${workspaceDir}
+This is a prepared workspace with the files you need to modify.
+
+Available Tools:
+- readFile: Read any file in the workspace
+- writeFile: Modify files (e.g., package.json files)
+- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
+- listFiles: Explore directory structure
+- askUser: Ask questions when you need clarification or approval for major changes
+
+Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
+				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
+			
 			// Build the request
-			const request = {
+			const request: any = {
 				messages: [
 					{
 						role: 'system' as const,
-						content: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`
+						content: systemPrompt
 					},
 					{
 						role: 'user' as const,
@@ -205,6 +247,28 @@ async function run() {
 				workspaceDir,
 				maxTurns
 			};
+
+			// Add tools if agent supports them (currently only Anthropic)
+			if (agent === 'anthropic' && workspaceDir) {
+				// Create workspace tool handlers
+				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
+				
+				// Start with workspace tools
+				const tools = getAllWorkspaceTools();
+				const toolHandlers = workspaceHandlers;
+				
+				// Add askUser tool if oracle is available
+				if (oracle) {
+					tools.push(createAskUserToolDefinition());
+					toolHandlers.set('askUser', createAskUserHandler(oracle));
+					console.log('Enabled tools: readFile, writeFile, runCommand, listFiles, askUser (with oracle)');
+				} else {
+					console.log('Enabled tools: readFile, writeFile, runCommand, listFiles');
+				}
+				
+				request.tools = tools;
+				request.toolHandlers = toolHandlers;
+			}
 
 			// Execute agent request
 			console.log('Sending request to agent...');
@@ -216,6 +280,19 @@ async function run() {
 			result.telemetry.tokens.out = response.tokensOut || 0;
 			result.telemetry.cost_usd = response.costUsd || 0;
 			result.telemetry.toolCalls = response.toolCalls ?? 0;
+			
+			// Log oracle usage if available
+			if (oracle) {
+				const questionLog = oracle.getQuestionLog();
+				if (questionLog.length > 0) {
+					console.log(`Oracle answered ${questionLog.length} question(s):`);
+					questionLog.forEach(({ question, answer }) => {
+						console.log(`  Q: ${question}`);
+						console.log(`  A: ${answer}`);
+					});
+					(result as any).oracle_questions = questionLog;
+				}
+			}
 			
 			console.log('Agent response received');
 			console.log('Tokens in:', result.telemetry.tokens.in);
@@ -241,34 +318,22 @@ async function run() {
 	// Run evaluators (deterministic baseline)
 	try {
 		if (workspaceDir) {
-			// Dynamically import evaluators (built output)
-			let runEvaluators: any;
-			try {
-				({ runEvaluators } = await import('ze-evaluator'));
-			} catch (e1) {
-				try {
-					({ runEvaluators } = await import('../../evaluators/dist/index.js'));
-					console.warn('Evaluators package not linked; using local dist fallback');
-				} catch (e2) {
-					console.warn('Evaluators not available (package or dist). Skipping evaluation');
-				}
-			}
-			if (runEvaluators) {
-				const ctx = {
-					scenario: scenarioCfg,
-					workspaceDir,
-					agentResponse: result.agent_response,
-					commandLog,
-					diffSummary: diffArtifacts.diffSummary,
-					depsDelta: diffArtifacts.depsDelta,
-				};
-				const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx);
-				result.scores = { ...result.scores, ...scoreCard };
-				result.totals = computeWeightedTotals(result.scores, scenarioCfg);
-				(result as any).evaluator_results = evaluatorResults;
-				(result as any).diff_summary = diffArtifacts.diffSummary;
-				(result as any).deps_delta = diffArtifacts.depsDelta;
-			}
+			console.log('Running evaluators...');
+			const ctx = {
+				scenario: scenarioCfg,
+				workspaceDir,
+				agentResponse: result.agent_response,
+				commandLog,
+				diffSummary: diffArtifacts.diffSummary,
+				depsDelta: diffArtifacts.depsDelta,
+			};
+			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx);
+			result.scores = { ...result.scores, ...scoreCard };
+			result.totals = computeWeightedTotals(result.scores, scenarioCfg);
+			(result as any).evaluator_results = evaluatorResults;
+			(result as any).diff_summary = diffArtifacts.diffSummary;
+			(result as any).deps_delta = diffArtifacts.depsDelta;
+			console.log('Evaluators completed successfully');
 		}
 	} catch (e) {
 		console.warn('Evaluator run failed:', e);

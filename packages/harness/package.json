@@ -9,7 +9,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsc -w -p tsconfig.json"
+    "dev": "tsc -w -p tsconfig.json",
+    "start": "tsx src/cli.ts",
+    "dev:tsx": "tsx src/cli.ts"
   },
   "dependencies": {
     "yaml": "^2.5.0",

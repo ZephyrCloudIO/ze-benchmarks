@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.js';
+import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 
 export class PackageManagerEvaluator implements Evaluator {
 	meta = { name: 'PackageManagerEvaluator' } as const;
