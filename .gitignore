@@ -103,3 +103,8 @@ dist
 .tern-port
 
 .idea
+
+results/summary.json
+results/**/*
+results/workspaces/**/*
+results/summary.json
