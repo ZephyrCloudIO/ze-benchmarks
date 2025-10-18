@@ -2,17 +2,15 @@
   "name": "@ze/database",
   "version": "0.1.0",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": "./dist/index.js",
   "scripts": {
-    "build": "echo 'Build not needed with tsx - use pnpm start or pnpm dev'",
+    "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.14.10",
+    "better-sqlite3": "^12.4.1",
     "typescript": "^5.5.4"
   },
   "dependencies": {
