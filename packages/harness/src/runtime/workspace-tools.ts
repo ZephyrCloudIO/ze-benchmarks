@@ -108,6 +108,11 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 			return `Error: Path '${input.path}' is outside workspace`;
 		}
 
+		// Security: block access to node_modules directories
+		if (input.path.includes('node_modules') || input.path.includes('/node_modules/') || input.path.startsWith('node_modules/')) {
+			return `Error: Access to node_modules is not allowed. Please focus on your project files.`;
+		}
+
 		if (!existsSync(fullPath)) {
 			return `Error: File '${input.path}' does not exist`;
 		}
@@ -129,6 +134,11 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 		const resolvedPath = join(workspaceDir, input.path);
 		if (!resolvedPath.startsWith(workspaceDir)) {
 			return `Error: Path '${input.path}' is outside workspace`;
+		}
+
+		// Security: block access to node_modules directories
+		if (input.path.includes('node_modules') || input.path.includes('/node_modules/') || input.path.startsWith('node_modules/')) {
+			return `Error: Access to node_modules is not allowed. Please focus on your project files.`;
 		}
 
 		try {
@@ -166,6 +176,11 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 	handlers.set('listFiles', async (input: { path: string }): Promise<string> => {
 		const fullPath = join(workspaceDir, input.path);
 		
+		// Security: block access to node_modules directories
+		if (input.path.includes('node_modules') || input.path.includes('/node_modules/') || input.path.startsWith('node_modules/')) {
+			return `Error: Access to node_modules is not allowed. Please focus on your project files.`;
+		}
+		
 		if (!existsSync(fullPath)) {
 			return `Error: Path '${input.path}' does not exist`;
 		}
@@ -177,14 +192,16 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 			}
 
 			const entries = readdirSync(fullPath);
-			const details = entries.map(entry => {
+			// Filter out node_modules directories from the listing
+			const filteredEntries = entries.filter(entry => entry !== 'node_modules');
+			const details = filteredEntries.map(entry => {
 				const entryPath = join(fullPath, entry);
 				const entryStat = statSync(entryPath);
 				const type = entryStat.isDirectory() ? 'dir' : 'file';
 				return `${type.padEnd(4)} ${entry}`;
 			});
 
-			console.log(`[listFiles] Listed ${input.path} (${entries.length} entries)`);
+			console.log(`[listFiles] Listed ${input.path} (${details.length} entries, node_modules filtered)`);
 			return details.join('\n');
 		} catch (error) {
 			return `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;

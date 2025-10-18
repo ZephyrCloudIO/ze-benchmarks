@@ -203,7 +203,8 @@ export class AnthropicAdapter implements AgentAdapter {
     };
   }
 
-  
+  // TODO: Impplement this as a seperate module so that it's easier to update the pricing model
+  // use the openrouter api to get the pricing model for the model
   private estimateCost(inputTokens: number, outputTokens: number): number {
     // Claude 3.7 Sonnet pricing: $3/1M input, $15/1M output
     const inputCost = (inputTokens / 1_000_000) * 3;

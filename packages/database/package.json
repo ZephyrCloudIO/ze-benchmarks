@@ -1,20 +1,22 @@
 {
-  "name": "ze-evaluator",
+  "name": "@ze/database",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "echo 'Build not needed with tsx - use pnpm start or pnpm dev'",
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "@types/node": "^20.14.10"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.4"
   },
   "dependencies": {
-    "semver": "^7.6.3"
+    "better-sqlite3": "^12.4.1",
+    "zod": "^3.23.8"
   }
 }
