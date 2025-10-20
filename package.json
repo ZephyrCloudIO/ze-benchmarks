@@ -2,9 +2,6 @@
   "name": "ze-benchmarks",
   "private": true,
   "version": "0.1.0",
-  "workspaces": [
-    "packages/*"
-  ],
   "scripts": {
     "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/harness run build",
     "build:evals": "pnpm --filter ze-evaluator run build",
@@ -18,5 +15,10 @@
   },
   "devDependencies": {
     "tsx": "^4.20.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }
