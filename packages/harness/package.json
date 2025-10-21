@@ -17,7 +17,8 @@
     "yaml": "^2.5.0",
     "zod": "^3.23.8",
     "globby": "^14.0.2",
-    "ze-evaluator": "workspace:*"
+    "ze-evaluator": "workspace:*",
+    "@ze/database": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
