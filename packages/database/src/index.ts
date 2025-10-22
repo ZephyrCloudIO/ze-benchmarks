@@ -7,5 +7,7 @@ export type {
   RunTelemetry,
   SuiteStatistics,
   ScenarioStatistics,
-  DetailedRunStatistics
+  DetailedRunStatistics,
+  BatchRun,
+  BatchStatistics
 } from './logger';

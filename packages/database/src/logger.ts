@@ -69,6 +69,7 @@ export interface DetailedRunStatistics {
 export interface BenchmarkRun {
   id: number;
   runId: string;
+  batchId?: string;
   suite: string;
   scenario: string;
   tier: string;
@@ -103,6 +104,29 @@ export interface RunTelemetry {
   workspaceDir?: string;
 }
 
+export interface BatchRun {
+  batchId: string;
+  createdAt: number;
+  completedAt?: number;
+  totalRuns: number;
+  successfulRuns: number;
+  avgScore?: number;
+  avgWeightedScore?: number;
+  metadata?: string;
+}
+
+export interface BatchStatistics {
+  batchId: string;
+  createdAt: number;
+  completedAt?: number;
+  totalRuns: number;
+  successfulRuns: number;
+  avgScore: number;
+  avgWeightedScore: number;
+  duration: number;
+  runs: BenchmarkRun[];
+}
+
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
   private db: Database.Database;
@@ -125,16 +149,34 @@ export class BenchmarkLogger {
 
   private initializeSchema() {
     this.db.exec(SCHEMA);
+    this.addBatchIdColumnIfNeeded();
   }
 
-  startRun(suite: string, scenario: string, tier: string, agent: string, model?: string): string {
+  private addBatchIdColumnIfNeeded() {
+    try {
+      // Check if batchId column exists
+      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const hasBatchId = columns.some(col => col.name === 'batchId');
+      
+      if (!hasBatchId) {
+        console.log('Adding batchId column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN batchId TEXT');
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_batchId ON benchmark_runs(batchId)');
+        console.log('✓ batchId column added successfully');
+      }
+    } catch (error) {
+      console.warn('Failed to add batchId column:', error);
+    }
+  }
+
+  startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string): string {
     const runId = uuidv4();
     this.currentRunId = runId;
 
     this.db.prepare(`
-      INSERT INTO benchmark_runs (run_id, suite, scenario, tier, agent, model, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'running')
-    `).run(runId, suite, scenario, tier, agent, model);
+      INSERT INTO benchmark_runs (run_id, batchId, suite, scenario, tier, agent, model, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'running')
+    `).run(runId, batchId, suite, scenario, tier, agent, model);
 
     return runId;
   }
@@ -525,10 +567,166 @@ export class BenchmarkLogger {
     };
   }
 
+  startBatch(): string {
+    const batchId = uuidv4();
+    const now = Date.now();
+    
+    this.db.prepare(`
+      INSERT INTO batch_runs (batchId, createdAt, totalRuns, successfulRuns)
+      VALUES (?, ?, 0, 0)
+    `).run(batchId, now);
+    
+    return batchId;
+  }
+
+  completeBatch(batchId: string, summary: {
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore: number;
+    avgWeightedScore: number;
+    metadata?: Record<string, any>;
+  }) {
+    const now = Date.now();
+    
+    this.db.prepare(`
+      UPDATE batch_runs 
+      SET completedAt = ?, totalRuns = ?, successfulRuns = ?, avgScore = ?, avgWeightedScore = ?, metadata = ?
+      WHERE batchId = ?
+    `).run(now, summary.totalRuns, summary.successfulRuns, summary.avgScore, summary.avgWeightedScore, 
+           JSON.stringify(summary.metadata), batchId);
+  }
+
+  getBatchHistory(limit: number = 20): BatchRun[] {
+    const rows = this.db.prepare(`
+      SELECT 
+        batchId,
+        createdAt,
+        completedAt,
+        totalRuns,
+        successfulRuns,
+        avgScore,
+        avgWeightedScore,
+        metadata
+      FROM batch_runs 
+      ORDER BY createdAt DESC 
+      LIMIT ?
+    `).all(limit) as any[];
+    
+    return rows.map(row => ({
+      batchId: row.batchId,
+      createdAt: row.createdAt,
+      completedAt: row.completedAt,
+      totalRuns: row.totalRuns,
+      successfulRuns: row.successfulRuns,
+      avgScore: row.avgScore,
+      avgWeightedScore: row.avgWeightedScore,
+      metadata: row.metadata
+    }));
+  }
+
+  getBatchDetails(batchId: string): BatchStatistics | null {
+    const batchRow = this.db.prepare(`
+      SELECT 
+        batchId,
+        createdAt,
+        completedAt,
+        totalRuns,
+        successfulRuns,
+        avgScore,
+        avgWeightedScore
+      FROM batch_runs WHERE batchId = ?
+    `).get(batchId) as any;
+    
+    if (!batchRow) return null;
+    
+    const runs = this.db.prepare(`
+      SELECT 
+        id,
+        run_id as runId,
+        batchId,
+        suite,
+        scenario,
+        tier,
+        agent,
+        model,
+        status,
+        started_at as startedAt,
+        completed_at as completedAt,
+        total_score as totalScore,
+        weighted_score as weightedScore,
+        metadata
+      FROM benchmark_runs 
+      WHERE batchId = ?
+      ORDER BY started_at
+    `).all(batchId) as any[];
+    
+    const duration = batchRow.completedAt ? batchRow.completedAt - batchRow.createdAt : 0;
+    
+    return {
+      batchId: batchRow.batchId,
+      createdAt: batchRow.createdAt,
+      completedAt: batchRow.completedAt,
+      totalRuns: batchRow.totalRuns,
+      successfulRuns: batchRow.successfulRuns,
+      avgScore: batchRow.avgScore || 0,
+      avgWeightedScore: batchRow.avgWeightedScore || 0,
+      duration,
+      runs: runs.map(run => ({
+        id: run.id,
+        runId: run.runId,
+        batchId: run.batchId,
+        suite: run.suite,
+        scenario: run.scenario,
+        tier: run.tier,
+        agent: run.agent,
+        model: run.model,
+        status: run.status,
+        startedAt: run.startedAt,
+        completedAt: run.completedAt,
+        totalScore: run.totalScore,
+        weightedScore: run.weightedScore,
+        metadata: run.metadata
+      }))
+    };
+  }
+
+  getBatchComparison(batchIds: string[]): BatchStatistics[] {
+    const placeholders = batchIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT 
+        batchId,
+        createdAt,
+        completedAt,
+        totalRuns,
+        successfulRuns,
+        avgScore,
+        avgWeightedScore
+      FROM batch_runs 
+      WHERE batchId IN (${placeholders})
+      ORDER BY createdAt DESC
+    `).all(...batchIds) as any[];
+    
+    return rows.map(row => {
+      const duration = row.completedAt ? row.completedAt - row.createdAt : 0;
+      return {
+        batchId: row.batchId,
+        createdAt: row.createdAt,
+        completedAt: row.completedAt,
+        totalRuns: row.totalRuns,
+        successfulRuns: row.successfulRuns,
+        avgScore: row.avgScore || 0,
+        avgWeightedScore: row.avgWeightedScore || 0,
+        duration,
+        runs: [] // Will be populated if needed
+      };
+    });
+  }
+
   clearDatabase() {
     this.db.exec('DELETE FROM run_telemetry');
     this.db.exec('DELETE FROM evaluation_results');
     this.db.exec('DELETE FROM benchmark_runs');
+    this.db.exec('DELETE FROM batch_runs');
   }
 
   close() {

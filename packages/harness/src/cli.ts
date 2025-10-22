@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter } from '../../agent-adapters/src/index.ts';
+import { EchoAgent, ClaudeCodeAdapter, AnthropicAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
 import { runEvaluators } from '../../evaluators/src/index.ts';
 import { runValidationCommands } from './runtime/validation.ts';
 import { buildDiffArtifacts } from './runtime/diff.ts';
@@ -11,7 +11,7 @@ import { Oracle } from './runtime/oracle.ts';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
 import { BenchmarkLogger } from '@ze/database';
-import { intro, outro, spinner, log, select, confirm } from '@clack/prompts';
+import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel } from '@clack/prompts';
 import chalk from 'chalk';
 import cliProgress from 'cli-progress';
 import figlet from 'figlet';
@@ -247,6 +247,7 @@ async function showInteractiveMenu() {
 			options: [
 				{ value: 'benchmark', label: 'Run a Benchmark' },
 				{ value: 'history', label: 'View History' },
+				{ value: 'batch-history', label: 'View Batch History' },
 				{ value: 'stats', label: 'View Statistics' },
 				{ value: 'evaluators', label: 'Evaluator Performance' },
 				{ value: 'clear', label: 'Clear Database' },
@@ -261,6 +262,9 @@ async function showInteractiveMenu() {
 				break;
 			case 'history':
 				await runInteractiveHistory();
+				break;
+			case 'batch-history':
+				await runInteractiveBatchHistory();
 				break;
 			case 'stats':
 				await runInteractiveStats();
@@ -285,6 +289,111 @@ async function showInteractiveMenu() {
 	}
 }
 
+async function executeMultipleBenchmarks(
+	suites: string[],
+	scenarios: string[],
+	tiers: string[],
+	agents: string[],
+	models: (string | undefined)[],
+	maxTurns: number,
+	noJson: boolean
+) {
+	// Initialize batch tracking
+	const logger = BenchmarkLogger.getInstance();
+	const batchId = logger.startBatch();
+	
+	// Calculate total combinations
+	const combinations: Array<{
+		suite: string;
+		scenario: string;
+		tier: string;
+		agent: string;
+		model?: string;
+	}> = [];
+	
+	for (const suite of suites) {
+		for (const scenario of scenarios) {
+			for (const tier of tiers) {
+				for (const agent of agents) {
+					// Handle model selection per agent
+					const agentModels = (agent === 'anthropic' || agent === 'claude-code') 
+						? models.filter(m => m !== undefined)
+						: [undefined];
+					
+					for (const model of agentModels) {
+						combinations.push({ suite, scenario, tier, agent, model });
+					}
+				}
+			}
+		}
+	}
+	
+	// Show summary
+	console.log(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s):`));
+	
+	// Track batch statistics
+	let successfulRuns = 0;
+	let totalScore = 0;
+	let totalWeightedScore = 0;
+	const startTime = Date.now();
+	
+	// Execute sequentially with progress tracking
+	for (let i = 0; i < combinations.length; i++) {
+		const { suite, scenario, tier, agent, model } = combinations[i];
+		
+		console.log(`\n${chalk.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} | ${tier} | ${agent}${model ? ` (${model})` : ''}`);
+		console.log(chalk.gray('─'.repeat(60)));
+		
+		await executeBenchmark(suite, scenario, tier, agent, model, maxTurns, noJson, batchId);
+		
+		// Add separator between runs
+		if (i < combinations.length - 1) {
+			console.log('\n' + chalk.gray('═'.repeat(60)) + '\n');
+		}
+	}
+	
+	// Complete batch tracking
+	const endTime = Date.now();
+	const duration = endTime - startTime;
+	
+	// Calculate batch statistics
+	const batchStats = logger.getBatchDetails(batchId);
+	if (batchStats) {
+		successfulRuns = batchStats.successfulRuns;
+		totalScore = batchStats.avgScore * batchStats.totalRuns;
+		totalWeightedScore = batchStats.avgWeightedScore * batchStats.totalRuns;
+	}
+	
+	logger.completeBatch(batchId, {
+		totalRuns: combinations.length,
+		successfulRuns,
+		avgScore: combinations.length > 0 ? totalScore / combinations.length : 0,
+		avgWeightedScore: combinations.length > 0 ? totalWeightedScore / combinations.length : 0,
+		metadata: {
+			suites,
+			scenarios,
+			tiers,
+			agents,
+			models: models.filter(m => m !== undefined),
+			maxTurns,
+			duration
+		}
+	});
+	
+	// Show batch summary
+	console.log('\n' + chalk.bold.underline('Batch Summary'));
+	console.log('┌─────────────────────────────────────────────────────────────┐');
+	console.log(`│ ${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 8))}...`);
+	console.log(`│ ${chalk.bold('Total Runs:')} ${combinations.length}`);
+	console.log(`│ ${chalk.bold('Successful:')} ${successfulRuns} (${combinations.length > 0 ? ((successfulRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
+	console.log(`│ ${chalk.bold('Avg Score:')} ${combinations.length > 0 ? (totalScore / combinations.length).toFixed(4) : 0} / 10.0`);
+	console.log(`│ ${chalk.bold('Duration:')} ${(duration / 1000).toFixed(2)}s`);
+	console.log('└─────────────────────────────────────────────────────────────┘');
+	
+	// Show completion summary
+	console.log('\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s)!`));
+}
+
 async function runInteractiveBenchmark() {
 	console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
 	
@@ -306,62 +415,138 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 	
-	// Select suite
-	const selectedSuite = await select({
-		message: 'Choose a suite:',
-		options: suites.map(suite => ({ value: suite, label: suite }))
-	}) as string;
+	// Select suites (multiselect)
+	const selectedSuites = await multiselect({
+		message: 'Choose suites:',
+		options: [
+			{ value: '__ALL__', label: 'All suites' },
+			...suites.map(suite => ({ value: suite, label: suite }))
+		],
+		required: true
+	});
+
+	if (isCancel(selectedSuites)) {
+		cancel('Operation cancelled.');
+		return;
+	}
+
+	// Expand "All" selection
+	const suitesToUse = selectedSuites.includes('__ALL__') ? suites : selectedSuites;
 	
-	// Get scenarios for selected suite
-	const scenariosDir = join(suitesDir, selectedSuite, 'scenarios');
-	const scenarios = readdirSync(scenariosDir).filter(dir => 
-		existsSync(join(scenariosDir, dir, 'scenario.yaml'))
-	);
+	// Get scenarios for all selected suites
+	const allScenarios: Array<{ value: string; label: string; suite: string }> = [];
+	for (const suite of suitesToUse) {
+		const scenariosDir = join(suitesDir, suite, 'scenarios');
+		if (existsSync(scenariosDir)) {
+			const scenarios = readdirSync(scenariosDir).filter(dir => 
+				existsSync(join(scenariosDir, dir, 'scenario.yaml'))
+			);
+			scenarios.forEach(scenario => {
+				allScenarios.push({ 
+					value: scenario, 
+					label: `${scenario} (${suite})`,
+					suite 
+				});
+			});
+		}
+	}
 	
-	if (scenarios.length === 0) {
-		log.error(chalk.red('No scenarios found for this suite'));
+	if (allScenarios.length === 0) {
+		log.error(chalk.red('No scenarios found for selected suites'));
 		return;
 	}
 	
-	// Select scenario
-	const selectedScenario = await select({
-		message: 'Choose a scenario:',
-		options: scenarios.map(scenario => ({ value: scenario, label: scenario }))
-	}) as string;
-	
-	// Select tier
-	const tier = await select({
-		message: 'Choose difficulty tier:',
+	// Select scenarios (multiselect)
+	const selectedScenarios = await multiselect({
+		message: 'Choose scenarios:',
 		options: [
+			{ value: '__ALL__', label: 'All scenarios' },
+			...allScenarios
+		],
+		required: true
+	});
+
+	if (isCancel(selectedScenarios)) {
+		cancel('Operation cancelled.');
+		return;
+	}
+
+	// Expand "All" selection and filter by suite
+	const scenariosToUse = selectedScenarios.includes('__ALL__') 
+		? allScenarios.map(s => s.value)
+		: selectedScenarios;
+	
+	// Select tiers (multiselect)
+	const selectedTiers = await multiselect({
+		message: 'Choose difficulty tiers:',
+		options: [
+			{ value: '__ALL__', label: 'All tiers' },
 			{ value: 'L0', label: 'L0 - Minimal' },
 			{ value: 'L1', label: 'L1 - Basic' },
 			{ value: 'L2', label: 'L2 - Directed' },
 			{ value: 'L3', label: 'L3 - Migration' },
 			{ value: 'Lx', label: 'Lx - Adversarial' }
-		]
-	}) as string;
+		],
+		required: true
+	});
+
+	if (isCancel(selectedTiers)) {
+		cancel('Operation cancelled.');
+		return;
+	}
+
+	// Expand "All" selection
+	const tiersToUse = selectedTiers.includes('__ALL__') 
+		? ['L0', 'L1', 'L2', 'L3', 'Lx'] 
+		: selectedTiers;
 	
-	// Select agent
-	const agent = await select({
-		message: 'Choose an agent:',
+	// Select agents (multiselect)
+	const selectedAgents = await multiselect({
+		message: 'Choose agents:',
 		options: [
+			{ value: '__ALL__', label: 'All agents' },
 			{ value: 'echo', label: 'Echo (Test Agent)' },
 			{ value: 'anthropic', label: 'Anthropic Claude' },
 			{ value: 'claude-code', label: 'Claude Code' }
-		]
-	}) as string;
+		],
+		required: true
+	});
+
+	if (isCancel(selectedAgents)) {
+		cancel('Operation cancelled.');
+		return;
+	}
+
+	// Expand "All" selection
+	const agentsToUse = selectedAgents.includes('__ALL__') 
+		? ['echo', 'anthropic', 'claude-code'] 
+		: selectedAgents;
 	
-	// Ask for model if needed
-	let model = undefined;
-	if (agent === 'anthropic' || agent === 'claude-code') {
-		model = await select({
-			message: 'Choose a model:',
+	// Ask for models if needed
+	let modelsToUse: (string | undefined)[] = [undefined];
+	const needsModels = agentsToUse.some(agent => agent === 'anthropic' || agent === 'claude-code');
+	
+	if (needsModels) {
+		const selectedModels = await multiselect({
+			message: 'Choose models:',
 			options: [
+				{ value: '__ALL__', label: 'All models' },
 				{ value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Latest)' },
 				{ value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Fast)' },
 				{ value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' }
-			]
-		}) as string;
+			],
+			required: true
+		});
+
+		if (isCancel(selectedModels)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+
+		// Expand "All" selection
+		modelsToUse = selectedModels.includes('__ALL__') 
+			? ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229']
+			: selectedModels;
 	}
 	
 	// Ask for max turns
@@ -381,14 +566,32 @@ async function runInteractiveBenchmark() {
 		initialValue: true
 	});
 	
-	// Show command that will be executed
-	console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${String(selectedSuite)}/${String(selectedScenario)}'`)} ${chalk.yellow(`'${String(tier)}'`)} ${chalk.yellow(`'${String(agent)}'`)} ${model ? chalk.yellow(`'${String(model)}'`) : ''} ${!includeJson ? '--no-json' : ''}`);
+	// Show summary of what will be executed
+	const totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
+	console.log(`\n${chalk.green('►')} Will run ${chalk.bold(totalCombinations.toString())} benchmark combination(s)`);
+	console.log(`   ${chalk.cyan('Suites:')} ${suitesToUse.join(', ')}`);
+	console.log(`   ${chalk.cyan('Scenarios:')} ${scenariosToUse.join(', ')}`);
+	console.log(`   ${chalk.cyan('Tiers:')} ${tiersToUse.join(', ')}`);
+	console.log(`   ${chalk.cyan('Agents:')} ${agentsToUse.join(', ')}`);
+	if (needsModels) {
+		console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
+	}
+	console.log(`   ${chalk.cyan('Max turns:')} ${maxTurns}`);
+	console.log(`   ${chalk.cyan('JSON output:')} ${includeJson ? 'Yes' : 'No'}`);
 	
 	// Show title before execution
 	console.log(chalk.cyan(createTitle()));
 	
-	// Execute the benchmark
-	await executeBenchmark(String(selectedSuite), String(selectedScenario), String(tier), String(agent), model, maxTurns, !includeJson);
+	// Execute all benchmark combinations
+	await executeMultipleBenchmarks(
+		suitesToUse,
+		scenariosToUse,
+		tiersToUse,
+		agentsToUse,
+		modelsToUse,
+		maxTurns,
+		!includeJson
+	);
 }
 
 async function runInteractiveHistory() {
@@ -449,7 +652,8 @@ async function runInteractiveStats() {
 			options: [
 				{ value: 'suite', label: '📊 Suite Statistics' },
 				{ value: 'scenario', label: '📈 Scenario Statistics' },
-				{ value: 'run', label: '🔍 Run Details' }
+				{ value: 'run', label: '🔍 Run Details' },
+				{ value: 'batch', label: '📦 Batch Statistics' }
 			]
 		}) as string;
 		
@@ -591,6 +795,58 @@ async function runInteractiveStats() {
 				console.log(formatStats('Cost', `$${stats.telemetrySummary.cost.toFixed(6)}`, 'blue'));
 				console.log(formatStats('Duration', `${(stats.telemetrySummary.duration / 1000).toFixed(2)}s`, 'blue'));
 			}
+			
+		} else if (statsType === 'batch') {
+			// Get recent batches to choose from
+			const batchHistory = logger.getBatchHistory(10);
+			
+			if (batchHistory.length === 0) {
+				log.warning('No batch runs found');
+				outro(chalk.yellow('Run some benchmarks first'));
+				return;
+			}
+			
+			const selectedBatch = await select({
+				message: 'Choose a batch to view details:',
+				options: batchHistory.map((batch, index) => ({
+					value: batch.batchId,
+					label: `${index + 1}. Batch ${batch.batchId.substring(0, 8)}... - ${batch.successfulRuns}/${batch.totalRuns} runs - ${batch.avgWeightedScore?.toFixed(4) || 'N/A'}`
+				}))
+			}) as string;
+			
+			// Execute batch stats
+			const batchStats = logger.getBatchDetails(selectedBatch);
+			if (!batchStats) {
+				log.error('Batch not found');
+				return;
+			}
+			
+			console.log(chalk.bold.bgGreen(` 📦 Batch Details `));
+			console.log(`\n${chalk.gray('ID:')} ${chalk.dim(selectedBatch.substring(0, 8))}...`);
+			console.log(formatStats('Total Runs', batchStats.totalRuns));
+			console.log(formatStats('Successful', batchStats.successfulRuns, 'green'));
+			console.log(formatStats('Success Rate', `${batchStats.totalRuns > 0 ? ((batchStats.successfulRuns / batchStats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
+			console.log(formatStats('Avg Score', batchStats.avgScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Weighted', batchStats.avgWeightedScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Duration', `${(batchStats.duration / 1000).toFixed(2)}s`, 'blue'));
+			console.log(formatStats('Started', new Date(batchStats.createdAt).toLocaleString()));
+			if (batchStats.completedAt) {
+				console.log(formatStats('Completed', new Date(batchStats.completedAt).toLocaleString()));
+			}
+			
+			// Show runs in batch with ranking
+			if (batchStats.runs.length > 0) {
+				console.log('\n' + chalk.underline('Runs in Batch'));
+				const sortedRuns = batchStats.runs
+					.filter(run => run.weightedScore !== null && run.weightedScore !== undefined)
+					.sort((a, b) => (b.weightedScore || 0) - (a.weightedScore || 0));
+				
+				sortedRuns.forEach((run, index) => {
+					const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '  ';
+					const status = run.status === 'completed' ? chalk.green('✓') : run.status === 'failed' ? chalk.red('✗') : chalk.yellow('○');
+					console.log(`  ${medal} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)} ${chalk.cyan(run.agent)} ${chalk.yellow(run.weightedScore?.toFixed(4) || 'N/A')}`);
+				});
+			}
 		}
 		
 	} catch (error) {
@@ -667,6 +923,56 @@ async function runInteractiveEvaluators() {
 	}
 }
 
+async function runInteractiveBatchHistory() {
+	const logger = BenchmarkLogger.getInstance();
+	
+	try {
+		const limit = await select({
+			message: 'How many recent batches to show?',
+			options: [
+				{ value: 5, label: '5 batches' },
+				{ value: 10, label: '10 batches' },
+				{ value: 20, label: '20 batches' },
+				{ value: 50, label: '50 batches' }
+			]
+		}) as number;
+		
+		// Execute batch history command
+		const batchHistory = logger.getBatchHistory(limit);
+		
+		if (batchHistory.length === 0) {
+			log.warning('No batch runs found');
+			outro(chalk.yellow('Run some benchmarks first'));
+			return;
+		}
+		
+		intro(chalk.bgCyan(' 📋 Batch History '));
+		
+		batchHistory.forEach((batch, index) => {
+			const status = batch.completedAt 
+				? chalk.green('✓') 
+				: chalk.yellow('○');
+			
+			console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
+			console.log(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns}`, 'green')}`);
+			console.log(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
+			console.log(`   ${chalk.gray(new Date(batch.createdAt).toLocaleString())}`);
+			if (batch.completedAt) {
+				const duration = (batch.completedAt - batch.createdAt) / 1000;
+				console.log(`   ${formatStats('Duration', `${duration.toFixed(2)}s`, 'blue')}`);
+			}
+		});
+		
+		outro(chalk.green(`Showing ${batchHistory.length} recent batches`));
+		
+	} catch (error) {
+		log.error(chalk.red('Failed to fetch batch history:'));
+		console.error(chalk.dim(error instanceof Error ? error.message : String(error)));
+	} finally {
+		logger.close();
+	}
+}
+
 async function runInteractiveClear() {
 	const logger = BenchmarkLogger.getInstance();
 	
@@ -700,10 +1006,10 @@ async function runInteractiveClear() {
 	}
 }
 
-async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, maxTurns?: number, noJson?: boolean) {
+async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, maxTurns?: number, noJson?: boolean, batchId?: string) {
 	// Initialize logger
 	const logger = BenchmarkLogger.getInstance();
-	const runId = logger.startRun(suite, scenario, tier, agent, model);
+	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
 	const startTime = Date.now();
 	
 	// Load scenario with progress bar
@@ -803,7 +1109,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
 			
 			// Build the request
-			const request: any = {
+			const request: AgentRequest = {
 				messages: [
 					{
 						role: 'system' as const,
@@ -814,7 +1120,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 						content: promptContent
 					}
 				],
-				workspaceDir,
+				...(workspaceDir && { workspaceDir }),
 				maxTurns
 			};
 
