@@ -3,6 +3,7 @@ import type { EvaluationContext, Evaluator, EvaluatorResult, ScoreCard } from '.
 import { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
 import { InstallEvaluator } from './evaluators/install.ts';
 import { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
+import { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 import { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 import { TestEvaluator } from './evaluators/test.ts';
 
@@ -16,6 +17,11 @@ export async function runEvaluators(
 		new DependencyTargetsEvaluator(),
 		new IntegrityGuardEvaluator(),
 	];
+
+	// Add LLM judge if enabled
+	if (shouldEnableLLMJudge(ctx.scenario)) {
+		evaluators.push(new LLMJudgeEvaluator());
+	}
 
 	const results: EvaluatorResult[] = [];
 	for (const evaluator of evaluators) {
@@ -32,9 +38,15 @@ export async function runEvaluators(
 		manager_correctness: results.find((result) => result.name === 'PackageManagerEvaluator')?.score ?? 0,
 		dependency_targets: results.find((result) => result.name === 'DependencyTargetsEvaluator')?.score ?? 0,
 		integrity_guard: results.find((result) => result.name === 'IntegrityGuardEvaluator')?.score ?? 0,
+		llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
 	};
 
 	return { results, scoreCard };
+}
+
+function shouldEnableLLMJudge(scenario: any): boolean {
+	return scenario.llm_judge?.enabled && 
+	       !!process.env.OPENROUTER_API_KEY;
 }
 
 export * from './types.ts';
@@ -42,6 +54,7 @@ export type { EvaluatorResult as Result } from './types.ts';
 export { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
 export { InstallEvaluator } from './evaluators/install.ts';
 export { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
+export { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 export { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 export { TestEvaluator } from './evaluators/test.ts';
 

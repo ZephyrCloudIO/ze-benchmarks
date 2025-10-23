@@ -46,9 +46,6 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 				args.push('--add-dir', request.workspaceDir);
 			}
 
-			console.log('Executing Claude with args:', args);
-			console.log('Input prompt:', prompt);
-			console.log('Workspace directory:', request.workspaceDir || 'current directory');
 
 			const response = await this.executeClaudeCommand(args, prompt, request.workspaceDir);
 
@@ -94,12 +91,6 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 					return;
 				}
 
-				if (stderr) {
-					console.warn('Claude CLI stderr:', stderr);
-				}
-
-				// Debug: Log raw output
-				console.log('Raw Claude output:', stdout);
 
 				try {
 					const response = this.parseClaudeOutput(stdout);

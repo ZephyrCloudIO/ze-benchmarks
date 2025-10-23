@@ -50,7 +50,6 @@ export class AnthropicAdapter implements AgentAdapter {
         throw new Error('Unexpected streaming response');
       }
       
-      console.log(`[Anthropic] Turn ${turn + 1}/${maxTurns}: ${response.stop_reason}`);
       
       totalInputTokens += response.usage.input_tokens;
       totalOutputTokens += response.usage.output_tokens;
@@ -136,12 +135,10 @@ export class AnthropicAdapter implements AgentAdapter {
     toolUses: ToolUseBlock[],
     toolHandlers?: Map<string, (input: unknown) => Promise<string> | string>
   ): Promise<ToolResult[]> {
-    console.log(`[Anthropic] Processing ${toolUses.length} tool call(s)...`);
 
     const results: ToolResult[] = [];
 
     for (const toolUse of toolUses) {
-      console.log(`[Anthropic] Tool: ${toolUse.name}`, toolUse.input);
       
       const handler = toolHandlers?.get(toolUse.name);
       let resultContent: string;
@@ -149,17 +146,11 @@ export class AnthropicAdapter implements AgentAdapter {
       if (handler) {
         try {
           resultContent = await handler(toolUse.input);
-          const preview = resultContent.length > 200 
-            ? resultContent.substring(0, 200) + '...' 
-            : resultContent;
-          console.log(`[Anthropic] Tool result: ${preview}`);
         } catch (error) {
           resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
-          console.error(`[Anthropic] Tool error:`, error);
         }
       } else {
         resultContent = `Tool '${toolUse.name}' is not available`;
-        console.warn(`[Anthropic] ${resultContent}`);
       }
 
       results.push({
