@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -14,9 +16,37 @@ interface DashboardStats {
   avgCost: number;
 }
 
+interface TopPerformer {
+  agent: string;
+  model: string;
+  avgScore: number;
+  runCount: number;
+  avgCost: number;
+}
+
+interface RecentRun {
+  runId: string;
+  suite: string;
+  scenario: string;
+  agent: string;
+  model: string;
+  status: string;
+  weightedScore: number | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+interface ScoreDistribution {
+  range: string;
+  count: number;
+}
+
 function Dashboard() {
   const { db, isLoading, error } = useDatabase();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
+  const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
+  const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -56,6 +86,91 @@ function Dashboard() {
         avgScore,
         avgCost,
       });
+
+      // Query top performers (agent/model combinations by average score)
+      const topPerformersResult = db.exec(`
+        SELECT
+          br.agent,
+          br.model,
+          AVG(br.weighted_score) as avg_score,
+          COUNT(*) as run_count,
+          AVG(rt.cost_usd) as avg_cost
+        FROM benchmark_runs br
+        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
+        WHERE br.weighted_score IS NOT NULL
+        GROUP BY br.agent, br.model
+        ORDER BY avg_score DESC
+        LIMIT 5
+      `);
+
+      if (topPerformersResult[0]) {
+        const performers = topPerformersResult[0].values.map((row) => ({
+          agent: row[0] as string,
+          model: row[1] as string,
+          avgScore: row[2] as number,
+          runCount: row[3] as number,
+          avgCost: row[4] as number || 0,
+        }));
+        setTopPerformers(performers);
+      }
+
+      // Query recent runs
+      const recentRunsResult = db.exec(`
+        SELECT
+          run_id,
+          suite,
+          scenario,
+          agent,
+          model,
+          status,
+          weighted_score,
+          started_at,
+          completed_at
+        FROM benchmark_runs
+        ORDER BY started_at DESC
+        LIMIT 15
+      `);
+
+      if (recentRunsResult[0]) {
+        const runs = recentRunsResult[0].values.map((row) => ({
+          runId: row[0] as string,
+          suite: row[1] as string,
+          scenario: row[2] as string,
+          agent: row[3] as string,
+          model: row[4] as string,
+          status: row[5] as string,
+          weightedScore: row[6] as number | null,
+          startedAt: row[7] as string,
+          completedAt: row[8] as string | null,
+        }));
+        setRecentRuns(runs);
+      }
+
+      // Query score distribution
+      const scoreDistResult = db.exec(`
+        SELECT
+          CASE
+            WHEN weighted_score >= 9.0 THEN '9.0-10.0'
+            WHEN weighted_score >= 8.0 THEN '8.0-9.0'
+            WHEN weighted_score >= 7.0 THEN '7.0-8.0'
+            WHEN weighted_score >= 6.0 THEN '6.0-7.0'
+            WHEN weighted_score >= 5.0 THEN '5.0-6.0'
+            ELSE '0.0-5.0'
+          END as range,
+          COUNT(*) as count
+        FROM benchmark_runs
+        WHERE weighted_score IS NOT NULL
+        GROUP BY range
+        ORDER BY range DESC
+      `);
+
+      if (scoreDistResult[0]) {
+        const distribution = scoreDistResult[0].values.map((row) => ({
+          range: row[0] as string,
+          count: row[1] as number,
+        }));
+        setScoreDistribution(distribution);
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -104,10 +219,84 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Score Distribution Chart */}
       <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-2xl font-semibold mb-4">Recent Activity</h2>
-        <div className="h-64 flex items-center justify-center text-muted-foreground">
-          Chart placeholder - Activity timeline will go here
+        <h2 className="text-2xl font-semibold mb-4">Score Distribution</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Distribution of weighted scores across all benchmark runs
+        </p>
+        {scoreDistribution.length > 0 ? (
+          <ChartContainer
+            config={{
+              count: {
+                label: "Runs",
+                color: "hsl(var(--chart-1))",
+              },
+            }}
+            className="h-[300px]"
+          >
+            <BarChart data={scoreDistribution}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="range" />
+              <YAxis />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No data available
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-2xl font-semibold mb-4">Recent Runs</h2>
+        <div className="space-y-2">
+          {recentRuns.length > 0 ? (
+            recentRuns.map((run, idx) => (
+              <div key={idx} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{run.scenario}</div>
+                  <div className="text-sm text-muted-foreground flex gap-2 items-center">
+                    <span>{run.suite}</span>
+                    <span>•</span>
+                    <span>{run.agent}</span>
+                    {run.model && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate">{run.model}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`px-2 py-1 rounded text-xs font-medium ${
+                    run.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                    run.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
+                    {run.status}
+                  </div>
+                </div>
+                <div className="text-right min-w-[60px]">
+                  {run.weightedScore !== null ? (
+                    <>
+                      <div className="font-bold">{run.weightedScore.toFixed(2)}</div>
+                      <div className="text-xs text-muted-foreground">score</div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">-</div>
+                  )}
+                </div>
+                <div className="text-right text-xs text-muted-foreground min-w-[120px]">
+                  {new Date(run.startedAt).toLocaleDateString()} {new Date(run.startedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-muted-foreground py-8">No recent runs</div>
+          )}
         </div>
       </div>
 
@@ -117,26 +306,25 @@ function Dashboard() {
           <Button variant="outline" size="sm">View All</Button>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <div>
-              <div className="font-medium">Claude 3.5 Sonnet</div>
-              <div className="text-sm text-muted-foreground">anthropic agent</div>
-            </div>
-            <div className="text-right">
-              <div className="font-semibold">9.2</div>
-              <div className="text-xs text-muted-foreground">156 runs</div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <div>
-              <div className="font-medium">Claude Code</div>
-              <div className="text-sm text-muted-foreground">claude-code agent</div>
-            </div>
-            <div className="text-right">
-              <div className="font-semibold">8.9</div>
-              <div className="text-xs text-muted-foreground">234 runs</div>
-            </div>
-          </div>
+          {topPerformers.length > 0 ? (
+            topPerformers.map((performer, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex-1">
+                  <div className="font-medium">{performer.model || 'Unknown Model'}</div>
+                  <div className="text-sm text-muted-foreground">{performer.agent} agent</div>
+                </div>
+                <div className="text-right mr-4">
+                  <div className="font-semibold">{performer.avgScore.toFixed(2)}</div>
+                  <div className="text-xs text-muted-foreground">{performer.runCount} runs</div>
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  ${performer.avgCost.toFixed(3)}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-muted-foreground py-8">No data available</div>
+          )}
         </div>
       </div>
     </div>

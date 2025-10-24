@@ -602,46 +602,47 @@ npx shadcn@latest add chart
 ### 1. Setup & Configuration
 - [x] Initialize TanStack Router with routes
 - [x] Configure tailwindcss and shadcn/ui
-- [ ] Install MVP shadcn components:
+- [x] Install MVP shadcn components:
   ```bash
   npx shadcn@latest add card table button badge chart
   npx shadcn@latest add select calendar popover skeleton
   ```
+  Installed: card, chart, button, badge, skeleton
 - [ ] Configure chart theming and color palette
 - [ ] Set up global typography and spacing tokens
 
 ### 2. Data Layer
-- [ ] Create API client/hooks for database queries
-  - Wrapper around BenchmarkLogger methods
-  - React Query or SWR for caching/state management
-- [ ] Implement mock data for development
-- [ ] Type definitions for all data models
-- [ ] Add error handling and loading states
+- [x] Create database connection via sql.js (DatabaseProvider)
+- [x] Type definitions for all data models
+- [x] Add error handling and loading states
+- [ ] React Query or SWR for caching/state management (optional enhancement)
 
 ### 3. Phase 1 Development (MVP)
 **Week 1-2: Executive Dashboard**
-- [ ] Create metric card components with trend indicators
-- [ ] Implement score distribution bar chart
-- [ ] Add recent activity timeline (line chart)
-- [ ] Build top performers table
-- [ ] Add basic filters (date range, agent select)
+- [x] Create metric card components (total runs, success rate, avg score, avg cost)
+- [x] Implement score distribution bar chart
+- [x] Add recent activity - Recent Runs table
+- [x] Build top performers table
+- [ ] Add basic filters (date range, agent select) (TODO)
 
 **Week 3-4: Agent Performance Dashboard**
-- [ ] Agent comparison grid with cards
-- [ ] Model performance leaderboard
-- [ ] Score breakdown stacked bar chart
-- [ ] Filters panel
+- [x] Agent comparison grid with cards
+- [x] Model performance leaderboard
+- [ ] Score breakdown stacked bar chart (TODO - needs chart library)
+- [ ] Agent vs Model Heatmap (TODO)
+- [ ] Cost vs Performance Scatter plot (TODO)
+- [ ] Filters panel (TODO)
 
 **Week 5-6: Run Details View**
-- [ ] Run info card with metadata
-- [ ] Score breakdown with progress bars
-- [ ] Telemetry details grid
-- [ ] Evaluation details accordion
+- [ ] Run info card with metadata (TODO)
+- [ ] Score breakdown with progress bars (TODO)
+- [ ] Telemetry details grid (TODO)
+- [ ] Evaluation details accordion (TODO)
 
 ### 4. Phase 2 Development (Extended)
-- Suite & Scenario Analysis page
-- Cost & Efficiency Analysis page
-- Evaluator Performance page
+- [x] Suite & Scenario Analysis page (basic version with cards and table)
+- [x] Cost & Efficiency Analysis page (cost stats and efficiency rankings)
+- [x] Evaluator Performance page (rankings and score distributions)
 
 ### 5. Phase 3 Development (Advanced)
 - Trends & Historical Analysis
