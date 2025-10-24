@@ -1,8 +1,18 @@
 import { spawn, exec } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
 import { createServer } from 'net';
+
+// Constants
+const DEFAULT_PORT = 3000;
+const PORT_RANGE_MAX = 10;
+const COMMON_DEV_PORTS = [3000];
+const SERVER_STARTUP_TIMEOUT = 15000;
+const GRACEFUL_SHUTDOWN_TIMEOUT = 2000;
+const RETRY_DELAY = 500;
+const CLEANUP_DELAY = 100;
+const MAX_STARTUP_ATTEMPTS = 3;
 
 let serverProcess: any = null;
 let serverUrl: string | null = null;
@@ -79,7 +89,7 @@ function killProcessOnPort(port: number): Promise<void> {
 }
 
 // OS-agnostic function to find an available port
-async function findAvailablePort(startPort: number = 3000, maxAttempts: number = 10): Promise<number> {
+async function findAvailablePort(startPort: number = DEFAULT_PORT, maxAttempts: number = PORT_RANGE_MAX): Promise<number> {
   for (let i = 0; i < maxAttempts; i++) {
     const port = startPort + i;
     const available = await isPortAvailable(port);
@@ -90,6 +100,8 @@ async function findAvailablePort(startPort: number = 3000, maxAttempts: number =
   throw new Error(`No available ports found in range ${startPort}-${startPort + maxAttempts - 1}`);
 }
 
+// Note: Database sync functions removed - database is now created directly in public/
+
 export async function startDevServer(): Promise<string> {
   if (serverUrl) {
     return serverUrl;
@@ -99,7 +111,7 @@ export async function startDevServer(): Promise<string> {
   try {
     stopDevServer();
     // Brief pause for process cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, CLEANUP_DELAY));
   } catch (err) {
     // Ignore errors when stopping
   }
@@ -108,7 +120,6 @@ export async function startDevServer(): Promise<string> {
   const reportDir = join(__dirname, '../../../benchmark-report');
   
   // Check if benchmark-report directory exists
-  const { existsSync } = await import('fs');
   if (!existsSync(reportDir)) {
     const error = new Error(`Benchmark report directory not found: ${reportDir}`);
     throw error;
@@ -121,59 +132,28 @@ export async function startDevServer(): Promise<string> {
     throw error;
   }
   
-  // Copy database file to public directory for dev server
-  const dbSource = join(__dirname, '../../../results/benchmarks.db');
-  const publicDir = join(reportDir, 'public');
-  const dbDest = join(publicDir, 'benchmarks.db');
-  
-  // Ensure public directory exists
-  if (!existsSync(publicDir)) {
-    try {
-      mkdirSync(publicDir, { recursive: true });
-    } catch (err) {
-      console.error('Failed to create public directory:', err);
-      throw new Error(`Failed to create public directory: ${err}`);
-    }
-  }
-  
-  // Copy database if source exists
-  if (existsSync(dbSource)) {
-    try {
-      copyFileSync(dbSource, dbDest);
-      console.log('Database copied to web server successfully');
-    } catch (err) {
-      console.error('Failed to copy database:', err);
-      throw new Error(`Failed to copy database: ${err}`);
-    }
-  } else {
-    console.warn('Source database not found, web server will start without database');
-  }
+  // Note: Database is now created directly in public/ directory by BenchmarkLogger
   
   // Kill processes on common dev server ports to ensure clean start
-  await Promise.all([
-    killProcessOnPort(3000),
-    killProcessOnPort(3001),
-    killProcessOnPort(3002)
-  ]);
+  await Promise.all(COMMON_DEV_PORTS.map(port => killProcessOnPort(port)));
   
   // Find an available port (OS-agnostic)
-  const availablePort = await findAvailablePort(3000, 10);
+  const availablePort = await findAvailablePort(DEFAULT_PORT, PORT_RANGE_MAX);
   
   // Retry mechanism for dev server startup
   let attempts = 0;
-  const maxAttempts = 3;
   
-  while (attempts < maxAttempts) {
+  while (attempts < MAX_STARTUP_ATTEMPTS) {
     try {
       const result = await startDevServerProcess(reportDir, availablePort);
       return result;
     } catch (err) {
       attempts++;
-      if (attempts >= maxAttempts) {
+      if (attempts >= MAX_STARTUP_ATTEMPTS) {
         throw err;
       }
       // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
     }
   }
   
@@ -222,7 +202,11 @@ async function startDevServerProcess(reportDir: string, availablePort: number): 
     });
     
     serverProcess.stderr.on('data', (data: Buffer) => {
-      // Silently handle stderr
+      const errorOutput = data.toString();
+      // Log critical errors only
+      if (errorOutput.includes('error') || errorOutput.includes('Error')) {
+        console.error('Dev server error:', errorOutput.trim());
+      }
     });
     
     serverProcess.on('error', (err: Error) => {
@@ -239,13 +223,13 @@ async function startDevServerProcess(reportDir: string, availablePort: number): 
       }
     });
     
-    // Timeout after 15 seconds
+    // Timeout after configured duration
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        reject(new Error('Dev server failed to start within 15 seconds'));
+        reject(new Error(`Dev server failed to start within ${SERVER_STARTUP_TIMEOUT / 1000} seconds`));
       }
-    }, 15000);
+    }, SERVER_STARTUP_TIMEOUT);
   });
 }
 
@@ -253,40 +237,7 @@ export function getServerUrl(): string | null {
   return serverUrl;
 }
 
-export function updateDatabase(): void {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const dbSource = join(__dirname, '../../../results/benchmarks.db');
-  const reportDir = join(__dirname, '../../../benchmark-report');
-  const publicDir = join(reportDir, 'public');
-  const dbDest = join(publicDir, 'benchmarks.db');
-  
-  // Always ensure public directory exists
-  if (!existsSync(publicDir)) {
-    try {
-      mkdirSync(publicDir, { recursive: true });
-    } catch (err) {
-      console.error('Failed to create public directory:', err);
-      return;
-    }
-  }
-  
-  // Copy database if source exists
-  if (existsSync(dbSource)) {
-    try {
-      copyFileSync(dbSource, dbDest);
-      console.log('Database synced to web server');
-    } catch (err) {
-      console.error('Failed to sync database:', err);
-    }
-  } else {
-    console.warn('Source database not found:', dbSource);
-  }
-}
-
-export function forceDatabaseSync(): void {
-  console.log('🔄 Forcing database synchronization...');
-  updateDatabase();
-}
+// Note: Database sync functions removed - database is now created directly in public/
 
 export function stopDevServer(): void {
   if (serverProcess) {
@@ -299,7 +250,7 @@ export function stopDevServer(): void {
         if (serverProcess && !serverProcess.killed) {
           serverProcess.kill('SIGKILL');
         }
-      }, 2000);
+      }, GRACEFUL_SHUTDOWN_TIMEOUT);
       
     } catch (err) {
       // Silently handle stop errors
@@ -311,7 +262,5 @@ export function stopDevServer(): void {
   
   // Also kill any processes on common dev server ports (OS-agnostic)
   // Note: This is fire-and-forget to avoid async issues
-  killProcessOnPort(3000);
-  killProcessOnPort(3001);
-  killProcessOnPort(3002);
+  COMMON_DEV_PORTS.forEach(port => killProcessOnPort(port));
 }

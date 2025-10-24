@@ -18,8 +18,7 @@ export default defineConfig({
   },
   output: {
     copy: [
-      { from: '../node_modules/.pnpm/sql.js@1.13.0/node_modules/sql.js/dist/sql-wasm.wasm' },
-      { from: '../results/benchmarks.db', to: 'benchmarks.db' }
+      { from: '../node_modules/.pnpm/sql.js@1.13.0/node_modules/sql.js/dist/sql-wasm.wasm' }
     ]
   },
   server: {

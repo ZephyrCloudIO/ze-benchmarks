@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
-import { mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { dirname, join } from 'path';
 import { SCHEMA } from './schema';
 
 export interface RunStatistics {
@@ -133,11 +133,19 @@ export class BenchmarkLogger {
   private currentRunId: string | null = null;
 
   constructor(dbPath?: string) {
-    const path = dbPath || process.env.ZE_BENCHMARKS_DB || 'results/benchmarks.db';
+    // Use absolute path to avoid working directory issues
+    const defaultPath = join(process.cwd(), 'benchmark-report', 'public', 'benchmarks.db');
+    const path = dbPath || process.env.ZE_BENCHMARKS_DB || defaultPath;
+    
+    console.log(`Database path: ${path}`);
+    
     // Ensure directory exists
     mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.initializeSchema();
+    
+    // Ensure database is properly created and accessible
+    this.ensureDatabaseExists();
   }
 
   static getInstance(dbPath?: string): BenchmarkLogger {
@@ -169,6 +177,70 @@ export class BenchmarkLogger {
     }
   }
 
+  private updateTimestamp(): void {
+    try {
+      const versionFile = join(dirname(this.db.name), 'db-version.json');
+      writeFileSync(versionFile, JSON.stringify({ 
+        lastModified: Date.now() 
+      }));
+    } catch (error) {
+      // Silently ignore timestamp update errors
+    }
+  }
+
+  /**
+   * Ensures the database file exists and is properly initialized
+   * This method can be called to verify database creation
+   */
+  ensureDatabaseExists(): boolean {
+    try {
+      console.log(`Checking database at: ${this.db.name}`);
+      console.log(`File exists: ${existsSync(this.db.name)}`);
+      
+      // Check if database file exists
+      if (!existsSync(this.db.name)) {
+        console.warn('Database file does not exist, creating new one...');
+        mkdirSync(dirname(this.db.name), { recursive: true });
+        this.db = new Database(this.db.name);
+        this.initializeSchema();
+        return true;
+      }
+      
+      // Test database connection
+      console.log('Testing database connection...');
+      this.db.prepare('SELECT 1').get();
+      console.log('✓ Database connection successful');
+      return true;
+    } catch (error) {
+      console.error('Failed to ensure database exists:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Public method to create the database file explicitly
+   * This can be called from CLI or other parts of the system
+   */
+  createDatabase(): boolean {
+    try {
+      console.log(`Creating database at: ${this.db.name}`);
+      mkdirSync(dirname(this.db.name), { recursive: true });
+      
+      // Create a new database instance
+      this.db = new Database(this.db.name);
+      this.initializeSchema();
+      
+      // Update timestamp to indicate database creation
+      this.updateTimestamp();
+      
+      console.log('✓ Database created successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to create database:', error);
+      return false;
+    }
+  }
+
   startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string): string {
     const runId = uuidv4();
     this.currentRunId = runId;
@@ -189,16 +261,20 @@ export class BenchmarkLogger {
       SET status = 'completed', completed_at = CURRENT_TIMESTAMP, total_score = ?, weighted_score = ?, metadata = ?
       WHERE run_id = ?
     `).run(totalScore, weightedScore, JSON.stringify(metadata), this.currentRunId);
+    
+    this.updateTimestamp();
   }
 
-  failRun(error: string) {
+  failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'unknown') {
     if (!this.currentRunId) throw new Error('No active run');
     
     this.db.prepare(`
       UPDATE benchmark_runs 
       SET status = 'failed', completed_at = CURRENT_TIMESTAMP, metadata = ?
       WHERE run_id = ?
-    `).run(JSON.stringify({ error }), this.currentRunId);
+    `).run(JSON.stringify({ error, errorType: errorType || 'unknown' }), this.currentRunId);
+    
+    this.updateTimestamp();
   }
 
   logEvaluation(evaluatorName: string, score: number, maxScore: number, details?: string) {
@@ -208,6 +284,8 @@ export class BenchmarkLogger {
       INSERT INTO evaluation_results (run_id, evaluator_name, score, max_score, details)
       VALUES (?, ?, ?, ?, ?)
     `).run(this.currentRunId, evaluatorName, score, maxScore, details);
+    
+    this.updateTimestamp();
   }
 
   logTelemetry(toolCalls?: number, tokensIn?: number, tokensOut?: number, costUsd?: number, durationMs?: number, workspaceDir?: string) {
@@ -465,7 +543,7 @@ export class BenchmarkLogger {
       SELECT 
         scenario,
         COUNT(*) as runs,
-        AVG(weighted_score) as avgScore
+        AVG(total_score) as avgScore
       FROM benchmark_runs 
       WHERE suite = ? AND status = 'completed'
       GROUP BY scenario
@@ -503,7 +581,7 @@ export class BenchmarkLogger {
       SELECT 
         agent,
         COUNT(*) as runs,
-        AVG(weighted_score) as avgScore
+        AVG(total_score) as avgScore
       FROM benchmark_runs 
       WHERE suite = ? AND scenario = ? AND status = 'completed'
       GROUP BY agent
@@ -515,7 +593,7 @@ export class BenchmarkLogger {
       SELECT 
         tier,
         COUNT(*) as runs,
-        AVG(weighted_score) as avgScore
+        AVG(total_score) as avgScore
       FROM benchmark_runs 
       WHERE suite = ? AND scenario = ? AND status = 'completed'
       GROUP BY tier
@@ -594,6 +672,8 @@ export class BenchmarkLogger {
       WHERE batchId = ?
     `).run(now, summary.totalRuns, summary.successfulRuns, summary.avgScore, summary.avgWeightedScore, 
            JSON.stringify(summary.metadata), batchId);
+    
+    this.updateTimestamp();
   }
 
   getBatchHistory(limit: number = 20): BatchRun[] {
@@ -720,6 +800,213 @@ export class BenchmarkLogger {
         runs: [] // Will be populated if needed
       };
     });
+  }
+
+  getBatchAnalytics(batchId: string) {
+    const batch = this.getBatchDetails(batchId);
+    if (!batch) return null;
+
+    // Suite/scenario breakdown
+    const suiteBreakdown = this.db.prepare(`
+      SELECT 
+        suite,
+        scenario,
+        COUNT(*) as runs,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' THEN total_score END) as avgScore,
+        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
+      FROM benchmark_runs 
+      WHERE batchId = ?
+      GROUP BY suite, scenario
+      ORDER BY suite, scenario
+    `).all(batchId) as any[];
+
+    // Agent performance comparison
+    const agentPerformance = this.db.prepare(`
+      SELECT 
+        agent,
+        model,
+        COUNT(*) as runs,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore,
+        MIN(CASE WHEN status = 'completed' THEN weighted_score END) as minScore,
+        MAX(CASE WHEN status = 'completed' THEN weighted_score END) as maxScore
+      FROM benchmark_runs 
+      WHERE batchId = ?
+      GROUP BY agent, model
+      ORDER BY avgWeightedScore DESC
+    `).all(batchId) as any[];
+
+    // Tier distribution
+    const tierDistribution = this.db.prepare(`
+      SELECT 
+        tier,
+        COUNT(*) as runs,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
+      FROM benchmark_runs 
+      WHERE batchId = ?
+      GROUP BY tier
+      ORDER BY tier
+    `).all(batchId) as any[];
+
+    // Evaluator score breakdown
+    const evaluatorBreakdown = this.db.prepare(`
+      SELECT 
+        er.evaluator_name as evaluatorName,
+        AVG(er.score) as avgScore,
+        MAX(er.max_score) as maxScore,
+        COUNT(*) as count
+      FROM evaluation_results er
+      JOIN benchmark_runs br ON er.run_id = br.run_id
+      WHERE br.batchId = ? AND br.status = 'completed'
+      GROUP BY er.evaluator_name
+      ORDER BY avgScore DESC
+    `).all(batchId) as any[];
+
+    // Failed runs details
+    const failedRuns = this.db.prepare(`
+      SELECT 
+        run_id as runId,
+        suite,
+        scenario,
+        tier,
+        agent,
+        model,
+        metadata
+      FROM benchmark_runs 
+      WHERE batchId = ? AND status = 'failed'
+      ORDER BY started_at
+    `).all(batchId) as any[];
+
+    return {
+      batch,
+      suiteBreakdown: suiteBreakdown.map(row => ({
+        suite: row.suite,
+        scenario: row.scenario,
+        runs: row.runs,
+        successfulRuns: row.successfulRuns,
+        avgScore: row.avgScore || 0,
+        avgWeightedScore: row.avgWeightedScore || 0
+      })),
+      agentPerformance: agentPerformance.map(row => ({
+        agent: row.agent,
+        model: row.model,
+        runs: row.runs,
+        successfulRuns: row.successfulRuns,
+        avgWeightedScore: row.avgWeightedScore || 0,
+        minScore: row.minScore || 0,
+        maxScore: row.maxScore || 0
+      })),
+      tierDistribution: tierDistribution.map(row => ({
+        tier: row.tier,
+        runs: row.runs,
+        successfulRuns: row.successfulRuns,
+        avgWeightedScore: row.avgWeightedScore || 0
+      })),
+      evaluatorBreakdown: evaluatorBreakdown.map(row => ({
+        evaluatorName: row.evaluatorName,
+        avgScore: row.avgScore || 0,
+        maxScore: row.maxScore || 1,
+        count: row.count
+      })),
+      failedRuns: failedRuns.map(row => ({
+        runId: row.runId,
+        suite: row.suite,
+        scenario: row.scenario,
+        tier: row.tier,
+        agent: row.agent,
+        model: row.model,
+        error: row.metadata ? JSON.parse(row.metadata).error : null
+      }))
+    };
+  }
+
+  getAllBatches(filters?: {
+    limit?: number;
+    status?: 'completed' | 'running';
+    sortBy?: 'date' | 'score';
+  }) {
+    const limit = filters?.limit || 50;
+    const sortBy = filters?.sortBy || 'date';
+    
+    let whereClause = '';
+    if (filters?.status === 'completed') {
+      whereClause = 'WHERE completedAt IS NOT NULL';
+    } else if (filters?.status === 'running') {
+      whereClause = 'WHERE completedAt IS NULL';
+    }
+
+    const orderBy = sortBy === 'score' 
+      ? 'ORDER BY avgWeightedScore DESC, createdAt DESC'
+      : 'ORDER BY createdAt DESC';
+
+    const rows = this.db.prepare(`
+      SELECT 
+        batchId,
+        createdAt,
+        completedAt,
+        totalRuns,
+        successfulRuns,
+        avgScore,
+        avgWeightedScore,
+        metadata
+      FROM batch_runs 
+      ${whereClause}
+      ${orderBy}
+      LIMIT ?
+    `).all(limit) as any[];
+
+    return rows.map(row => ({
+      batchId: row.batchId,
+      createdAt: row.createdAt,
+      completedAt: row.completedAt,
+      totalRuns: row.totalRuns,
+      successfulRuns: row.successfulRuns,
+      avgScore: row.avgScore,
+      avgWeightedScore: row.avgWeightedScore,
+      metadata: row.metadata,
+      duration: row.completedAt ? row.completedAt - row.createdAt : null
+    }));
+  }
+
+  getBatchTrends(days: number = 30) {
+    const rows = this.db.prepare(`
+      SELECT 
+        DATE(createdAt / 1000, 'unixepoch') as date,
+        COUNT(*) as batchCount,
+        AVG(avgWeightedScore) as avgScore,
+        AVG(CAST(successfulRuns AS REAL) / CAST(totalRuns AS REAL)) as avgSuccessRate
+      FROM batch_runs 
+      WHERE createdAt >= ?
+        AND completedAt IS NOT NULL
+      GROUP BY DATE(createdAt / 1000, 'unixepoch')
+      ORDER BY date
+    `).all(Date.now() - (days * 24 * 60 * 60 * 1000)) as any[];
+
+    return rows.map(row => ({
+      date: row.date,
+      batchCount: row.batchCount,
+      avgScore: row.avgScore || 0,
+      avgSuccessRate: row.avgSuccessRate || 0
+    }));
+  }
+
+  getFailureBreakdown(batchId: string): { errorType: string, count: number }[] {
+    const rows = this.db.prepare(`
+      SELECT 
+        JSON_EXTRACT(metadata, '$.errorType') as errorType,
+        COUNT(*) as count
+      FROM benchmark_runs 
+      WHERE batchId = ? AND status = 'failed'
+      GROUP BY errorType
+      ORDER BY count DESC
+    `).all(batchId) as any[];
+
+    return rows.map(row => ({
+      errorType: row.errorType || 'unknown',
+      count: row.count
+    }));
   }
 
   clearDatabase() {

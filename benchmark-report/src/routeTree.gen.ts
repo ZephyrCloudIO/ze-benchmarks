@@ -15,7 +15,10 @@ import { Route as CostsRouteImport } from './routes/costs'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
+import { Route as BatchesIndexRouteImport } from './routes/batches.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as BatchesCompareRouteImport } from './routes/batches.compare'
+import { Route as BatchesBatchIdRouteImport } from './routes/batches.$batchId'
 
 const SuitesRoute = SuitesRouteImport.update({
   id: '/suites',
@@ -47,9 +50,24 @@ const RunsIndexRoute = RunsIndexRouteImport.update({
   path: '/runs/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BatchesIndexRoute = BatchesIndexRouteImport.update({
+  id: '/batches/',
+  path: '/batches/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BatchesCompareRoute = BatchesCompareRouteImport.update({
+  id: '/batches/compare',
+  path: '/batches/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BatchesBatchIdRoute = BatchesBatchIdRouteImport.update({
+  id: '/batches/$batchId',
+  path: '/batches/$batchId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -59,7 +77,10 @@ export interface FileRoutesByFullPath {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/batches/$batchId': typeof BatchesBatchIdRoute
+  '/batches/compare': typeof BatchesCompareRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/batches': typeof BatchesIndexRoute
   '/runs': typeof RunsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -68,7 +89,10 @@ export interface FileRoutesByTo {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/batches/$batchId': typeof BatchesBatchIdRoute
+  '/batches/compare': typeof BatchesCompareRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/batches': typeof BatchesIndexRoute
   '/runs': typeof RunsIndexRoute
 }
 export interface FileRoutesById {
@@ -78,7 +102,10 @@ export interface FileRoutesById {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/batches/$batchId': typeof BatchesBatchIdRoute
+  '/batches/compare': typeof BatchesCompareRoute
   '/runs/$runId': typeof RunsRunIdRoute
+  '/batches/': typeof BatchesIndexRoute
   '/runs/': typeof RunsIndexRoute
 }
 export interface FileRouteTypes {
@@ -89,7 +116,10 @@ export interface FileRouteTypes {
     | '/costs'
     | '/evaluators'
     | '/suites'
+    | '/batches/$batchId'
+    | '/batches/compare'
     | '/runs/$runId'
+    | '/batches'
     | '/runs'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -98,7 +128,10 @@ export interface FileRouteTypes {
     | '/costs'
     | '/evaluators'
     | '/suites'
+    | '/batches/$batchId'
+    | '/batches/compare'
     | '/runs/$runId'
+    | '/batches'
     | '/runs'
   id:
     | '__root__'
@@ -107,7 +140,10 @@ export interface FileRouteTypes {
     | '/costs'
     | '/evaluators'
     | '/suites'
+    | '/batches/$batchId'
+    | '/batches/compare'
     | '/runs/$runId'
+    | '/batches/'
     | '/runs/'
   fileRoutesById: FileRoutesById
 }
@@ -117,7 +153,10 @@ export interface RootRouteChildren {
   CostsRoute: typeof CostsRoute
   EvaluatorsRoute: typeof EvaluatorsRoute
   SuitesRoute: typeof SuitesRoute
+  BatchesBatchIdRoute: typeof BatchesBatchIdRoute
+  BatchesCompareRoute: typeof BatchesCompareRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
+  BatchesIndexRoute: typeof BatchesIndexRoute
   RunsIndexRoute: typeof RunsIndexRoute
 }
 
@@ -165,11 +204,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/batches/': {
+      id: '/batches/'
+      path: '/batches'
+      fullPath: '/batches'
+      preLoaderRoute: typeof BatchesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs/$runId': {
       id: '/runs/$runId'
       path: '/runs/$runId'
       fullPath: '/runs/$runId'
       preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/batches/compare': {
+      id: '/batches/compare'
+      path: '/batches/compare'
+      fullPath: '/batches/compare'
+      preLoaderRoute: typeof BatchesCompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/batches/$batchId': {
+      id: '/batches/$batchId'
+      path: '/batches/$batchId'
+      fullPath: '/batches/$batchId'
+      preLoaderRoute: typeof BatchesBatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -181,7 +241,10 @@ const rootRouteChildren: RootRouteChildren = {
   CostsRoute: CostsRoute,
   EvaluatorsRoute: EvaluatorsRoute,
   SuitesRoute: SuitesRoute,
+  BatchesBatchIdRoute: BatchesBatchIdRoute,
+  BatchesCompareRoute: BatchesCompareRoute,
   RunsRunIdRoute: RunsRunIdRoute,
+  BatchesIndexRoute: BatchesIndexRoute,
   RunsIndexRoute: RunsIndexRoute,
 }
 export const routeTree = rootRouteImport

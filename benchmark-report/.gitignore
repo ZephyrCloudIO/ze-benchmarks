@@ -14,3 +14,7 @@ dist/
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# Database files
+public/benchmarks.db
+public/db-version.json

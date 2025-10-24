@@ -4,6 +4,7 @@ import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { RefreshCw } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -41,12 +42,22 @@ interface ScoreDistribution {
   count: number;
 }
 
+interface RecentBatch {
+  batchId: string;
+  createdAt: number;
+  completedAt: number | null;
+  totalRuns: number;
+  successfulRuns: number;
+  avgWeightedScore: number | null;
+}
+
 function Dashboard() {
-  const { db, isLoading, error } = useDatabase();
+  const { db, isLoading, error, refreshDatabase, isRefreshing, lastRefreshed } = useDatabase();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
+  const [recentBatches, setRecentBatches] = useState<RecentBatch[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -171,6 +182,33 @@ function Dashboard() {
         }));
         setScoreDistribution(distribution);
       }
+
+      // Query recent batches
+      const batchesResult = db.exec(`
+        SELECT
+          batchId,
+          createdAt,
+          completedAt,
+          totalRuns,
+          successfulRuns,
+          avgWeightedScore
+        FROM batch_runs
+        WHERE completedAt IS NOT NULL
+        ORDER BY createdAt DESC
+        LIMIT 5
+      `);
+
+      if (batchesResult[0]) {
+        const batches = batchesResult[0].values.map((row) => ({
+          batchId: row[0] as string,
+          createdAt: row[1] as number,
+          completedAt: row[2] as number | null,
+          totalRuns: row[3] as number,
+          successfulRuns: row[4] as number,
+          avgWeightedScore: row[5] as number | null,
+        }));
+        setRecentBatches(batches);
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -186,11 +224,29 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">Executive Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          High-level overview of benchmark system health and performance
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">Executive Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            High-level overview of benchmark system health and performance
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <Button 
+            onClick={refreshDatabase} 
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+          {lastRefreshed && (
+            <p className="text-xs text-muted-foreground">
+              Last updated: {lastRefreshed.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -305,10 +361,56 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Recent Batches */}
+      <div className="rounded-lg border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold">Recent Batches</h2>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/batches">View All</Link>
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {recentBatches.length > 0 ? (
+            recentBatches.map((batch) => {
+              const successRate = batch.totalRuns > 0 
+                ? (batch.successfulRuns / batch.totalRuns) * 100 
+                : 0
+              const scoreColor = 
+                (batch.avgWeightedScore || 0) >= 9 ? 'text-green-600' :
+                (batch.avgWeightedScore || 0) >= 7 ? 'text-yellow-600' : 
+                'text-red-600'
+              
+              return (
+                <Link
+                  key={batch.batchId}
+                  to="/batches/$batchId"
+                  params={{ batchId: batch.batchId }}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                >
+                  <div className="flex-1">
+                    <div className="font-mono text-sm">{batch.batchId.substring(0, 12)}...</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {new Date(batch.createdAt).toLocaleDateString()} - {batch.totalRuns} runs ({successRate.toFixed(0)}% success)
+                    </div>
+                  </div>
+                  <div className={`text-right font-bold text-lg ${scoreColor}`}>
+                    {batch.avgWeightedScore?.toFixed(2) || 'N/A'}
+                  </div>
+                </Link>
+              )
+            })
+          ) : (
+            <div className="text-center text-muted-foreground py-8">No batches yet</div>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-semibold">Top Performers</h2>
-          <Button variant="outline" size="sm">View All</Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/agents">View All</Link>
+          </Button>
         </div>
         <div className="space-y-4">
           {topPerformers.length > 0 ? (

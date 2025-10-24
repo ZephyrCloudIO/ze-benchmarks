@@ -2,6 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { RefreshCw } from 'lucide-react'
 
 export const Route = createFileRoute('/runs/')({
   component: RunsPage,
@@ -9,6 +11,7 @@ export const Route = createFileRoute('/runs/')({
 
 interface Run {
   runId: string;
+  batchId: string | null;
   suite: string;
   scenario: string;
   tier: string;
@@ -18,10 +21,11 @@ interface Run {
   weightedScore: number | null;
   startedAt: string;
   completedAt: string | null;
+  metadata: string | null;
 }
 
 function RunsPage() {
-  const { db, isLoading, error } = useDatabase();
+  const { db, isLoading, error, refreshDatabase, isRefreshing } = useDatabase();
   const [runs, setRuns] = useState<Run[]>([]);
   const [filter, setFilter] = useState<'all' | 'completed' | 'failed'>('all');
 
@@ -32,6 +36,7 @@ function RunsPage() {
       let query = `
         SELECT
           run_id,
+          batchId,
           suite,
           scenario,
           tier,
@@ -40,7 +45,8 @@ function RunsPage() {
           status,
           weighted_score,
           started_at,
-          completed_at
+          completed_at,
+          metadata
         FROM benchmark_runs
       `;
 
@@ -57,15 +63,17 @@ function RunsPage() {
       if (result[0]) {
         const runsData = result[0].values.map((row) => ({
           runId: row[0] as string,
-          suite: row[1] as string,
-          scenario: row[2] as string,
-          tier: row[3] as string,
-          agent: row[4] as string,
-          model: row[5] as string,
-          status: row[6] as string,
-          weightedScore: row[7] as number | null,
-          startedAt: row[8] as string,
-          completedAt: row[9] as string | null,
+          batchId: row[1] as string | null,
+          suite: row[2] as string,
+          scenario: row[3] as string,
+          tier: row[4] as string,
+          agent: row[5] as string,
+          model: row[6] as string,
+          status: row[7] as string,
+          weightedScore: row[8] as number | null,
+          startedAt: row[9] as string,
+          completedAt: row[10] as string | null,
+          metadata: row[11] as string | null,
         }));
         setRuns(runsData);
       } else {
@@ -87,11 +95,22 @@ function RunsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight">Benchmark Runs</h1>
-        <p className="text-muted-foreground mt-2">
-          Browse and search all benchmark runs
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">Benchmark Runs</h1>
+          <p className="text-muted-foreground mt-2">
+            Browse and search all benchmark runs
+          </p>
+        </div>
+        <Button 
+          onClick={refreshDatabase} 
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+        </Button>
       </div>
 
       {/* Filter Buttons */}
@@ -165,7 +184,32 @@ function RunsPage() {
                           <span className="truncate">{run.model}</span>
                         </>
                       )}
+                      {run.batchId && (
+                        <>
+                          <span>•</span>
+                          <Link
+                            to="/batches/$batchId"
+                            params={{ batchId: run.batchId }}
+                            className="text-blue-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Batch
+                          </Link>
+                        </>
+                      )}
                     </div>
+                    {run.status === 'failed' && run.metadata && (
+                      <div className="text-xs text-red-600 mt-1">
+                        {(() => {
+                          try {
+                            const metadata = JSON.parse(run.metadata);
+                            return metadata.error || 'Unknown error';
+                          } catch {
+                            return 'Parse error';
+                          }
+                        })()}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <Badge

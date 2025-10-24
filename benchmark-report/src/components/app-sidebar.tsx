@@ -7,6 +7,8 @@ import {
   FolderTree,
   CheckCircle,
   PlayCircle,
+  Layers,
+  GitCompare,
 } from 'lucide-react'
 
 import {
@@ -35,6 +37,21 @@ const navigation = [
         title: 'Runs',
         url: '/runs',
         icon: PlayCircle,
+      },
+    ],
+  },
+  {
+    title: 'Batches',
+    items: [
+      {
+        title: 'All Batches',
+        url: '/batches',
+        icon: Layers,
+      },
+      {
+        title: 'Compare Batches',
+        url: '/batches/compare',
+        icon: GitCompare,
       },
     ],
   },

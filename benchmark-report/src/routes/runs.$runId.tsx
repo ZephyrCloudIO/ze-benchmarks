@@ -1,7 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
@@ -11,6 +12,7 @@ export const Route = createFileRoute('/runs/$runId')({
 
 interface RunDetails {
   runId: string;
+  batchId: string | null;
   suite: string;
   scenario: string;
   tier: string;
@@ -53,7 +55,7 @@ function RunDetailsPage() {
       // Query run details
       const runResult = db.exec(`
         SELECT
-          run_id, suite, scenario, tier, agent, model, status,
+          run_id, batchId, suite, scenario, tier, agent, model, status,
           started_at, completed_at, total_score, weighted_score
         FROM benchmark_runs
         WHERE run_id = ?
@@ -63,16 +65,17 @@ function RunDetailsPage() {
         const row = runResult[0].values[0];
         setRunDetails({
           runId: row[0] as string,
-          suite: row[1] as string,
-          scenario: row[2] as string,
-          tier: row[3] as string,
-          agent: row[4] as string,
-          model: row[5] as string,
-          status: row[6] as string,
-          startedAt: row[7] as string,
-          completedAt: row[8] as string | null,
-          totalScore: row[9] as number | null,
-          weightedScore: row[10] as number | null,
+          batchId: row[1] as string | null,
+          suite: row[2] as string,
+          scenario: row[3] as string,
+          tier: row[4] as string,
+          agent: row[5] as string,
+          model: row[6] as string,
+          status: row[7] as string,
+          startedAt: row[8] as string,
+          completedAt: row[9] as string | null,
+          totalScore: row[10] as number | null,
+          weightedScore: row[11] as number | null,
         });
       }
 
@@ -175,6 +178,20 @@ function RunDetailsPage() {
             <div className="text-sm text-muted-foreground">Model</div>
             <div className="font-semibold mt-1">{runDetails.model || 'N/A'}</div>
           </div>
+          {runDetails.batchId && (
+            <div>
+              <div className="text-sm text-muted-foreground">Batch</div>
+              <div className="mt-1">
+                <Link
+                  to="/batches/$batchId"
+                  params={{ batchId: runDetails.batchId }}
+                  className="text-blue-600 hover:underline font-mono text-sm"
+                >
+                  {runDetails.batchId.substring(0, 8)}...
+                </Link>
+              </div>
+            </div>
+          )}
           <div>
             <div className="text-sm text-muted-foreground">Started</div>
             <div className="font-semibold mt-1">
@@ -190,7 +207,39 @@ function RunDetailsPage() {
             </div>
           )}
         </div>
+        
+        {/* Batch Action Button */}
+        {runDetails.batchId && (
+          <div className="mt-4 pt-4 border-t">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/batches/$batchId" params={{ batchId: runDetails.batchId }}>
+                View Full Batch
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Error Details for Failed Runs */}
+      {runDetails.status === 'failed' && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+          <h2 className="text-2xl font-semibold mb-4 text-red-700">Error Details</h2>
+          <div className="space-y-2">
+            <div className="p-3 bg-white border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">
+                {(() => {
+                  try {
+                    // Try to get error from telemetry or other sources
+                    return 'Run failed - check logs for details';
+                  } catch {
+                    return 'Unknown error occurred';
+                  }
+                })()}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Score Breakdown */}
       <div className="rounded-lg border bg-card p-6">
