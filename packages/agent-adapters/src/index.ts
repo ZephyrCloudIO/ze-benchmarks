@@ -13,7 +13,6 @@ export type ToolHandler = (input: any) => Promise<string> | string;
 export type AgentRequest = {
 	messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
 	workspaceDir?: string;
-	maxTurns?: number;
 	tools?: ToolDefinition[];
 	toolHandlers?: Map<string, ToolHandler>;
 };
@@ -41,3 +40,4 @@ export class EchoAgent implements AgentAdapter {
 
 export { ClaudeCodeAdapter } from './claude-code.ts';
 export { AnthropicAdapter } from './anthropic.ts';
+export { OpenRouterAdapter } from './openrouter.ts';

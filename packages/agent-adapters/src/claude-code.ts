@@ -15,9 +15,9 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 	private defaultMaxTurns: number;
 	private permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
-	constructor(model?: string, defaultMaxTurns = 10, permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' = 'bypassPermissions') {
+	constructor(model?: string, permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' = 'bypassPermissions') {
 		this.model = model;
-		this.defaultMaxTurns = defaultMaxTurns;
+		this.defaultMaxTurns = 50; // Internal max iterations
 		this.permissionMode = permissionMode;
 	}
 
@@ -26,7 +26,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 		const prompt = this.convertMessagesToPrompt(request.messages);
 
 		try {
-			const maxTurns = Math.max(1, request.maxTurns ?? this.defaultMaxTurns);
+			const maxTurns = this.defaultMaxTurns;
 			const args = [
 				'-p',
 				'--output-format', 'json',

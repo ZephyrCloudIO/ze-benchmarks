@@ -18,7 +18,7 @@ interface ConversationTurn {
 export class AnthropicAdapter implements AgentAdapter {
   name = "anthropic";
   private readonly client: Anthropic;
-  private readonly DEFAULT_MAX_TURNS = 30;
+  private readonly DEFAULT_MAX_ITERATIONS = 50;
   private readonly DEFAULT_MAX_TOKENS = 8192;
   private readonly DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
   
@@ -34,7 +34,7 @@ export class AnthropicAdapter implements AgentAdapter {
   
   async send(request: AgentRequest): Promise<AgentResponse> {
     const apiRequest = this.buildInitialRequest(request);
-    const maxTurns = request.maxTurns || this.DEFAULT_MAX_TURNS;
+    const maxIterations = this.DEFAULT_MAX_ITERATIONS;
 
     let totalToolCalls = 0;
     let totalInputTokens = 0;
@@ -42,7 +42,7 @@ export class AnthropicAdapter implements AgentAdapter {
     const conversationHistory: ConversationTurn[] = [];
 
     // Multi-turn conversation loop
-    for (let turn = 0; turn < maxTurns; turn++) {
+    for (let turn = 0; turn < maxIterations; turn++) {
       const response = await this.client.messages.create(apiRequest);
       
       // Type guard: ensure we got a Message, not a Stream

@@ -18,7 +18,12 @@
     /* Shadcn */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@harness/*": ["../packages/harness/src/*"],
+      "@database/*": ["../packages/database/src/*"],
+      "@evaluators/*": ["../packages/evaluators/src/*"],
+      "@agent-adapters/*": ["../packages/agent-adapters/src/*"],
+      "@db/*": ["../results/*"]
     },
     /* type checking */
     "strict": true,

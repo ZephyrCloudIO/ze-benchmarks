@@ -1,4 +1,4 @@
-import initSqlJs, { Database } from 'sql.js';
+import initSqlJs, { type Database } from 'sql.js';
 
 let dbInstance: Database | null = null;
 let initPromise: Promise<Database> | null = null;
@@ -101,6 +101,36 @@ export function closeDatabase(): void {
     dbInstance = null;
     initPromise = null;
   }
+}
+
+/**
+ * Reload the database from disk
+ * Useful for refreshing data when the database file changes
+ */
+export async function reloadDatabase(): Promise<void> {
+  if (dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+    initPromise = null;
+  }
+  await initDatabase();
+}
+
+/**
+ * Watch the database for changes and reload automatically
+ * Returns a function to stop watching
+ */
+export function watchDatabase(callback: () => void, intervalMs = 5000): () => void {
+  const interval = setInterval(async () => {
+    try {
+      await reloadDatabase();
+      callback();
+    } catch (err) {
+      console.error('Failed to reload database:', err);
+    }
+  }, intervalMs);
+  
+  return () => clearInterval(interval);
 }
 
 // Type definitions for database tables

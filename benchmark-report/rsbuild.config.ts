@@ -1,14 +1,19 @@
 import {defineConfig} from '@rsbuild/core';
 import {pluginReact} from '@rsbuild/plugin-react';
-// @ts-expect-error
 import {tanstackRouter} from '@tanstack/router-plugin/rspack';
 import {pluginNodePolyfill} from "@rsbuild/plugin-node-polyfill";
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [pluginNodePolyfill(), pluginReact()],
   resolve: {
     alias: {
-      '@': './src'
+      '@': './src',
+      '@harness': '../packages/harness/src',
+      '@database': '../packages/database/src',
+      '@evaluators': '../packages/evaluators/src',
+      '@agent-adapters': '../packages/agent-adapters/src',
+      '@db': resolve(__dirname, '../results')
     },
   },
   output: {
@@ -18,6 +23,7 @@ export default defineConfig({
     ]
   },
   server: {
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
     publicDir: {
       name: 'public',
       copyOnBuild: true,
@@ -37,8 +43,5 @@ export default defineConfig({
         return context.resourcePath.endsWith('.css') ? {plugins: [require('@tailwindcss/postcss')]} : {};
       },
     },
-  },
-  dev: {
-    writeToDisk: false,
   },
 });
