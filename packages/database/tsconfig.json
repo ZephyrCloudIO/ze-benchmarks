@@ -1,0 +1,12 @@
+{
+  "extends": "../harness/tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "allowImportingTsExtensions": false,
+    "noEmit": false
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

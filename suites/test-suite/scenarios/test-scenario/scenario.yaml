@@ -1,0 +1,70 @@
+id: test-scenario
+suite: test-suite
+title: "Test Scenario with Limited Tiers"
+description: |
+  Update workspace dependencies; keep @types/node aligned with node engine,
+  migrate xterm → @xterm/xterm, avoid bumping tooling pinned by Nx.
+timeout_minutes: 40
+workspace:
+  node: "18.20.x"
+  manager: auto
+  managers_allowed: [pnpm]
+  workspaces: pnpm
+baseline:
+  run:
+    - cmd: "pnpm install"
+    - cmd: "pnpm -w -r test --if-present"
+    - cmd: "pnpm -w -r lint --if-present"
+constraints:
+  blocklist:
+    - name: "webpack"
+      reason: "Pinned by Nx preset; major upgrade breaks builder"
+  namespace_migrations:
+    - from: "xterm"
+      to: "@xterm/xterm"
+  companion_versions:
+    - main: "node"
+      companions:
+        - name: "@types/node"
+          rule: "major must match"
+    - main: "react"
+      companions:
+        - name: "@types/react"
+          rule: "major must match"
+targets:
+  required:
+    - name: "typescript"
+      to: ">=5.5 <6"
+    - name: "nx"
+      to: "~20.0"
+  optional:
+    - name: "eslint"
+      to: "^9"
+validation:
+  commands:
+    install: "pnpm install"
+    test: "pnpm -w -r test --if-present"
+    lint: "pnpm -w -r lint --if-present"
+    typecheck: "pnpm -w -r -F @acme/app tsc --noEmit --project tsconfig.json"
+oracle:
+  answers_file: "./oracle-answers.json"
+llm_judge:
+  enabled: true
+  model: "meta-llama/llama-3.1-8b-instruct"
+  temperature: 0.1
+  max_tokens: 2000
+rubric_overrides:
+  weights:
+    install_success: 1.0
+    tests_nonregression: 1.5
+    manager_correctness: 1.0
+    used_manager_commands: 0.6
+    semantic_upgrade_quality: 0.8
+    companion_alignment: 0.7
+    deprecated_handling: 0.5
+    namespace_migrations: 0.7
+    breaking_changes_strategy: 0.7
+    monorepo_handling: 0.8
+    user_questions_quality: 0.4
+    efficiency: 0.5
+    llm_judge: 1.0

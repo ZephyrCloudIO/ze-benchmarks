@@ -1,0 +1,29 @@
+{
+  "name": "@ze/database",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.14.10",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
+  }
+}

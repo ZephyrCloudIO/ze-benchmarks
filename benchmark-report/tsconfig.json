@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "lib": ["DOM", "ES2020"],
+    "jsx": "react-jsx",
+    "target": "ES2020",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+
+    /* modules */
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noUncheckedSideEffectImports": true,
+    /* Shadcn */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@harness/*": ["../packages/harness/src/*"],
+      "@database/*": ["../packages/database/src/*"],
+      "@evaluators/*": ["../packages/evaluators/src/*"],
+      "@agent-adapters/*": ["../packages/agent-adapters/src/*"],
+      "@db/*": ["../results/*"]
+    },
+    /* type checking */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src"]
+}

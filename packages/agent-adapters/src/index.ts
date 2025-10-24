@@ -1,5 +1,29 @@
-export type AgentRequest = { messages: { role: 'system' | 'user' | 'assistant'; content: string }[] };
-export type AgentResponse = { content: string; tokensIn?: number; tokensOut?: number; costUsd?: number };
+export type ToolDefinition = {
+	name: string;
+	description: string;
+	input_schema: {
+		type: 'object';
+		properties: Record<string, any>;
+		required?: string[];
+	};
+};
+
+export type ToolHandler = (input: any) => Promise<string> | string;
+
+export type AgentRequest = {
+	messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
+	workspaceDir?: string;
+	tools?: ToolDefinition[];
+	toolHandlers?: Map<string, ToolHandler>;
+};
+
+export type AgentResponse = {
+	content: string;
+	tokensIn?: number;
+	tokensOut?: number;
+	costUsd?: number;
+	toolCalls?: number;
+};
 
 export interface AgentAdapter {
 	name: string;
@@ -13,3 +37,7 @@ export class EchoAgent implements AgentAdapter {
 		return { content: last };
 	}
 }
+
+export { ClaudeCodeAdapter } from './claude-code.ts';
+export { AnthropicAdapter } from './anthropic.ts';
+export { OpenRouterAdapter } from './openrouter.ts';
