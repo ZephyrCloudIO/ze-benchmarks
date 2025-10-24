@@ -20,7 +20,7 @@ export class AnthropicAdapter implements AgentAdapter {
   private readonly client: Anthropic;
   private readonly DEFAULT_MAX_ITERATIONS = 50;
   private readonly DEFAULT_MAX_TOKENS = 8192;
-  private readonly DEFAULT_MODEL = "claude-3-7-sonnet-20250219";
+  private readonly DEFAULT_MODEL = "claude-3-5-sonnet-20241022";
   
   constructor(apiKey = process.env.ANTHROPIC_API_KEY!) {
     if (!apiKey) {

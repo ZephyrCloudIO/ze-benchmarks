@@ -1,90 +1,129 @@
 ## Zephyr Bench – Real‑world LLM & Tool Benchmark Suite
 
-Zephyr Bench is a modular benchmark for evaluating coding agents on real software tasks.
+Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real software tasks with dynamic tier loading, multiple agent adapters, and detailed evaluation metrics.
 
-- **Harness CLI**: `packages/harness` → `ze-bench`
-- **Suites**: `suites/` (initial: `update-deps`)
-- **Results**: `results/`
+- **Harness CLI**: `packages/harness` → Interactive CLI with dynamic model/tier loading
+- **Suites**: `suites/` (update-deps, test-suite with dynamic tier scanning)
+- **Results**: `results/` with SQLite database and web dashboard
+- **Agents**: Echo, Anthropic Claude, OpenRouter, Claude Code
+- **Evaluators**: Automated tests, LLM Judge, dependency analysis
 
-### Quick start (stubbed harness)
+### Quick Start
 ```bash
+# Install dependencies
 npm install
-npm -w packages/harness run build
-node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L0
-# writes results/summary.json
+
+# Set up environment variables
+export ANTHROPIC_API_KEY=your_key_here
+export OPENROUTER_API_KEY=your_key_here  # Optional for OpenRouter models
+
+# Run interactive CLI
+npm -w packages/harness run dev
+# or
+npx tsx packages/harness/src/cli.ts
 ```
 
-### How to test your own agent (e.g., Anthropic Claude)
-The harness is adapter-based. You implement an `AgentAdapter`, then run the CLI with `--agent` and `--model` (once wired). Below is the minimal path for Anthropic:
+### Interactive CLI Features
+- **Dynamic Tier Loading**: Automatically scans available difficulty tiers for each scenario
+- **Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code
+- **Model Selection**: Dynamic loading of available models from APIs
+- **Batch Execution**: Run multiple combinations with progress tracking
+- **Web Dashboard**: Real-time results viewing at `http://localhost:3000`
+- **Comprehensive Statistics**: Performance metrics, evaluator scores, LLM Judge analysis
 
-1) Install SDK in the adapters workspace
+### Available Agents
+
+The system includes several pre-configured agents:
+
+- **Echo Agent**: Test agent that echoes the prompt (no API calls)
+- **Anthropic Claude**: Direct API integration with Claude models
+- **OpenRouter**: Access to multiple LLM providers through OpenRouter API
+- **Claude Code**: Integration with Claude Code CLI tool
+
+### Dynamic Tier System
+
+The system automatically scans available difficulty tiers for each scenario:
+
+- **L0 - Minimal**: Basic dependency updates
+- **L1 - Basic**: Standard updates with some complexity
+- **L2 - Directed**: Complex updates with specific requirements
+- **L3 - Migration**: Major version migrations
+- **Lx - Adversarial**: Challenging edge cases
+
+Tiers are dynamically loaded based on available prompt files in `suites/{suite}/prompts/{scenario}/`.
+
+### Evaluation System
+
+Comprehensive evaluation through multiple metrics:
+
+- **Automated Tests**: Install, test, lint, typecheck validation
+- **LLM Judge**: AI-powered code quality assessment with weighted scoring
+- **Dependency Analysis**: Correctness, safety, best practices
+- **Performance Metrics**: Execution time, success rates, token usage
+
+### Web Dashboard
+
+Real-time results viewing at `http://localhost:3000` with:
+- Interactive charts and statistics
+- Detailed run analysis
+- Model performance comparisons
+- Live database updates
+
+### Environment Variables
+
+Required for different agents:
+- **ANTHROPIC_API_KEY**: Required for Anthropic Claude agent
+- **OPENROUTER_API_KEY**: Required for OpenRouter agent
+- **CLAUDE_MODEL**: Optional model override for Anthropic (defaults to claude-3-5-sonnet-20241022)
+
+### CLI Commands
+
 ```bash
-npm i -w packages/agent-adapters @anthropic-ai/sdk
+# Interactive mode (recommended)
+npx tsx packages/harness/src/cli.ts
+
+# Direct execution
+npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --tier L0 --agent echo
+
+# View results
+npx tsx packages/harness/src/cli.ts --history
+npx tsx packages/harness/src/cli.ts --stats suite update-deps
 ```
 
-2) Create an Anthropic adapter at `packages/agent-adapters/src/anthropic.ts`
-```ts
-import Anthropic from "@anthropic-ai/sdk";
-import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.js";
+### Project Structure
 
-export class AnthropicAdapter implements AgentAdapter {
-  name = "anthropic";
-  private client: Anthropic;
-  constructor(apiKey = process.env.ANTHROPIC_API_KEY!) {
-    if (!apiKey) throw new Error("Missing ANTHROPIC_API_KEY");
-    this.client = new Anthropic({ apiKey });
-  }
-  async send(request: AgentRequest): Promise<AgentResponse> {
-    const system = request.messages.find(m => m.role === "system")?.content;
-    const user = request.messages.filter(m => m.role === "user" || m.role === "assistant")
-      .map(m => (m.role === "user" ? { type: "text", text: m.content } : { type: "text", text: `Assistant: ${m.content}` })) as any[];
-    const resp = await this.client.messages.create({
-      model: process.env.CLAUDE_MODEL || "claude-3-7-sonnet-20250219",
-      system,
-      messages: [{ role: "user", content: user.length ? user : [{ type: "text", text: "" }] }],
-      max_output_tokens: 2048
-    });
-    const content = resp.content?.[0]?.type === "text" ? resp.content[0].text : JSON.stringify(resp);
-    return { content };
-  }
-}
+```
+ze-benchmarks/
+├── packages/
+│   ├── harness/          # CLI and execution engine
+│   ├── agent-adapters/   # Agent implementations
+│   ├── evaluators/       # Evaluation logic and LLM Judge
+│   └── database/         # SQLite database management
+├── suites/
+│   ├── update-deps/      # Dependency update scenarios
+│   └── test-suite/       # Test scenarios with limited tiers
+├── results/              # Benchmark results and database
+└── benchmark-report/     # Web dashboard (React + RSbuild)
 ```
 
-3) Export it (optional convenience) in `packages/agent-adapters/src/index.ts`
-```ts
-export * from "./anthropic.js";
-```
+### Docker Support
 
-4) Wire the CLI (if not yet): add `--agent`/`--model` flags and call the adapter with the selected tier prompt. At a minimum in `packages/harness/src/cli.ts`:
-```ts
-// parse --agent and --model
-// pick prompt file: suites/<suite>/prompts/<scenario>/<tier>.md
-// instantiate adapter (e.g., new AnthropicAdapter()) and send the prompt
-```
-If you want, I can wire this for you in the codebase.
-
-5) Run it
 ```bash
-export ANTHROPIC_API_KEY=...      # required
-export CLAUDE_MODEL=claude-3-7-sonnet-20250219  # optional override
-node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
-```
-Results will still be written to `results/` with telemetry once fully wired.
-
-### Environment variables
-- **ANTHROPIC_API_KEY**: required for Anthropic adapter
-- **CLAUDE_MODEL**: optional model override (defaults to Sonnet 3.7 example)
-
-### Docker (optional)
-```bash
+# Build Docker image
 docker build -f docker/node-lts.Dockerfile -t ze-bench .
-docker run --rm -e ANTHROPIC_API_KEY -e CLAUDE_MODEL ze-bench run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
+
+# Run with environment variables
+docker run --rm \
+  -e ANTHROPIC_API_KEY=your_key \
+  -e OPENROUTER_API_KEY=your_key \
+  ze-bench
 ```
 
-### Notes
-- Current CLI is stubbed (loads scenario, writes a placeholder result). The adapter/flags wiring is straightforward; happy to add it if you want this runnable end-to-end now.
+### Adding New Scenarios
 
-### Scenario fixtures: raw code, not tarballs
-- Each scenario includes a raw fixture directory (e.g., `suites/update-deps/scenarios/nx-pnpm-monorepo/repo-fixture`).
-- The harness copies this directory into a temp workspace under `results/workspaces/...` when you run a scenario.
-- If you prefer a different folder name, you can also use `repo/` instead of `repo-fixture/`.
+1. Create scenario directory: `suites/{suite}/scenarios/{scenario}/`
+2. Add `scenario.yaml` configuration
+3. Create prompt files: `suites/{suite}/prompts/{scenario}/L{0-3}-{name}.md`
+4. Add repository fixture: `suites/{suite}/scenarios/{scenario}/repo-fixture/`
+
+The system will automatically detect available tiers and scenarios.

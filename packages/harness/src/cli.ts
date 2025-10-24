@@ -15,7 +15,7 @@ import { BenchmarkLogger } from '@ze/database';
 import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel } from '@clack/prompts';
 import chalk from 'chalk';
 import figlet from 'figlet';
-import { startDevServer, getServerUrl, stopDevServer, updateDatabase } from './dev-server.ts';
+import { startDevServer, getServerUrl, stopDevServer, updateDatabase, forceDatabaseSync } from './dev-server.ts';
 
 // ============================================================================
 // DYNAMIC MODEL LOADING
@@ -708,8 +708,28 @@ async function executeMultipleBenchmarks(
 		}
 	}
 	
+	// Automatically determine parallel execution based on number of benchmarks
+	const useParallel = combinations.length >= 3; // Enable parallel for 3+ benchmarks
+	let concurrency = 3;
+	
+	if (useParallel) {
+		// Smart concurrency based on number of benchmarks
+		if (combinations.length <= 5) {
+			concurrency = 2; // Conservative for small batches
+		} else if (combinations.length <= 15) {
+			concurrency = 3; // Balanced for medium batches
+		} else if (combinations.length <= 30) {
+			concurrency = 5; // Aggressive for large batches
+		} else {
+			concurrency = 8; // Maximum for very large batches
+		}
+	}
+	
 	// Show summary
 	console.log(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s):`));
+	if (useParallel) {
+		console.log(chalk.gray(`Parallel execution with concurrency: ${concurrency}`));
+	}
 	
 	// Track batch statistics
 	let successfulRuns = 0;
@@ -717,19 +737,32 @@ async function executeMultipleBenchmarks(
 	let totalWeightedScore = 0;
 	const startTime = Date.now();
 	
-	// Execute sequentially with progress tracking
-	for (let i = 0; i < combinations.length; i++) {
-		const { suite, scenario, tier, agent, model } = combinations[i];
-		
-		console.log(`\n${chalk.bold.cyan(`Benchmark ${i + 1}/${combinations.length}`)} ${chalk.gray('─')} ${suite}/${scenario}`);
-		console.log(chalk.gray(`${tier} | ${agent}${model ? ` (${model})` : ''}`));
-		console.log();
-		
-		await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId);
-		
-		// Add separator between runs
-		if (i < combinations.length - 1) {
-			console.log('\n' + chalk.gray('─'.repeat(60)) + '\n');
+	if (useParallel) {
+		// Parallel execution
+		await executeWithConcurrency(
+			combinations,
+			concurrency,
+			async (combo, i) => {
+				const { suite, scenario, tier, agent, model } = combo;
+				console.log(`\n${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`${tier} | ${agent}${model ? ` (${model})` : ''}`)}`);
+				await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId);
+			}
+		);
+	} else {
+		// Sequential execution (existing code)
+		for (let i = 0; i < combinations.length; i++) {
+			const { suite, scenario, tier, agent, model } = combinations[i];
+			
+			console.log(`\n${chalk.bold.cyan(`Benchmark ${i + 1}/${combinations.length}`)} ${chalk.gray('─')} ${suite}/${scenario}`);
+			console.log(chalk.gray(`${tier} | ${agent}${model ? ` (${model})` : ''}`));
+			console.log();
+			
+			await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId);
+			
+			// Add separator between runs
+			if (i < combinations.length - 1) {
+				console.log('\n' + chalk.gray('─'.repeat(60)) + '\n');
+			}
 		}
 	}
 	
@@ -770,19 +803,38 @@ async function executeMultipleBenchmarks(
 	console.log(`│ ${chalk.bold('Duration:')} ${(duration / 1000).toFixed(2)}s`);
 	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 	
-	// Restart dev server to pick up latest database
-	try {
-		// console.log(chalk.gray('\n🔄 Restarting dev server to update database...'));
-		stopDevServer();
-		await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-		const serverUrl = await startDevServer();
-		// console.log(chalk.green('✓') + chalk.gray(` Dev server restarted at: ${serverUrl}`));
-	} catch (err) {
-		// console.log(chalk.yellow('⚠') + chalk.gray(' Dev server restart failed, continuing...'));
-	}
+	// Database updates will be handled when dev server is started for statistics viewing
 	
 	// Show completion summary
 	console.log('\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s)!`));
+}
+
+// ============================================================================
+// PARALLEL EXECUTION HELPER
+// ============================================================================
+
+async function executeWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  executor: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  const results: Promise<void>[] = [];
+  let currentIndex = 0;
+  
+  async function runNext(): Promise<void> {
+    const index = currentIndex++;
+    if (index >= items.length) return;
+    
+    await executor(items[index], index);
+    await runNext();
+  }
+  
+  // Start initial batch of concurrent executions
+  for (let i = 0; i < Math.min(concurrency, items.length); i++) {
+    results.push(runNext());
+  }
+  
+  await Promise.all(results);
 }
 
 async function runInteractiveHistoryMenu() {
@@ -1025,11 +1077,14 @@ async function runInteractiveBenchmark() {
 		console.log('🧠 Loading available Anthropic models...');
 		// Anthropic has a fixed set of models
 		const anthropicModels = [
-			{ value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-			{ value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-			{ value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
-			{ value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
-			{ value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' }
+			{ value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Current)' },
+			{ value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Current)' },
+			{ value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet (Active)' },
+			{ value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Active)' },
+			{ value: 'claude-opus-4-20250514', label: 'Claude Opus 4 (Active)' },
+			{ value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (Active)' },
+			{ value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (Active)' },
+			{ value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (Active)' }
 		];
 		
 		const selectedModels = await multiselect({
@@ -1049,11 +1104,14 @@ async function runInteractiveBenchmark() {
 		console.log('🧠 Loading available Claude Code models...');
 		// Claude Code has a fixed set of models
 		const claudeCodeModels = [
-			{ value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-			{ value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-			{ value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
-			{ value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
-			{ value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' }
+			{ value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Current)' },
+			{ value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Current)' },
+			{ value: 'claude-3-7-sonnet-20250219', label: 'Claude 3.7 Sonnet (Active)' },
+			{ value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Active)' },
+			{ value: 'claude-opus-4-20250514', label: 'Claude Opus 4 (Active)' },
+			{ value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1 (Active)' },
+			{ value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5 (Active)' },
+			{ value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (Active)' }
 		];
 		
 		const selectedModels = await multiselect({
@@ -1078,8 +1136,27 @@ async function runInteractiveBenchmark() {
 		initialValue: true
 	});
 	
-	// Show summary of what will be executed
+	// Calculate total combinations for automatic parallel decision
 	const totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
+	
+	// Automatically determine parallel execution based on number of benchmarks
+	const useParallel = totalCombinations >= 3; // Enable parallel for 3+ benchmarks
+	let concurrency = 3;
+	
+	if (useParallel) {
+		// Smart concurrency based on number of benchmarks
+		if (totalCombinations <= 5) {
+			concurrency = 2; // Conservative for small batches
+		} else if (totalCombinations <= 15) {
+			concurrency = 3; // Balanced for medium batches
+		} else if (totalCombinations <= 30) {
+			concurrency = 5; // Aggressive for large batches
+		} else {
+			concurrency = 8; // Maximum for very large batches
+		}
+	}
+	
+	// Show summary of what will be executed
 	console.log(`\n${chalk.green('►')} Will run ${chalk.bold(totalCombinations.toString())} benchmark combination(s)`);
 	console.log(`   ${chalk.cyan('Suites:')} ${suitesToUse.join(', ')}`);
 	console.log(`   ${chalk.cyan('Scenarios:')} ${scenariosToUse.join(', ')}`);
@@ -1089,6 +1166,7 @@ async function runInteractiveBenchmark() {
 		console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
 	}
 	console.log(`   ${chalk.cyan('JSON output:')} ${includeJson ? 'Yes' : 'No'}`);
+	console.log(`   ${chalk.cyan('Parallel execution:')} ${useParallel ? `Yes (concurrency: ${concurrency})` : 'No'}`);
 	
 	// Show title before execution
 	console.log(chalk.cyan(createTitle()));
@@ -1109,6 +1187,15 @@ async function runInteractiveBenchmark() {
 // ============================================================================
 
 async function runInteractiveHistory() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1147,6 +1234,15 @@ async function runInteractiveHistory() {
 }
 
 async function runInteractiveSuiteStats() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1201,6 +1297,15 @@ async function runInteractiveSuiteStats() {
 }
 
 async function runInteractiveScenarioStats() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1269,6 +1374,15 @@ async function runInteractiveScenarioStats() {
 }
 
 async function runInteractiveRunStats() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1348,6 +1462,15 @@ async function runInteractiveRunStats() {
 }
 
 async function runInteractiveBatchStats() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1412,6 +1535,15 @@ async function runInteractiveBatchStats() {
 
 
 async function runInteractiveEvaluators() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1469,6 +1601,15 @@ async function runInteractiveEvaluators() {
 }
 
 async function runInteractiveBatchHistory() {
+	// Start dev server for web viewing
+	try {
+		const serverUrl = await startDevServer();
+		forceDatabaseSync(); // Ensure database is synced
+		console.log(chalk.gray(`\n🌐 View in browser: ${serverUrl}`));
+	} catch (err) {
+		// Continue without web server
+	}
+	
 	const logger = BenchmarkLogger.getInstance();
 	
 	try {
@@ -1921,16 +2062,7 @@ async function run() {
 	// Check for required environment variables first
 	await validateEnvironment();
 	
-	// Start dev server in background
-	// console.log(chalk.gray('Starting statistics web server...'));
-	try {
-		const serverUrl = await startDevServer();
-		// console.log(chalk.green('✓ Statistics server ready at:'), chalk.blue(serverUrl));
-	} catch (err) {
-		// console.log(chalk.yellow('⚠ Statistics server failed to start:'));
-		// console.error(chalk.red(err instanceof Error ? err.message : String(err)));
-		// console.log(chalk.gray('Continuing without web interface...'));
-	}
+	// Dev server will be started only when viewing statistics
 	
 	const parsedArgs = parseArgs(process.argv);
 	

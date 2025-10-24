@@ -98,8 +98,8 @@ export async function startDevServer(): Promise<string> {
   // Ensure we stop any existing server first
   try {
     stopDevServer();
-    // Wait a bit for processes to fully stop
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Brief pause for process cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
   } catch (err) {
     // Ignore errors when stopping
   }
@@ -128,15 +128,25 @@ export async function startDevServer(): Promise<string> {
   
   // Ensure public directory exists
   if (!existsSync(publicDir)) {
-    mkdirSync(publicDir, { recursive: true });
+    try {
+      mkdirSync(publicDir, { recursive: true });
+    } catch (err) {
+      console.error('Failed to create public directory:', err);
+      throw new Error(`Failed to create public directory: ${err}`);
+    }
   }
   
+  // Copy database if source exists
   if (existsSync(dbSource)) {
     try {
       copyFileSync(dbSource, dbDest);
+      console.log('Database copied to web server successfully');
     } catch (err) {
-      // Silently fail if database copy fails
+      console.error('Failed to copy database:', err);
+      throw new Error(`Failed to copy database: ${err}`);
     }
+  } else {
+    console.warn('Source database not found, web server will start without database');
   }
   
   // Kill processes on common dev server ports to ensure clean start
@@ -163,7 +173,7 @@ export async function startDevServer(): Promise<string> {
         throw err;
       }
       // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
   
@@ -250,13 +260,32 @@ export function updateDatabase(): void {
   const publicDir = join(reportDir, 'public');
   const dbDest = join(publicDir, 'benchmarks.db');
   
+  // Always ensure public directory exists
+  if (!existsSync(publicDir)) {
+    try {
+      mkdirSync(publicDir, { recursive: true });
+    } catch (err) {
+      console.error('Failed to create public directory:', err);
+      return;
+    }
+  }
+  
+  // Copy database if source exists
   if (existsSync(dbSource)) {
     try {
       copyFileSync(dbSource, dbDest);
+      console.log('Database synced to web server');
     } catch (err) {
-      // Silently fail if database update fails
+      console.error('Failed to sync database:', err);
     }
+  } else {
+    console.warn('Source database not found:', dbSource);
   }
+}
+
+export function forceDatabaseSync(): void {
+  console.log('🔄 Forcing database synchronization...');
+  updateDatabase();
 }
 
 export function stopDevServer(): void {
