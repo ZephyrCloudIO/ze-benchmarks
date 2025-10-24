@@ -478,6 +478,10 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
 	console.log(`  ${chalk.cyan('--no-json')}                     Skip JSON output`);
 	
+	console.log('\n' + chalk.bold('Web Dashboard:'));
+	console.log(`  ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
+	console.log(`  ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}`);
+	
 	outro(chalk.gray('Run any command to get started'));
 }
 
@@ -491,6 +495,10 @@ async function showInteractiveMenu() {
 	
 	console.log(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' Interactive Mode '));
+	
+	// Show web dashboard info
+	console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')} ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
+	console.log(`   ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}\n`);
 	
 	while (true) {
 		const action = await select({
@@ -1167,9 +1175,12 @@ async function runInteractiveSuiteStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
+		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
 		// Continue without web server
+		console.log(chalk.yellow('⚠ Web server not available, showing CLI statistics only'));
 	}
 	
 	const logger = BenchmarkLogger.getInstance();
@@ -1222,9 +1233,12 @@ async function runInteractiveScenarioStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
+		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
 		// Continue without web server
+		console.log(chalk.yellow('⚠ Web server not available, showing CLI statistics only'));
 	}
 	
 	const logger = BenchmarkLogger.getInstance();
@@ -1292,9 +1306,12 @@ async function runInteractiveRunStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
+		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
 		// Continue without web server
+		console.log(chalk.yellow('⚠ Web server not available, showing CLI statistics only'));
 	}
 	
 	const logger = BenchmarkLogger.getInstance();
@@ -1504,9 +1521,12 @@ async function runInteractiveBatchHistory() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
+		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
 		// Continue without web server
+		console.log(chalk.yellow('⚠ Web server not available, showing CLI statistics only'));
 	}
 	
 	const logger = BenchmarkLogger.getInstance();

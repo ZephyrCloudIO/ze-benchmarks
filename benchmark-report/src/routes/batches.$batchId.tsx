@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts'
 import { Copy, Download, RefreshCw } from 'lucide-react'
+import { scoreTickFormatter, formatTooltipScore, safeScore } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/batches/$batchId')({
   component: BatchDetailsPage,
@@ -483,12 +484,13 @@ function BatchDetailsPage() {
       )}
 
       {/* Agent Performance */}
-      {agentPerformance.length > 0 && (
-        <Card className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Agent Performance</h2>
-          
-          {/* Bar Chart */}
-          <div className="h-64 mb-6">
+      <Card className="p-6">
+        <h2 className="text-2xl font-bold mb-4">Agent Performance</h2>
+        
+        {agentPerformance.length > 0 ? (
+          <>
+            {/* Bar Chart */}
+            <div className="h-64 mb-6">
             <ChartContainer
               config={{
                 score: {
@@ -499,12 +501,33 @@ function BatchDetailsPage() {
             >
               <BarChart data={agentPerformance.map(a => ({
                 name: a.model && a.model !== 'default' ? `${a.agent} [${a.model}]` : a.agent,
-                score: a.avgWeightedScore,
+                score: safeScore(a.avgWeightedScore),
               }))}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis domain={[0, 10]} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <XAxis 
+                  dataKey="name" 
+                  label={{ value: 'Agent', position: 'insideBottom', offset: -5 }}
+                />
+                <YAxis 
+                  domain={[0, 1]} 
+                  tickFormatter={scoreTickFormatter}
+                  label={{ value: 'Score (0-10)', angle: -90, position: 'insideLeft' }}
+                />
+                <ChartTooltip 
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div className="rounded-lg border bg-background p-2 shadow-sm">
+                        <div className="grid gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium">{payload[0].payload.name}</span>
+                            <span className="text-sm font-bold">{formatTooltipScore(payload[0].value as number)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
                 <Bar dataKey="score" fill="hsl(var(--primary))" />
               </BarChart>
             </ChartContainer>
@@ -535,8 +558,14 @@ function BatchDetailsPage() {
               )
             })}
           </div>
-        </Card>
-      )}
+          </>
+        ) : (
+          <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+            <p className="text-lg font-medium">No agent performance data available</p>
+            <p className="text-sm mt-2">This batch may not have completed runs yet</p>
+          </div>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Tier Distribution */}

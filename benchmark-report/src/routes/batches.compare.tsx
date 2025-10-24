@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { scoreTickFormatter, formatTooltipScore, safeScore, generateSeriesColors } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/batches/compare')({
   component: BatchComparePage,
@@ -301,7 +302,7 @@ function BatchComparePage() {
                   ...acc,
                   [`batch${idx}`]: {
                     label: batch.batchId.substring(0, 8),
-                    color: `hsl(${idx * 60}, 70%, 50%)`,
+                    color: generateSeriesColors(batches.length)[idx],
                   },
                 }), {})}
               >
@@ -310,19 +311,43 @@ function BatchComparePage() {
                     name: 'Average Score',
                     ...batches.reduce((acc, batch, idx) => ({
                       ...acc,
-                      [`batch${idx}`]: batch.avgWeightedScore,
+                      [`batch${idx}`]: safeScore(batch.avgWeightedScore),
                     }), {}),
                   }]}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 10]} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <XAxis 
+                    dataKey="name" 
+                    label={{ value: 'Metric', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis 
+                    domain={[0, 1]} 
+                    tickFormatter={scoreTickFormatter}
+                    label={{ value: 'Score (0-10)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="grid gap-2">
+                            <div className="text-sm font-medium mb-2">Batch Comparison</div>
+                            {payload.map((entry, idx) => (
+                              <div key={idx} className="flex items-center justify-between gap-2">
+                                <span className="text-sm">{entry.name}</span>
+                                <span className="text-sm font-bold">{formatTooltipScore(entry.value as number)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
                   {batches.map((batch, idx) => (
                     <Bar
                       key={batch.batchId}
                       dataKey={`batch${idx}`}
-                      fill={`hsl(${idx * 60}, 70%, 50%)`}
+                      fill={generateSeriesColors(batches.length)[idx]}
                       name={batch.batchId.substring(0, 8)}
                     />
                   ))}

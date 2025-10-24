@@ -2,9 +2,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { RefreshCw } from 'lucide-react'
+import { getScoreDistributionRanges, safeScore } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -118,7 +119,7 @@ function Dashboard() {
         const performers = topPerformersResult[0].values.map((row) => ({
           agent: row[0] as string,
           model: row[1] as string,
-          avgScore: row[2] as number,
+          avgScore: safeScore(row[2] as number),
           runCount: row[3] as number,
           avgCost: row[4] as number || 0,
         }));
@@ -150,24 +151,17 @@ function Dashboard() {
           agent: row[3] as string,
           model: row[4] as string,
           status: row[5] as string,
-          weightedScore: row[6] as number | null,
+          weightedScore: safeScore(row[6] as number | null),
           startedAt: row[7] as string,
           completedAt: row[8] as string | null,
         }));
         setRecentRuns(runs);
       }
 
-      // Query score distribution
+      // Query score distribution (using 0-1 scale)
       const scoreDistResult = db.exec(`
         SELECT
-          CASE
-            WHEN weighted_score >= 9.0 THEN '9.0-10.0'
-            WHEN weighted_score >= 8.0 THEN '8.0-9.0'
-            WHEN weighted_score >= 7.0 THEN '7.0-8.0'
-            WHEN weighted_score >= 6.0 THEN '6.0-7.0'
-            WHEN weighted_score >= 5.0 THEN '5.0-6.0'
-            ELSE '0.0-5.0'
-          END as range,
+          ${getScoreDistributionRanges()},
           COUNT(*) as count
         FROM benchmark_runs
         WHERE weighted_score IS NOT NULL
@@ -205,7 +199,7 @@ function Dashboard() {
           completedAt: row[2] as number | null,
           totalRuns: row[3] as number,
           successfulRuns: row[4] as number,
-          avgWeightedScore: row[5] as number | null,
+          avgWeightedScore: safeScore(row[5] as number | null),
         }));
         setRecentBatches(batches);
       }
@@ -285,23 +279,43 @@ function Dashboard() {
           <ChartContainer
             config={{
               count: {
-                label: "Runs",
+                label: "Number of Runs",
                 color: "hsl(var(--chart-1))",
               },
             }}
-            className="h-[300px]"
+            className="h-[300px] w-full"
           >
             <BarChart data={scoreDistribution}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="range" />
-              <YAxis />
-              <ChartTooltip content={<ChartTooltipContent />} />
+              <XAxis 
+                dataKey="range" 
+                label={{ value: 'Score Range', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis 
+                label={{ value: 'Number of Runs', angle: -90, position: 'insideLeft' }}
+              />
+              <ChartTooltip 
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="rounded-lg border bg-background p-2 shadow-sm">
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">{payload[0].payload.range}</span>
+                          <span className="text-sm font-bold">{payload[0].value} runs</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
               <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ChartContainer>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-            No data available
+          <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground">
+            <p className="text-lg font-medium">No benchmark data available</p>
+            <p className="text-sm mt-2">Run some benchmarks to see score distribution</p>
           </div>
         )}
       </div>
