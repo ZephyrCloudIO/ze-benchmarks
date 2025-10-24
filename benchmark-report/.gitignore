@@ -15,6 +15,6 @@ dist/
 !.vscode/extensions.json
 .idea
 
-# Database files
-public/benchmarks.db
-public/db-version.json
+# Database files (keep public folder but ignore contents)
+public/*
+!public/.gitkeep
