@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
+    "@rsbuild/plugin-node-polyfill": "^1.4.2",
     "@tailwindcss/postcss": "^4.1.16",
     "@tanstack/react-router": "^1.133.25",
     "@tanstack/router-devtools": "^1.133.25",
