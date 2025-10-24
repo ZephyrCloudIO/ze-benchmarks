@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart'
+import { Pie, PieChart, Cell, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
 export const Route = createFileRoute('/costs')({
   component: CostsPage,
@@ -21,10 +23,25 @@ interface AgentCostEfficiency {
   scorePerDollar: number;
 }
 
+interface CostBreakdown {
+  name: string;
+  value: number;
+}
+
+interface TokenUsage {
+  agent: string;
+  model: string;
+  avgTokensIn: number;
+  avgTokensOut: number;
+  totalTokens: number;
+}
+
 function CostsPage() {
   const { db, isLoading, error } = useDatabase();
   const [costStats, setCostStats] = useState<CostStats | null>(null);
   const [costEfficiency, setCostEfficiency] = useState<AgentCostEfficiency[]>([]);
+  const [costBreakdown, setCostBreakdown] = useState<CostBreakdown[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -79,6 +96,53 @@ function CostsPage() {
         }));
         setCostEfficiency(efficiency);
       }
+
+      // Query cost breakdown by agent
+      const breakdownResult = db.exec(`
+        SELECT
+          br.agent,
+          SUM(rt.cost_usd) as total_cost
+        FROM benchmark_runs br
+        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
+        WHERE rt.cost_usd IS NOT NULL
+        GROUP BY br.agent
+        ORDER BY total_cost DESC
+      `);
+
+      if (breakdownResult[0]) {
+        const breakdown = breakdownResult[0].values.map((row) => ({
+          name: row[0] as string,
+          value: row[1] as number,
+        }));
+        setCostBreakdown(breakdown);
+      }
+
+      // Query token usage
+      const tokenResult = db.exec(`
+        SELECT
+          br.agent,
+          br.model,
+          AVG(rt.tokens_in) as avg_tokens_in,
+          AVG(rt.tokens_out) as avg_tokens_out,
+          AVG(rt.tokens_in + rt.tokens_out) as total_tokens
+        FROM benchmark_runs br
+        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
+        WHERE rt.tokens_in IS NOT NULL
+        GROUP BY br.agent, br.model
+        ORDER BY total_tokens DESC
+        LIMIT 10
+      `);
+
+      if (tokenResult[0]) {
+        const tokens = tokenResult[0].values.map((row) => ({
+          agent: row[0] as string,
+          model: row[1] as string,
+          avgTokensIn: row[2] as number || 0,
+          avgTokensOut: row[3] as number || 0,
+          totalTokens: row[4] as number || 0,
+        }));
+        setTokenUsage(tokens);
+      }
     } catch (err) {
       console.error('Failed to fetch cost stats:', err);
     }
@@ -119,6 +183,82 @@ function CostsPage() {
           <div className="text-3xl font-bold mt-2">{costStats?.totalRuns.toLocaleString() || '0'}</div>
           <div className="text-xs text-muted-foreground mt-1">With cost data</div>
         </div>
+      </div>
+
+      {/* Cost Breakdown Pie Chart */}
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-2xl font-semibold mb-4">Cost Breakdown by Agent</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Total cost distribution across different agents
+        </p>
+        {costBreakdown.length > 0 ? (
+          <ChartContainer
+            config={{
+              value: {
+                label: "Cost (USD)",
+              },
+            }}
+            className="h-[300px]"
+          >
+            <PieChart>
+              <Pie
+                data={costBreakdown}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label={(entry) => `${entry.name}: $${entry.value.toFixed(2)}`}
+              >
+                {costBreakdown.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
+                ))}
+              </Pie>
+              <ChartTooltip content={<ChartTooltipContent />} />
+            </PieChart>
+          </ChartContainer>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No data available
+          </div>
+        )}
+      </div>
+
+      {/* Token Usage Chart */}
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-2xl font-semibold mb-4">Token Usage by Agent/Model</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Average input and output tokens per run (top 10)
+        </p>
+        {tokenUsage.length > 0 ? (
+          <ChartContainer
+            config={{
+              avgTokensIn: {
+                label: "Tokens In",
+                color: "hsl(var(--chart-1))",
+              },
+              avgTokensOut: {
+                label: "Tokens Out",
+                color: "hsl(var(--chart-2))",
+              },
+            }}
+            className="h-[400px]"
+          >
+            <BarChart data={tokenUsage} layout="horizontal">
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="model" width={150} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar dataKey="avgTokensIn" stackId="a" fill="var(--color-avgTokensIn)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="avgTokensOut" stackId="a" fill="var(--color-avgTokensOut)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        ) : (
+          <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+            No data available
+          </div>
+        )}
       </div>
 
       {/* Cost Efficiency Table */}

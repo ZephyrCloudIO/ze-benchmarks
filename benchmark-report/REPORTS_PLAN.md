@@ -602,12 +602,15 @@ npx shadcn@latest add chart
 ### 1. Setup & Configuration
 - [x] Initialize TanStack Router with routes
 - [x] Configure tailwindcss and shadcn/ui
+- [x] Add sidebar navigation with icons
+- [x] Add breadcrumb navigation
 - [x] Install MVP shadcn components:
   ```bash
   npx shadcn@latest add card table button badge chart
   npx shadcn@latest add select calendar popover skeleton
+  npx shadcn@latest add sidebar breadcrumb
   ```
-  Installed: card, chart, button, badge, skeleton
+  Installed: card, chart, button, badge, skeleton, sidebar, breadcrumb, accordion, progress, separator, sheet, tooltip, input
 - [ ] Configure chart theming and color palette
 - [ ] Set up global typography and spacing tokens
 
@@ -628,20 +631,24 @@ npx shadcn@latest add chart
 **Week 3-4: Agent Performance Dashboard**
 - [x] Agent comparison grid with cards
 - [x] Model performance leaderboard
-- [ ] Score breakdown stacked bar chart (TODO - needs chart library)
-- [ ] Agent vs Model Heatmap (TODO)
+- [x] Agent vs Model Heatmap
+- [ ] Score breakdown stacked bar chart (TODO)
 - [ ] Cost vs Performance Scatter plot (TODO)
 - [ ] Filters panel (TODO)
 
 **Week 5-6: Run Details View**
-- [ ] Run info card with metadata (TODO)
-- [ ] Score breakdown with progress bars (TODO)
-- [ ] Telemetry details grid (TODO)
-- [ ] Evaluation details accordion (TODO)
+- [x] Run info card with metadata
+- [x] Score breakdown with progress bars
+- [x] Telemetry details grid
+- [x] Evaluation details accordion
+- [x] Clickable navigation from Recent Runs table
 
 ### 4. Phase 2 Development (Extended)
 - [x] Suite & Scenario Analysis page (basic version with cards and table)
-- [x] Cost & Efficiency Analysis page (cost stats and efficiency rankings)
+- [x] Cost & Efficiency Analysis page
+  - [x] Cost stats and efficiency rankings
+  - [x] Cost breakdown pie chart
+  - [x] Token usage stacked bar chart
 - [x] Evaluator Performance page (rankings and score distributions)
 
 ### 5. Phase 3 Development (Advanced)

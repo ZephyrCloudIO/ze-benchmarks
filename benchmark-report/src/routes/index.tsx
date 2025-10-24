@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
@@ -255,7 +255,12 @@ function Dashboard() {
         <div className="space-y-2">
           {recentRuns.length > 0 ? (
             recentRuns.map((run, idx) => (
-              <div key={idx} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+              <Link
+                key={idx}
+                to="/runs/$runId"
+                params={{ runId: run.runId }}
+                className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{run.scenario}</div>
                   <div className="text-sm text-muted-foreground flex gap-2 items-center">
@@ -292,7 +297,7 @@ function Dashboard() {
                 <div className="text-right text-xs text-muted-foreground min-w-[120px]">
                   {new Date(run.startedAt).toLocaleDateString()} {new Date(run.startedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="text-center text-muted-foreground py-8">No recent runs</div>

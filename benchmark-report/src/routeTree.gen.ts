@@ -14,6 +14,8 @@ import { Route as EvaluatorsRouteImport } from './routes/evaluators'
 import { Route as CostsRouteImport } from './routes/costs'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RunsIndexRouteImport } from './routes/runs.index'
+import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 
 const SuitesRoute = SuitesRouteImport.update({
   id: '/suites',
@@ -40,6 +42,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RunsIndexRoute = RunsIndexRouteImport.update({
+  id: '/runs/',
+  path: '/runs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunsRunIdRoute = RunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +59,8 @@ export interface FileRoutesByFullPath {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/runs/$runId': typeof RunsRunIdRoute
+  '/runs': typeof RunsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +68,8 @@ export interface FileRoutesByTo {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/runs/$runId': typeof RunsRunIdRoute
+  '/runs': typeof RunsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +78,37 @@ export interface FileRoutesById {
   '/costs': typeof CostsRoute
   '/evaluators': typeof EvaluatorsRoute
   '/suites': typeof SuitesRoute
+  '/runs/$runId': typeof RunsRunIdRoute
+  '/runs/': typeof RunsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/costs' | '/evaluators' | '/suites'
+  fullPaths:
+    | '/'
+    | '/agents'
+    | '/costs'
+    | '/evaluators'
+    | '/suites'
+    | '/runs/$runId'
+    | '/runs'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/costs' | '/evaluators' | '/suites'
-  id: '__root__' | '/' | '/agents' | '/costs' | '/evaluators' | '/suites'
+  to:
+    | '/'
+    | '/agents'
+    | '/costs'
+    | '/evaluators'
+    | '/suites'
+    | '/runs/$runId'
+    | '/runs'
+  id:
+    | '__root__'
+    | '/'
+    | '/agents'
+    | '/costs'
+    | '/evaluators'
+    | '/suites'
+    | '/runs/$runId'
+    | '/runs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +117,8 @@ export interface RootRouteChildren {
   CostsRoute: typeof CostsRoute
   EvaluatorsRoute: typeof EvaluatorsRoute
   SuitesRoute: typeof SuitesRoute
+  RunsRunIdRoute: typeof RunsRunIdRoute
+  RunsIndexRoute: typeof RunsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +158,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/runs/': {
+      id: '/runs/'
+      path: '/runs'
+      fullPath: '/runs'
+      preLoaderRoute: typeof RunsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runs/$runId': {
+      id: '/runs/$runId'
+      path: '/runs/$runId'
+      fullPath: '/runs/$runId'
+      preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +181,8 @@ const rootRouteChildren: RootRouteChildren = {
   CostsRoute: CostsRoute,
   EvaluatorsRoute: EvaluatorsRoute,
   SuitesRoute: SuitesRoute,
+  RunsRunIdRoute: RunsRunIdRoute,
+  RunsIndexRoute: RunsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
