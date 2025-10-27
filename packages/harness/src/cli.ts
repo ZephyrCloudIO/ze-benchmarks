@@ -1,8 +1,12 @@
 #!/usr/bin/env tsx
+import { config } from 'dotenv';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
+
+// Load environment variables from .env file in project root
+config({ path: resolve(process.cwd(), '.env') });
 import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
 import { OpenAI } from 'openai';
 import { runEvaluators } from '../../evaluators/src/index.ts';

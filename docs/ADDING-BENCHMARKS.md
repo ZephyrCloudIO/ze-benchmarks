@@ -8,8 +8,8 @@ Benchmarks are structured tests that evaluate AI agents' ability to perform spec
 
 - **Scenarios**: Specific tasks within a domain (e.g., "update dependencies")
 - **Prompts**: Different levels of instruction detail (L0-L3, Lx)
-- **Evaluators**: Automated scoring mechanisms
-- **Fixtures**: Starting repository states for testing
+- **Evaluators**: Automated scoring mechanisms (universal and LLM's as a judge)
+- **Fixtures**: Starting repository states for evaluating
 
 ## Directory Structure
 
@@ -34,9 +34,12 @@ suites/
 ## Required Files
 
 ### 1. scenario.yaml
+
 The main configuration file defining the benchmark scenario.
 
 **Required fields:**
+- `title`: Human-readable title
+- `description`: Detailed description
 - `id`: Unique identifier for the scenario
 - `suite`: Parent suite name
 - `workspace`: Node version and package manager settings
@@ -44,15 +47,14 @@ The main configuration file defining the benchmark scenario.
 - `validation`: Commands to verify success
 
 **Optional fields:**
-- `title`: Human-readable title
-- `description`: Detailed description
 - `constraints`: Package restrictions and rules
-- `targets`: Dependencies to update
-- `oracle`: Expected agent responses
+- `targets`: Key goals that need to be accomplished to effectively solve this suite
+- `oracle`: Expected agent responses 
 - `llm_judge`: AI-powered evaluation settings
-- `rubric_overrides`: Custom scoring weights
+- `rubric_overrides`: Custom scoring weights (in case you want to write your own evaluators)
 
 ### 2. Oracle Answers (oracle-answers.json)
+
 Expected responses to common agent questions, used for validation.
 
 ```json
@@ -63,6 +65,7 @@ Expected responses to common agent questions, used for validation.
 ```
 
 ### 3. Repository Fixture (repo-fixture/)
+
 Starting state of the repository before agent execution.
 
 **Structure:**
@@ -79,7 +82,8 @@ repo-fixture/
 ```
 
 ### 4. Prompt Files
-Different instruction levels for testing agent adaptability.
+
+Different instruction levels for testing agent adaptability. You can add more or fewer prompts as needed, but make sure to indicate whether the prompt is direct or indirect.
 
 - **L0-minimal.md**: Bare minimum context
 - **L1-basic.md**: Standard user scenario
@@ -90,15 +94,18 @@ Different instruction levels for testing agent adaptability.
 ## Step-by-Step Tutorial
 
 ### Step 1: Choose Your Domain
+
 Select a domain for your benchmark suite (e.g., "dependency-management", "code-migration", "testing").
 
 ### Step 2: Create Suite Structure
+
 ```bash
 mkdir -p suites/my-suite/prompts/my-scenario
 mkdir -p suites/my-suite/scenarios/my-scenario
 ```
 
 ### Step 3: Write scenario.yaml
+
 Create the main configuration file:
 
 ```yaml
@@ -138,6 +145,74 @@ targets:
     - name: "eslint"
       to: "^9"
 
+# Additional Target Examples:
+
+# Example 1: Todo App Migration (React to Solid.js)
+# targets:
+#   required:
+#     - name: "solid-js"
+#       to: "^1.8.0"
+#     - name: "@solidjs/router"
+#       to: "^0.10.0"
+#   optional:
+#     - name: "solid-styled-components"
+#       to: "^0.5.0"
+
+# Example 2: Testing Framework Upgrade
+# targets:
+#   required:
+#     - name: "vitest"
+#       to: "^1.0.0"
+#     - name: "@testing-library/react"
+#       to: "^14.0.0"
+#   optional:
+#     - name: "jsdom"
+#       to: "^23.0.0"
+
+# Example 3: Build Tool Migration (Webpack to Vite)
+# targets:
+#   required:
+#     - name: "vite"
+#       to: "^5.0.0"
+#     - name: "@vitejs/plugin-react"
+#       to: "^4.0.0"
+#   optional:
+#     - name: "vite-plugin-pwa"
+#       to: "^0.17.0"
+
+# Example 4: Security Fix (Vulnerable Dependencies)
+# targets:
+#   required:
+#     - name: "lodash"
+#       to: "^4.17.21"  # Fix security vulnerability
+#     - name: "axios"
+#       to: "^1.6.0"    # Update to secure version
+#   optional:
+#     - name: "dotenv"
+#       to: "^16.3.0"   # Optional security update
+
+# Example 5: Bug Fix (Broken TypeScript Types)
+# targets:
+#   required:
+#     - name: "@types/node"
+#       to: "^20.0.0"   # Fix broken type definitions
+#     - name: "typescript"
+#       to: "^5.2.0"    # Update to fix compilation errors
+#   optional:
+#     - name: "@types/react"
+#       to: "^18.2.0"   # Optional type improvements
+
+# Example 6: Performance Fix (Outdated Dependencies)
+# targets:
+#   required:
+#     - name: "react"
+#       to: "^18.2.0"   # Fix performance issues
+#     - name: "react-dom"
+#       to: "^18.2.0"   # Match React version
+#   optional:
+#     - name: "react-scripts"
+#       to: "^5.0.1"    # Optional build improvements
+
 validation:
   commands:
     install: "pnpm install"
@@ -163,6 +238,7 @@ rubric_overrides:
 ```
 
 ### Step 4: Create Oracle Answers
+
 Define expected responses to common questions:
 
 ```json
@@ -174,6 +250,7 @@ Define expected responses to common questions:
 ```
 
 ### Step 5: Set Up Repository Fixture
+
 Create a minimal but realistic starting repository:
 
 ```
@@ -193,6 +270,7 @@ repo-fixture/
 ```
 
 ### Step 6: Write Prompts
+
 Create different instruction levels:
 
 **L0-minimal.md:**
@@ -222,6 +300,7 @@ Constraints:
 ```
 
 ### Step 7: Test Your Benchmark
+
 Run your benchmark locally:
 
 ```bash

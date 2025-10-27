@@ -1,103 +1,99 @@
 # Zephyr Bench – Real-world LLM & Tool Benchmark Suite
 
-Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real software tasks with dynamic tier loading, multiple agent adapters, and detailed evaluation metrics.
+Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real software tasks. This system allows you to create realistic coding scenarios, test different AI agents, and measure their performance across multiple evaluation criteria.
 
-## 🚀 What's Working
+> **Environment Setup**: Create a `.env` file in the **project root directory** (`ze-benchmarks/.env`) with your API keys. See [Environment Variables](#-environment-variables) section below for details.
 
-### Core System
-- **✅ Interactive CLI**: Full-featured command-line interface with dynamic model/tier loading
-- **✅ Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code agents
-- **✅ Dynamic Tier System**: Automatic scanning of L0-L3 and Lx difficulty tiers
-- **✅ Batch Execution**: Run multiple combinations with progress tracking
-- **✅ SQLite Database**: Persistent storage with comprehensive schema
-- **✅ Web Dashboard**: Real-time results viewing with React + Rsbuild
-- **✅ Evaluation System**: Automated tests, LLM Judge, dependency analysis
-- **✅ Failure Detection**: Comprehensive run failure logging and analysis
+## 🏗️ How the System Works
 
-### Features
-- **✅ Real-time Statistics**: Performance metrics, evaluator scores, LLM Judge analysis
-- **✅ Batch Analytics**: Comprehensive batch-level statistics and trends
-- **✅ Auto-refresh**: Database synchronization with timestamp-based polling
-- **✅ Documentation**: Comprehensive guides for contributors
+### Architecture Overview
+The system consists of four main components:
 
-## 📋 What's Needed
+1. **Harness** (`packages/harness/`) - CLI interface and execution engine
+2. **Agent Adapters** (`packages/agent-adapters/`) - Integration with different AI providers
+3. **Evaluators** (`packages/evaluators/`) - Automated testing and evaluation logic
+4. **Database** (`packages/database/`) - SQLite storage for results and metadata
 
-### Documentation (In Progress)
-- **🔄 Example Benchmarks**: Complete working examples in `docs/examples/`
-- **🔄 LLM Evaluator Guide**: Advanced LLM evaluator documentation
-- **🔄 API Reference**: Complete interface documentation
-- **🔄 Troubleshooting Guide**: Common issues and solutions
+### Execution Flow
+1. **CLI** scans available suites and scenarios
+2. **Agent** receives prompt and workspace context
+3. **Agent** performs the requested task (e.g., update dependencies)
+4. **Evaluators** test the result (build, lint, tests, etc.)
+5. **Database** stores results with detailed metadata
+6. **Web Dashboard** displays results in real-time
 
-### System Enhancements
-- **📝 More Agent Adapters**: Additional LLM providers and tools
-- **📝 Advanced Evaluators**: More sophisticated evaluation metrics
-- **📝 Benchmark Suites**: Additional domain-specific scenarios
-- **📝 Performance Optimization**: Faster execution and better resource usage
+### Current Working Features
+- **✅ Interactive CLI**: Dynamic suite/scenario loading with progress tracking
+- **✅ Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code
+- **✅ Dynamic Tier System**: Automatic L0-L3 and Lx difficulty scanning
+- **✅ Batch Execution**: Run multiple agent/tier combinations
+- **✅ Real-time Database**: SQLite with timestamp-based auto-refresh
+- **✅ Web Dashboard**: React-based results viewer at `localhost:3000`
+- **✅ Comprehensive Evaluators**: Build, lint, typecheck, dependency analysis
+- **✅ Failure Detection**: Detailed error logging and categorization
 
-## 🗺️ Roadmap
+## 🚀 Quick Setup
 
-### Phase 1: Documentation Completion (Current)
-- [ ] Complete example benchmarks with full documentation
-- [ ] Advanced LLM evaluator guide with custom categories
-- [ ] Comprehensive API reference for all interfaces
-- [ ] Troubleshooting guide with common issues and solutions
-
-### Phase 2: System Enhancements
-- [ ] Additional agent adapters (GPT-4, Gemini, etc.)
-- [ ] Advanced evaluators (code quality, security, performance)
-- [ ] More benchmark suites (testing, deployment, migration)
-- [ ] Performance optimizations and caching
-
-### Phase 3: Community Features
-- [ ] Benchmark sharing and discovery
-- [ ] Community-contributed evaluators
-- [ ] Benchmark marketplace
-- [ ] Collaborative evaluation
-
-## 🚀 Quick Start
-
-### Installation
+### 1. Installation
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/your-org/ze-benchmarks.git
 cd ze-benchmarks
-
-# Install dependencies
 pnpm install
 
-# Build packages
-pnpm build
 ```
 
-### Environment Setup
+### 2. Environment Setup
 ```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your API keys
 # Required for Anthropic Claude
-export ANTHROPIC_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-# Optional for OpenRouter models
-export OPENROUTER_API_KEY=your_key_here
-
-# Optional model overrides
-export CLAUDE_MODEL=claude-3-5-sonnet-20241022
-export LLM_JUDGE_MODEL=anthropic/claude-3.5-sonnet
+# Optional for OpenRouter models  
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
-### Run Interactive CLI
-```bash
-# Start the interactive CLI
-pnpm -w packages/harness run dev
+**Get API Keys:**
+- **Anthropic Claude**: https://console.anthropic.com/settings/keys
+- **OpenRouter**: https://openrouter.ai/keys
 
-# Or run directly
+### 3. Run Your First Benchmark
+```bash
+# Start interactive CLI
 npx tsx packages/harness/src/cli.ts
+
+# Or run a specific benchmark
+npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
 ```
 
-### Start Web Dashboard
+### 4. View Results
 ```bash
-# Start the development server
+# Start web dashboard
 pnpm dev
-
-# Open http://localhost:3000 in your browser
+# Open http://localhost:3000
 ```
+
+## 📁 Understanding Suites and Scenarios
+
+### Suite Structure
+A **suite** is a collection of related benchmarks. Each suite contains:
+- **Scenarios**: Individual test cases within the suite
+- **Prompts**: Difficulty tiers (L0-L3, Lx) for each scenario
+- **Repository Fixtures**: Real codebases with intentional issues
+
+### Current Suites
+- **`update-deps`**: Dependency update scenarios (React, TypeScript, etc.)
+- **`test-suite`**: Basic test scenarios with limited tiers
+
+### Scenario Components
+Each scenario requires:
+1. **`scenario.yaml`**: Configuration and evaluation criteria
+2. **`oracle-answers.json`**: Expected outcomes for validation
+3. **`repo-fixture/`**: Complete codebase with intentional issues
+4. **Prompts**: L0-L3 and Lx difficulty tiers
 
 ## 🎯 Available Agents
 
@@ -108,9 +104,9 @@ pnpm dev
 | **OpenRouter** | Multiple LLM providers via OpenRouter | `OPENROUTER_API_KEY` |
 | **Claude Code** | Claude Code CLI tool integration | `ANTHROPIC_API_KEY` |
 
-## 📊 Dynamic Tier System
+## 📊 Prompt Tier System
 
-The system automatically scans available difficulty tiers for each scenario:
+The system automatically scans available difficulty tiers:
 
 | Tier | Description | Use Case |
 |------|-------------|----------|
@@ -123,59 +119,49 @@ The system automatically scans available difficulty tiers for each scenario:
 ## 🔍 Evaluation System
 
 ### Automated Evaluators
-- **Install Success**: Dependency installation validation
-- **Test Regression**: Test suite execution and validation
-- **Dependency Targets**: Required dependency updates
-- **Integrity Guard**: Security vulnerability checks
-- **Manager Correctness**: Package manager usage validation
+- **BuildEvaluator**: Validates project builds successfully
+- **LintEvaluator**: Ensures code quality standards
+- **TypecheckEvaluator**: Verifies TypeScript type correctness
+- **CompanionAlignmentEvaluator**: Ensures companion packages align
+- **NamespaceMigrationEvaluator**: Handles package namespace changes
 
 ### LLM Judge
 - **AI-Powered Assessment**: Quality evaluation using language models
 - **Weighted Scoring**: Configurable evaluation weights
 - **Detailed Feedback**: Comprehensive reasoning and suggestions
-- **Custom Categories**: Domain-specific evaluation criteria
 
-## 📈 Web Dashboard Features
-
-- **Real-time Results**: Live updates as benchmarks run
-- **Interactive Charts**: Performance visualization and trends
-- **Batch Analytics**: Comprehensive batch-level statistics
-- **Run Details**: Individual run analysis and debugging
-- **Model Comparison**: Side-by-side agent performance
-- **Failure Analysis**: Detailed failure reasons and patterns
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 ze-benchmarks/
 ├── packages/
 │   ├── harness/              # CLI and execution engine
-│   ├── agent-adapters/        # Agent implementations
+│   ├── agent-adapters/        # Agent implementations  
 │   ├── evaluators/           # Evaluation logic and LLM Judge
 │   └── database/             # SQLite database management
 ├── suites/                   # Benchmark scenarios
 │   ├── update-deps/          # Dependency update scenarios
-│   └── test-suite/           # Test scenarios with limited tiers
-├── results/                  # Benchmark results and database
+│   │   ├── prompts/          # L0-L3 and Lx prompts
+│   │   └── scenarios/        # Scenario configs and fixtures
+│   └── test-suite/           # Basic test scenarios
 ├── benchmark-report/         # Web dashboard (React + Rsbuild)
+│   └── public/               # Database and static assets
 └── docs/                     # Comprehensive documentation
     ├── ADDING-BENCHMARKS.md  # Guide for creating benchmarks
     ├── ADDING-EVALUATORS.md  # Guide for creating evaluators
-    ├── PROMPT-TIERS.md      # Prompt tier system documentation
-    ├── QUICK-START.md       # Fast-track onboarding guide
     └── templates/            # Ready-to-use templates
 ```
 
-## 🛠️ CLI Commands
+## 🛠️ CLI Usage
 
 ### Interactive Mode (Recommended)
 ```bash
 # Start interactive CLI
 npx tsx packages/harness/src/cli.ts
 
-# Available options:
-# - Run benchmarks with different agents
-# - View statistics and history
+# Choose from:
+# - Run benchmarks (select suite, scenario, agent, tier)
+# - View statistics and history  
 # - Compare model performance
 # - Analyze batch results
 ```
@@ -185,7 +171,7 @@ npx tsx packages/harness/src/cli.ts
 # Run specific benchmark
 npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
 
-# Batch execution
+# Batch execution (all tiers)
 npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --batch --agent anthropic
 
 # View results
@@ -205,64 +191,53 @@ npx tsx packages/harness/src/cli.ts --compare-batches
 npx tsx packages/harness/src/cli.ts --batch-details <batch-id>
 ```
 
-## 📚 Documentation
+## Creating New Suites and Scenarios
 
-### For Contributors
-- **[Quick Start Guide](docs/QUICK-START.md)** - Get up and running in 30 minutes
-- **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Comprehensive benchmark creation guide
-- **[Adding Evaluators](docs/ADDING-EVALUATORS.md)** - Detailed evaluator development guide
-- **[Prompt Tiers](docs/PROMPT-TIERS.md)** - Understanding the tier system
-- **[Contributing](docs/CONTRIBUTING.md)** - Contribution guidelines and process
-
-### Templates and Examples
-- **[Scenario Template](docs/templates/scenario.yaml)** - Annotated configuration template
-- **[Evaluator Template](docs/templates/heuristic-evaluator.ts)** - Complete evaluator template
-- **[Quality Checklists](docs/BENCHMARK-CHECKLIST.md)** - Pre-submission validation
-
-### Reference Documentation
-- **[Configuration Reference](docs/CONFIGURATION-REFERENCE.md)** - Complete config documentation
-- **[API Reference](docs/API-REFERENCE.md)** - Interface documentation
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-
-
-## 🔧 Adding New Scenarios
-
-### 1. Create Directory Structure
+### Step 1: Create Suite Structure
 ```bash
-mkdir -p suites/my-suite/prompts/my-scenario
-mkdir -p suites/my-suite/scenarios/my-scenario
+# Create new suite directory
+mkdir -p suites/my-new-suite/prompts/my-scenario
+mkdir -p suites/my-new-suite/scenarios/my-scenario/repo-fixture
 ```
 
-### 2. Add Configuration
+### Step 2: Create Scenario Configuration
 ```bash
-# Copy template
-cp docs/templates/scenario.yaml suites/my-suite/scenarios/my-scenario/scenario.yaml
-
-# Edit configuration
-# Update id, suite, title, description, and other fields
+# Copy and customize the template
+cp docs/templates/scenario.yaml suites/my-new-suite/scenarios/my-scenario/scenario.yaml
 ```
 
-### 3. Create Prompts
-```bash
-# L0 - Minimal context
-echo "Update the dependencies in this project." > suites/my-suite/prompts/my-scenario/L0-minimal.md
+Edit `scenario.yaml` with your specific requirements:
+```yaml
+id: "my-scenario"
+suite: "my-new-suite"
+title: "My Custom Scenario"
+description: "Description of what this scenario tests"
 
-# L1 - Basic context
-echo "This project needs its dependencies updated. Please update React and related packages to their latest compatible versions while ensuring the project still builds and tests pass." > suites/my-suite/prompts/my-scenario/L1-basic.md
+# Define what needs to be updated
+targets:
+  required:
+    - name: "react"
+      to: "^18.0.0"
+    - name: "@types/react"
+      to: "^18.0.0"
+  optional:
+    - name: "typescript"
+      to: "^5.0.0"
 
-# L2 - Directed guidance
-echo "Update the dependencies in this React project:
-1. Update React to the latest 18.x version
-2. Update @types/react to match React version
-3. Ensure all tests pass
-4. Maintain TypeScript compatibility" > suites/my-suite/prompts/my-scenario/L2-directed.md
+# Define validation commands
+validation:
+  commands:
+    install: "npm install"
+    build: "npm run build"
+    test: "npm test"
 ```
 
-### 4. Add Repository Fixture
+### Step 3: Create Repository Fixture
+Create a complete codebase with intentional issues:
+
 ```bash
-# Create minimal package.json
-mkdir -p suites/my-suite/scenarios/my-scenario/repo-fixture
-cat > suites/my-suite/scenarios/my-scenario/repo-fixture/package.json << 'EOF'
+# Create package.json with outdated dependencies
+cat > suites/my-new-suite/scenarios/my-scenario/repo-fixture/package.json << 'EOF'
 {
   "name": "test-project",
   "version": "1.0.0",
@@ -270,145 +245,138 @@ cat > suites/my-suite/scenarios/my-scenario/repo-fixture/package.json << 'EOF'
     "react": "^17.0.0",
     "@types/react": "^17.0.0"
   },
+  "devDependencies": {
+    "typescript": "^4.0.0"
+  },
   "scripts": {
+    "build": "tsc",
     "test": "echo 'Tests pass'"
   }
 }
 EOF
+
+# Add source files, config files, etc.
 ```
 
-### 5. Test Your Benchmark
+### Step 4: Create Prompts
+Create different difficulty tiers:
+
 ```bash
-# Test with a specific agent
-pnpm bench my-suite my-scenario --tier L1 --agent anthropic
+# L0 - Minimal context
+echo "Update the dependencies in this project." > suites/my-new-suite/prompts/my-scenario/L0-minimal.md
+
+# L1 - Basic context  
+echo "This React project needs its dependencies updated. Please update React and related packages to their latest compatible versions while ensuring the project still builds and tests pass." > suites/my-new-suite/prompts/my-scenario/L1-basic.md
+
+# L2 - Directed guidance
+echo "Update the dependencies in this React project:
+1. Update React to the latest 18.x version
+2. Update @types/react to match React version  
+3. Update TypeScript to latest 5.x version
+4. Ensure all tests pass
+5. Maintain TypeScript compatibility" > suites/my-new-suite/prompts/my-scenario/L2-directed.md
+```
+
+### Step 5: Create Oracle Answers
+```bash
+cat > suites/my-new-suite/scenarios/my-scenario/oracle-answers.json << 'EOF'
+{
+  "react": "^18.0.0",
+  "@types/react": "^18.0.0", 
+  "typescript": "^5.0.0"
+}
+EOF
+```
+
+### Step 6: Test Your Scenario
+```bash
+# Test with specific agent and tier
+npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --tier L1 --agent anthropic
 
 # Test all tiers
-pnpm bench my-suite my-scenario --tier L0,L1,L2 --agent anthropic
+npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --batch --agent anthropic
 ```
 
-## 🧪 Adding New Evaluators
+## 📚 Documentation
 
-### 1. Create Evaluator File
+### Comprehensive Guides
+- **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Complete benchmark creation guide
+- **[Adding Evaluators](docs/ADDING-EVALUATORS.md)** - Evaluator development guide  
+- **[Quick Start](docs/QUICK-START.md)** - Fast-track onboarding
+- **[Contributing](docs/CONTRIBUTING.md)** - Contribution guidelines
+
+### Templates
+- **[Scenario Template](docs/templates/scenario.yaml)** - Annotated configuration
+- **[Evaluator Template](docs/templates/heuristic-evaluator.ts)** - Complete evaluator template
+- **[Quality Checklists](docs/BENCHMARK-CHECKLIST.md)** - Pre-submission validation
+
+## 🔧 Environment Variables
+
+The system uses environment variables for configuration. Create a `.env` file from the example:
+
 ```bash
-# Copy template
-cp docs/templates/heuristic-evaluator.ts packages/evaluators/src/evaluators/my-custom-evaluator.ts
+cp .env.example .env
 ```
 
-### 2. Implement Evaluation Logic
-```typescript
-export class MyCustomEvaluator implements Evaluator {
-  meta = { name: 'MyCustomEvaluator' } as const;
+### Required Variables
+- **`ANTHROPIC_API_KEY`**: Required for Anthropic Claude agent and Claude Code
+- **`OPENROUTER_API_KEY`**: Required for OpenRouter agent
 
-  async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
-    // Your custom evaluation logic here
-    const score = this.checkSomething(ctx);
-    return {
-      name: this.meta.name,
-      score,
-      details: `Custom evaluation: ${score}`
-    };
-  }
-}
-```
+### Optional Variables
+- **`CLAUDE_MODEL`**: Override default Claude model (default: `claude-3-5-sonnet-20241022`)
+- **`LLM_JUDGE_MODEL`**: Override LLM Judge model (default: `anthropic/claude-3.5-sonnet`)
+- **`ZE_BENCHMARKS_DB`**: Override database path (default: `benchmark-report/public/benchmarks.db`)
+- **`DEBUG`**: Enable debug logging (default: `false`)
+- **`PORT`**: Web dashboard port (default: `3000`)
 
-### 3. Test Your Evaluator
-```typescript
-// Create test file
-describe('MyCustomEvaluator', () => {
-  it('should evaluate correctly', async () => {
-    const evaluator = new MyCustomEvaluator();
-    const result = await evaluator.evaluate(mockContext);
-    expect(result.score).toBeGreaterThanOrEqual(0);
-    expect(result.score).toBeLessThanOrEqual(1);
-  });
-});
-```
+## 🔍 Database and Results
+
+### Database Location
+- **Primary Database**: `benchmark-report/public/benchmarks.db`
+- **Auto-refresh**: Timestamp-based polling every 5 seconds
+- **Version Tracking**: `benchmark-report/public/db-version.json`
+
+### Result Storage
+- **Runs**: Individual benchmark executions with detailed metadata
+- **Batches**: Groups of runs with aggregate statistics  
+- **Evaluations**: Detailed evaluator results and scores
+- **Failures**: Categorized error logging (workspace, prompt, agent, evaluation)
+
+### Web Dashboard Features
+- **Real-time Updates**: Automatic refresh when database changes
+- **Interactive Charts**: Performance visualization with proper 0-1 scoring
+- **Batch Analytics**: Comprehensive batch-level statistics
+- **Run Details**: Individual run analysis and debugging
+- **Failure Analysis**: Detailed failure reasons and patterns
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how to get started:
-
-### 1. Fork and Clone
-```bash
-git clone https://github.com/your-username/ze-benchmarks.git
-cd ze-benchmarks
-```
-
-### 2. Create a Branch
-```bash
-git checkout -b feature/my-contribution
-```
-
-### 3. Make Your Changes
-- Follow the coding standards and guidelines
-- Test thoroughly
-- Update documentation as needed
-
-### 4. Submit a Pull Request
-- Fill out the PR template
-- Request review from maintainers
-- Address feedback and make changes
+### Getting Started
+1. **Fork and Clone**: `git clone https://github.com/your-username/ze-benchmarks.git`
+2. **Create Branch**: `git checkout -b feature/my-contribution`
+3. **Make Changes**: Follow coding standards and test thoroughly
+4. **Submit PR**: Fill out template and request review
 
 ### Quality Standards
-- **Benchmarks**: Realistic, challenging, well-documented
+- **Benchmarks**: Realistic, challenging, well-documented scenarios
 - **Evaluators**: Fast, reliable, meaningful feedback
 - **Documentation**: Clear, complete, examples included
 - **Testing**: Comprehensive test coverage
 
-## 📊 Current Status
-
-### ✅ Completed Features
-- Interactive CLI with dynamic tier loading
-- Multi-agent support (Echo, Anthropic, OpenRouter, Claude Code)
-- Comprehensive evaluation system
-- SQLite database with persistent storage
-- Web dashboard with real-time updates
-- Batch execution and analytics
-- Failure detection and logging
-- Docker support
-- Comprehensive documentation
-
-### 🔄 In Progress
-- Example benchmarks and templates
-- Advanced LLM evaluator documentation
-- API reference documentation
-- Troubleshooting guide
-
-### 📝 Planned Features
-- Additional agent adapters
-- Advanced evaluators
-- More benchmark suites
-- Performance optimizations
-- Community features
-
-## 🆘 Getting Help
-
-### Documentation
-- Check the `docs/` directory for comprehensive guides
-- Use the quick start guide for fast onboarding
-- Review templates and examples
-
-### Support
-- **GitHub Issues**: For bug reports and feature requests
-- **GitHub Discussions**: For questions and general discussion
-- **Pull Request Comments**: For specific feedback on contributions
+## 🆘 Troubleshooting
 
 ### Common Issues
 - **Benchmark not loading**: Check YAML syntax and file structure
-- **Evaluator not running**: Verify interface implementation
+- **Evaluator not running**: Verify interface implementation  
 - **Database issues**: Check file permissions and paths
 - **Agent failures**: Verify API keys and network connectivity
+- **Web dashboard not updating**: Check database location and permissions
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Contributors**: Thank you to all contributors who help improve the project
-- **Community**: Thanks to the AI agent evaluation community for feedback and suggestions
-- **Open Source**: Built on top of many excellent open source projects
+### Getting Help
+- **Documentation**: Check `docs/` directory for comprehensive guides
+- **GitHub Issues**: For bug reports and feature requests
+- **GitHub Discussions**: For questions and general discussion
 
 ---
 
-**Ready to get started?** Check out the [Quick Start Guide](docs/QUICK-START.md) to begin contributing in just 30 minutes!
+**Ready to create benchmarks?** Start with the [Quick Start Guide](docs/QUICK-START.md) or dive into [Adding Benchmarks](docs/ADDING-BENCHMARKS.md)!
