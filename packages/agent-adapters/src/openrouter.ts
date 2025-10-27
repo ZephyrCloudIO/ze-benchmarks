@@ -2,35 +2,8 @@ import { OpenAI } from 'openai';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
 
 interface ToolResult {
-  type: 'tool_result';
-  tool_use_id: string;
+  tool_call_id: string;
   content: string;
-}
-
-interface ConversationTurn {
-  role: 'assistant' | 'user';
-  content: string | ToolResult[];
-}
-
-interface ModelPricing {
-  prompt: string;
-  completion: string;
-  request: string;
-  image: string;
-  web_search: string;
-  internal_reasoning: string;
-  input_cache_read: string;
-  input_cache_write: string;
-}
-
-interface ModelData {
-  id: string;
-  name: string;
-  pricing: ModelPricing;
-}
-
-interface ModelsResponse {
-  data: ModelData[];
 }
 
 export class OpenRouterAdapter implements AgentAdapter {
@@ -38,90 +11,229 @@ export class OpenRouterAdapter implements AgentAdapter {
   private readonly client: OpenAI;
   private readonly DEFAULT_MAX_ITERATIONS = 50;
   private readonly DEFAULT_MAX_TOKENS = 8192;
-  private readonly DEFAULT_MODEL = "anthropic/claude-3.5-sonnet";
-  private modelPricing: Map<string, ModelPricing> = new Map();
+  private readonly DEFAULT_MODEL = "minimax/minimax-m2:free";
+  private readonly model: string;
+  private readonly modelSource: 'parameter' | 'environment' | 'default';
   
-  constructor(apiKey = process.env.OPENROUTER_API_KEY!) {
-    console.log('🔧 Initializing OpenRouter adapter...');
-    
+  constructor(apiKey = process.env.OPENROUTER_API_KEY!, model?: string) {
     if (!apiKey) {
-      console.error('❌ Missing OPENROUTER_API_KEY environment variable');
       throw new Error(
         "Missing OPENROUTER_API_KEY environment variable. " +
         "Get your API key from: https://openrouter.ai/keys"
       );
     }
-    
-    console.log(`✅ API key found: ${apiKey.substring(0, 8)}...`);
-    console.log(`🔧 Using model: ${process.env.OPENROUTER_MODEL || this.DEFAULT_MODEL}`);
-    
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: apiKey,
     });
-
-    // Load model pricing data
-    this.loadModelPricing();
-    console.log('✅ OpenRouter adapter initialized');
+    
+    // Determine model source and log appropriately
+    if (model) {
+      this.model = model;
+      this.modelSource = 'parameter';
+      console.log(`✅ OpenRouter: Using model from parameter: ${this.model}`);
+    } else if (process.env.OPENROUTER_MODEL) {
+      this.model = process.env.OPENROUTER_MODEL;
+      this.modelSource = 'environment';
+      console.log(`✅ OpenRouter: Using model from environment: ${this.model}`);
+    } else {
+      this.model = this.DEFAULT_MODEL;
+      this.modelSource = 'default';
+      console.log(`⚠️  OpenRouter: No model specified, using default: ${this.model}`);
+      console.log(`   Specify with --model flag or set OPENROUTER_MODEL environment variable`);
+    }
+    
+    if (this.model.includes('llama')) {
+      console.log(`⚠️  Note: Some Llama models may return JSON descriptions instead of native tool calls`);
+      console.log(`   Fallback JSON parser is active`);
+    }
+  }
+  
+  getModel(): string {
+    return this.model;
+  }
+  
+  getModelSource(): string {
+    return this.modelSource;
   }
   
   async send(request: AgentRequest): Promise<AgentResponse> {
-    console.log('📤 Sending request to OpenRouter...');
     const apiRequest = this.buildInitialRequest(request);
     const maxIterations = this.DEFAULT_MAX_ITERATIONS;
-    console.log(`🔧 Using model: ${apiRequest.model}`);
-    console.log(`🔧 Max iterations: ${maxIterations}`);
+
     console.log(`🔧 Messages: ${apiRequest.messages.length} messages`);
+    console.log(`🔧 Tools: ${apiRequest.tools?.length || 0} tools`);
 
     let totalToolCalls = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    const conversationHistory: ConversationTurn[] = [];
 
     // Multi-turn conversation loop
     for (let turn = 0; turn < maxIterations; turn++) {
-      const response = await this.client.chat.completions.create(apiRequest);
+      console.log(`  Turn ${turn + 1}: Sending request...`);
       
-      const message = response.choices[0]?.message;
-      if (!message) {
-        throw new Error('No message in response');
+      // Debug: Show what we're sending
+      if (turn === 0) {
+        console.log(`  🔧 Tools: ${apiRequest.tools?.length || 0} tools`);
+        console.log(`  🔧 Tool choice: ${apiRequest.tool_choice || 'none'}`);
+        if (apiRequest.tools && apiRequest.tools.length > 0) {
+          apiRequest.tools.forEach((tool: any, index: number) => {
+            console.log(`    ${index + 1}. ${tool.function?.name || tool.name || 'unknown'}`);
+          });
+        }
       }
       
-      totalInputTokens += response.usage?.prompt_tokens || 0;
-      totalOutputTokens += response.usage?.completion_tokens || 0;
+      try {
+        const response = await this.client.chat.completions.create(apiRequest);
+        
+        const message = response.choices[0]?.message;
+        if (!message) {
+          console.error('❌ No message in response');
+          console.error('🔍 Response:', JSON.stringify(response, null, 2));
+          throw new Error('No message in response');
+        }
+        
+        totalInputTokens += response.usage?.prompt_tokens || 0;
+        totalOutputTokens += response.usage?.completion_tokens || 0;
 
-      // Extract tool calls from response
-      const toolCalls = message.tool_calls || [];
-      
-      // If no tools requested, we're done
-      if (toolCalls.length === 0) {
-        const content = message.content || '';
-        const modelId = apiRequest.model;
-        return this.buildResponse(content, totalInputTokens, totalOutputTokens, totalToolCalls, modelId);
+        // Extract tool calls from response
+        const toolCalls = message.tool_calls || [];
+        
+        // Debug: Show raw response structure
+        console.log(`  🔍 Raw message:`, JSON.stringify({
+          has_tool_calls: !!message.tool_calls,
+          tool_calls_length: toolCalls.length,
+          has_content: !!message.content,
+          content_type: typeof message.content
+        }, null, 2));
+        
+        // Debug: Show what we received
+        console.log(`  📥 Received: ${toolCalls.length} tool calls, content: ${message.content ? 'yes' : 'no'}`);
+        if (toolCalls.length === 0 && message.content) {
+          console.log(`  📝 Content preview: ${message.content.substring(0, 100)}${message.content.length > 100 ? '...' : ''}`);
+        }
+        
+        // Fallback: Parse JSON tool descriptions from content if no tool_calls
+        if (toolCalls.length === 0 && message.content) {
+          try {
+            const content = message.content.trim();
+            const parsed = JSON.parse(content);
+            
+            // Handle array of tool calls
+            const toolDescriptions = Array.isArray(parsed) ? parsed : [parsed];
+            
+            for (const desc of toolDescriptions) {
+              if (desc.name && (desc.parameters || desc.arguments)) {
+                console.log(`  🔄 Converting JSON description to tool call: ${desc.name}`);
+                
+                toolCalls.push({
+                  id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                  type: 'function',
+                  function: {
+                    name: desc.name,
+                    arguments: JSON.stringify(desc.parameters || desc.arguments || {})
+                  }
+                });
+              }
+            }
+            
+            if (toolCalls.length > 0) {
+              console.log(`  ✅ Created ${toolCalls.length} synthetic tool call(s)`);
+            }
+          } catch (e) {
+            // Not JSON or not a tool description - treat as final response
+            console.log(`  ℹ️ Content is not a tool description, treating as final response`);
+          }
+        }
+        
+        // If no tools requested, we're done
+        if (toolCalls.length === 0) {
+          const content = message.content || '';
+          console.log(`  ✓ Complete: ${totalInputTokens} tokens in, ${totalOutputTokens} tokens out`);
+          console.log(`  📝 Response: ${content.substring(0, 200)}${content.length > 200 ? '...' : ''}`);
+          const modelId = apiRequest.model;
+          return this.buildResponse(content, totalInputTokens, totalOutputTokens, totalToolCalls, modelId);
+        }
+
+        // Process all tool calls
+        totalToolCalls += toolCalls.length;
+        console.log(`  🔧 Tool calls: ${toolCalls.length}`);
+        toolCalls.forEach((call: any, index: number) => {
+          console.log(`    ${index + 1}. ${call.function?.name}(${call.function?.arguments || '{}'})`);
+        });
+        
+        const toolResults = await this.executeTools(toolCalls, request.toolHandlers);
+        console.log(`  ✅ Executed ${toolCalls.length} tools`);
+        
+        // Show tool results
+        toolResults.forEach((result, index) => {
+          console.log(`    ${index + 1}. Result: ${result.content.substring(0, 100)}${result.content.length > 100 ? '...' : ''}`);
+        });
+
+        // Update request for next turn
+        const assistantMessage = { 
+          role: 'assistant', 
+          content: message.content || null, 
+          tool_calls: toolCalls 
+        };
+        
+        const toolMessages = toolResults.map((result) => ({
+          role: 'tool',
+          tool_call_id: result.tool_call_id,
+          content: result.content
+        }));
+        
+        apiRequest.messages = [
+          ...apiRequest.messages,
+          assistantMessage,
+          ...toolMessages
+        ];
+        
+        console.log(`  📝 Updated messages: ${apiRequest.messages.length} total`);
+        
+        // Ensure tools are included in every request
+        if (request.tools && request.tools.length > 0) {
+          apiRequest.tools = request.tools;
+          apiRequest.tool_choice = "auto";
+        }
+        
+      } catch (error) {
+        console.error(`❌ Error on turn ${turn + 1}:`);
+        console.error(`🔍 Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+        console.error(`🔍 Error message: ${error instanceof Error ? error.message : String(error)}`);
+        
+        if (error instanceof Error) {
+          // Handle specific OpenRouter errors
+          if (error.message.includes('No allowed providers are available')) {
+            console.error('🚨 Model availability issue!');
+            console.error('💡 Try these alternatives:');
+            console.error('   - openai/gpt-4o-mini');
+            console.error('   - meta-llama/llama-3.1-70b-instruct');
+            console.error('   - Check your OpenRouter account credits');
+          } else if (error.message.includes('timeout')) {
+            console.error('🚨 Request timeout!');
+            console.error('💡 Try a different model or retry later');
+          } else if (error.message.includes('rate limit')) {
+            console.error('🚨 Rate limit exceeded!');
+            console.error('💡 Wait a moment and try again');
+          }
+          
+          // Show stack trace for debugging
+          if (error.stack) {
+            console.error('🔍 Stack trace:');
+            console.error(error.stack);
+          }
+        }
+        
+        throw error;
       }
-
-      // Process all tool calls
-      totalToolCalls += toolCalls.length;
-      const toolResults = await this.executeTools(toolCalls, request.toolHandlers);
-
-      // Add to conversation history
-      conversationHistory.push(
-        { role: 'assistant', content: message.content || '' },
-        { role: 'user', content: toolResults }
-      );
-
-      // Update request for next turn
-      apiRequest.messages = [
-        ...apiRequest.messages,
-        { role: 'assistant', content: message.content || '', tool_calls: toolCalls },
-        { role: 'user', content: toolResults }
-      ];
     }
 
     // Max turns reached
-    const finalContent = this.extractFinalContent(conversationHistory);
+    console.log(`⚠️ Max turns reached (${maxIterations})`);
+    console.log(`  ✓ Complete: ${totalInputTokens} tokens in, ${totalOutputTokens} tokens out`);
     const modelId = apiRequest.model;
-    return this.buildResponse(finalContent, totalInputTokens, totalOutputTokens, totalToolCalls, modelId);
+    return this.buildResponse('Max tool calling iterations reached', totalInputTokens, totalOutputTokens, totalToolCalls, modelId);
   }
   
   /**
@@ -137,7 +249,7 @@ export class OpenRouterAdapter implements AgentAdapter {
       }));
 
     const params: any = {
-      model: process.env.OPENROUTER_MODEL || this.DEFAULT_MODEL,
+      model: this.model,
       max_tokens: this.DEFAULT_MAX_TOKENS,
       messages: userMessages.length > 0 ? userMessages : [{ role: "user", content: "" }],
       temperature: 0.1
@@ -153,12 +265,6 @@ export class OpenRouterAdapter implements AgentAdapter {
     if (request.tools && request.tools.length > 0) {
       params.tools = request.tools;
       params.tool_choice = "auto";
-    }
-
-    // Add model routing support
-    if (process.env.OPENROUTER_FALLBACK_MODELS) {
-      const fallbackModels = process.env.OPENROUTER_FALLBACK_MODELS.split(',').map(m => m.trim());
-      params.models = fallbackModels;
     }
 
     return params;
@@ -177,35 +283,25 @@ export class OpenRouterAdapter implements AgentAdapter {
       if (handler) {
         try {
           const input = JSON.parse(toolCall.function.arguments || '{}');
+          console.log(`    🔧 Executing ${toolCall.function.name} with:`, JSON.stringify(input, null, 2));
           resultContent = await handler(input);
+          console.log(`    ✅ ${toolCall.function.name} completed`);
         } catch (error) {
+          console.error(`    ❌ Error in ${toolCall.function.name}:`, error);
           resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
         }
       } else {
+        console.warn(`    ⚠️ No handler found for tool: ${toolCall.function.name}`);
         resultContent = `Tool '${toolCall.function.name}' is not available`;
       }
 
       results.push({
-        type: 'tool_result',
-        tool_use_id: toolCall.id,
+        tool_call_id: toolCall.id,
         content: resultContent
       });
     }
 
     return results;
-  }
-
-  private extractFinalContent(history: ConversationTurn[]): string {
-    if (history.length < 2) {
-      return 'Max tool calling iterations reached';
-    }
-
-    const lastAssistantTurn = history[history.length - 2];
-    if (lastAssistantTurn && lastAssistantTurn.role === 'assistant') {
-      return lastAssistantTurn.content as string;
-    }
-
-    return 'Max tool calling iterations reached';
   }
 
   private buildResponse(
@@ -219,51 +315,8 @@ export class OpenRouterAdapter implements AgentAdapter {
       content,
       tokensIn,
       tokensOut,
-      costUsd: this.estimateCost(tokensIn, tokensOut, modelId),
+      costUsd: 0, // Simplified - no cost calculation
       toolCalls
     };
-  }
-
-  /**
-   * Load model pricing data from OpenRouter's Models API
-   */
-  private async loadModelPricing(): Promise<void> {
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/models');
-      const data: ModelsResponse = await response.json();
-      
-      for (const model of data.data) {
-        this.modelPricing.set(model.id, model.pricing);
-      }
-    } catch (error) {
-      console.warn('Failed to load model pricing from OpenRouter API:', error);
-    }
-  }
-
-  /**
-   * Estimate cost based on real-time pricing from OpenRouter Models API
-   */
-  private estimateCost(inputTokens: number, outputTokens: number, modelId?: string): number {
-    const model = modelId || this.DEFAULT_MODEL;
-    const pricing = this.modelPricing.get(model);
-    
-    if (!pricing) {
-      // Fallback to default pricing if model not found
-      console.warn(`Using fallback pricing for model ${model} - $3/M tokens input, $15/M tokens output`);
-      const inputCost = (inputTokens / 1_000_000) * 3;
-      const outputCost = (outputTokens / 1_000_000) * 15;
-      return inputCost + outputCost;
-    }
-    
-    // Convert string prices to numbers (they come as strings from API)
-    const promptCost = parseFloat(pricing.prompt) || 0;
-    const completionCost = parseFloat(pricing.completion) || 0;
-    const requestCost = parseFloat(pricing.request) || 0;
-    
-    // Calculate costs
-    const inputCost = (inputTokens * promptCost);
-    const outputCost = (outputTokens * completionCost);
-    
-    return inputCost + outputCost + requestCost;
   }
 }

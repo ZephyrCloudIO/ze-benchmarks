@@ -12,10 +12,11 @@ import { Oracle } from './runtime/oracle.ts';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
 import { BenchmarkLogger } from '@ze/database';
-import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel } from '@clack/prompts';
+import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel, text } from '@clack/prompts';
 import chalk from 'chalk';
 import figlet from 'figlet';
 import { startDevServer, getServerUrl, stopDevServer } from './dev-server.ts';
+import { OpenRouterAPI } from './lib/openrouter-api.ts';
 
 // ============================================================================
 // DYNAMIC MODEL LOADING
@@ -358,10 +359,8 @@ function loadPrompt(suite: string, scenario: string, tier: string): string | nul
 function createAgentAdapter(agentName: string, model?: string): AgentAdapter {
 	switch (agentName) {
 		case 'openrouter':
-			if (model) {
-				process.env.OPENROUTER_MODEL = model;
-			}
-			return new OpenRouterAdapter();
+			// Pass model directly to constructor instead of using environment variable
+			return new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
 		case 'anthropic':
 			if (model) {
 				process.env.CLAUDE_MODEL = model;
@@ -478,6 +477,11 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
 	console.log(`  ${chalk.cyan('--no-json')}                     Skip JSON output`);
 	
+	console.log('\n' + chalk.bold('Model Selection:'));
+	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
+	console.log(`  ${chalk.gray('Search by:')} model name, provider, or description`);
+	console.log(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
+	
 	console.log('\n' + chalk.bold('Web Dashboard:'));
 	console.log(`  ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
 	console.log(`  ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}`);
@@ -585,7 +589,7 @@ async function executeMultipleBenchmarks(
 			for (const tier of validTiers) {
 				for (const agent of agents) {
 					// Handle model selection per agent
-					const agentModels = (agent === 'anthropic' || agent === 'claude-code') 
+					const agentModels = (agent === 'anthropic' || agent === 'claude-code' || agent === 'openrouter') 
 						? models.filter(m => m !== undefined)
 						: [undefined];
 					
@@ -982,33 +986,91 @@ async function runInteractiveBenchmark() {
 	const needsClaudeCodeModels = agentsToUse.some(agent => agent === 'claude-code');
 	
 	if (needsOpenRouterModels) {
-		console.log('🧠 Loading available OpenRouter models...');
-		// For testing, use only openai/gpt-4o
-		const modelOptions = [
-			{ value: 'openai/gpt-4o', label: '💰 GPT-4o' }
-		];
-		console.log(`✅ Loaded ${modelOptions.length} model options`);
+		console.log('🔍 Loading OpenRouter models with tool support...');
 		
-		const selectedModels = await multiselect({
-			message: 'Choose models:',
-			options: modelOptions,
-			required: true
+		const openrouterAPI = new OpenRouterAPI(process.env.OPENROUTER_API_KEY || '');
+		const toolModels = await openrouterAPI.getModelsWithToolSupport();
+		
+		console.log(`✅ Found ${toolModels.length} models with tool support`);
+		
+		// Quick shortcuts for common models
+		const QUICK_MODELS = {
+			'free': 'Filter by free models only',
+			'gpt': 'OpenAI GPT models',
+			'claude': 'Anthropic Claude models',
+			'llama': 'Meta Llama models',
+			'gemma': 'Google Gemma models',
+			'mistral': 'Mistral AI models'
+		};
+
+		// Show shortcuts
+		console.log(`\n${chalk.gray('Quick searches:')} ${Object.keys(QUICK_MODELS).join(', ')}`);
+		
+		// Text-based search instead of dropdown
+		const modelSearch = await text({
+			message: 'Search for OpenRouter model (type to filter):',
+			placeholder: 'e.g., gpt-4o, llama, gemma, claude',
+			validate: (value) => {
+				if (!value || value.length < 2) {
+					return 'Please enter at least 2 characters to search';
+				}
+			}
 		});
 
-		if (isCancel(selectedModels)) {
+		if (isCancel(modelSearch)) {
 			cancel('Operation cancelled.');
 			return;
 		}
 
-		// Expand "All" selection - use the actual selected model IDs
-		if (selectedModels.includes('__ALL__')) {
-			// If "All models" is selected, use just openai/gpt-4o for testing
-			modelsToUse = ['openai/gpt-4o'];
-			console.log(`🎯 Using "All models" - selected: ${modelsToUse.join(', ')}`);
-		} else {
-			// Use the selected model IDs directly
-			modelsToUse = selectedModels;
-			console.log(`🎯 Selected models: ${modelsToUse.join(', ')}`);
+		// Search and display results
+		const searchResults = openrouterAPI.searchModels(toolModels, modelSearch);
+		
+		if (searchResults.length === 0) {
+			log.warning(`No models found matching "${modelSearch}"`);
+			log.info('Try searching for: gpt-4o, llama, gemma, claude, mistral');
+			return;
+		}
+
+		// Show search results with pricing info
+		console.log(`\n📋 Found ${searchResults.length} matching models:\n`);
+		
+		const selectedModel = await select({
+			message: 'Choose a model:',
+			options: searchResults.map(model => {
+				const promptCost = parseFloat(model.pricing.prompt);
+				const isFree = promptCost === 0;
+				const costLabel = isFree ? '(FREE)' : `($${promptCost}/1K tokens)`;
+				
+				return {
+					value: model.id,
+					label: `${model.name} ${costLabel}`,
+					hint: model.description?.substring(0, 80)
+				};
+			})
+		});
+
+		if (isCancel(selectedModel)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+
+		modelsToUse = [selectedModel];
+		console.log(`🎯 Selected model: ${selectedModel}`);
+		
+		// Display selected model details
+		const selectedModelInfo = toolModels.find(m => m.id === selectedModel);
+		
+		if (selectedModelInfo) {
+			console.log(`\n${chalk.bold.cyan('Model Details:')}`);
+			console.log(`  ${chalk.gray('Name:')} ${selectedModelInfo.name}`);
+			console.log(`  ${chalk.gray('ID:')} ${selectedModelInfo.id}`);
+			console.log(`  ${chalk.gray('Context:')} ${selectedModelInfo.context_length.toLocaleString()} tokens`);
+			console.log(`  ${chalk.gray('Cost:')} $${selectedModelInfo.pricing.prompt}/1K prompt, $${selectedModelInfo.pricing.completion}/1K completion`);
+			
+			const isFree = parseFloat(selectedModelInfo.pricing.prompt) === 0;
+			if (isFree) {
+				console.log(`  ${chalk.green('✓ FREE MODEL')}`);
+			}
 		}
 	} else if (needsAnthropicModels) {
 		console.log('🧠 Loading available Anthropic models...');
@@ -1690,6 +1752,36 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		try {
 			// Create agent adapter
 		const agentAdapter = createAgentAdapter(agent, model);
+			
+			// Show selected model info - ALWAYS for OpenRouter
+			if (agent === 'openrouter' && 'getModel' in agentAdapter) {
+				const adapterModel = (agentAdapter as any).getModel();
+				const modelSource = 'getModelSource' in agentAdapter 
+					? (agentAdapter as any).getModelSource() 
+					: 'unknown';
+				
+				if (modelSource === 'default') {
+					console.log(chalk.yellow(`  ⚠️  Using default model: ${chalk.cyan(adapterModel)}`));
+					console.log(chalk.gray(`     Tip: Search and select a model in interactive mode or use --model flag`));
+				} else if (modelSource === 'environment') {
+					console.log(chalk.blue(`  ℹ️  Using model from environment: ${chalk.cyan(adapterModel)}`));
+				} else if (model && modelSource === 'parameter') {
+					console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(model)}`));
+					
+					// Verify match
+					if (adapterModel !== model) {
+						console.log(chalk.yellow(`  ⚠️  Warning: Model mismatch - requested: ${model}, adapter: ${adapterModel}`));
+					} else {
+						console.log(chalk.green(`  ✅ Model confirmed: ${adapterModel}`));
+					}
+				} else {
+					console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(adapterModel)}`));
+				}
+			} else if (model && agent !== 'openrouter') {
+				// For non-OpenRouter agents, show model if provided
+				console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(model)}`));
+			}
+			
 			// Agent info is shown in progress bar
 			
 			// Load oracle if available
@@ -1736,8 +1828,8 @@ Work efficiently: read files to understand the current state, make necessary cha
 				...(workspaceDir && { workspaceDir }),
 			};
 
-			// Add tools if agent supports them (currently only Anthropic)
-			if (agent === 'anthropic' && workspaceDir) {
+			// Add tools if agent supports them (Anthropic and OpenRouter)
+			if ((agent === 'anthropic' || agent === 'openrouter') && workspaceDir) {
 				// Create workspace tool handlers
 				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
 				
@@ -1754,7 +1846,22 @@ Work efficiently: read files to understand the current state, make necessary cha
 					// Tools: readFile, writeFile, runCommand, listFiles
 				}
 				
-				request.tools = tools;
+				// Convert tools to adapter-specific format
+				if (agent === 'openrouter') {
+					// Convert ToolDefinition to OpenRouter format
+					(request as any).tools = tools.map(tool => ({
+						type: 'function',
+						function: {
+							name: tool.name,
+							description: tool.description,
+							parameters: tool.input_schema  // Map input_schema → parameters
+						}
+					}));
+				} else {
+					// Anthropic uses ToolDefinition format directly
+					request.tools = tools;
+				}
+				
 				request.toolHandlers = toolHandlers;
 			}
 
@@ -2307,6 +2414,13 @@ async function run() {
 	
 	log.info(chalk.bold(`Running: ${suite}/${scenario}`));
 	log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agent)}`);
+	
+	// Warn if OpenRouter agent but no model specified
+	if (agent === 'openrouter' && !model && !process.env.OPENROUTER_MODEL) {
+		console.log(chalk.yellow(`\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
+		console.log(chalk.gray(`   Tip: Use --model flag or set OPENROUTER_MODEL environment variable`));
+		console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\n`));
+	}
 	
 	// Execute the benchmark
 	await executeBenchmark(suite, scenario, tier, agent, model, noJson);
