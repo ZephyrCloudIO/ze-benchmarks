@@ -250,34 +250,6 @@ cp .env.example .env
 - **Run Details**: Individual run analysis and debugging
 - **Failure Analysis**: Detailed failure reasons and patterns
 
-## Contributing
-
-### Getting Started
-1. **Fork and Clone**: `git clone https://github.com/your-username/ze-benchmarks.git`
-2. **Create Branch**: `git checkout -b feature/my-contribution`
-3. **Make Changes**: Follow coding standards and test thoroughly
-4. **Submit PR**: Fill out template and request review
-
-### Quality Standards
-- **Benchmarks**: Realistic, challenging, well-documented scenarios
-- **Evaluators**: Fast, reliable, meaningful feedback
-- **Documentation**: Clear, complete, examples included
-- **Testing**: Comprehensive test coverage
-
-## Troubleshooting
-
-### Common Issues
-- **Benchmark not loading**: Check YAML syntax and file structure
-- **Evaluator not running**: Verify interface implementation  
-- **Database issues**: Check file permissions and paths
-- **Agent failures**: Verify API keys and network connectivity
-- **Web dashboard not updating**: Check database location and permissions
-
-### Getting Help
-- **Documentation**: Check `docs/` directory for comprehensive guides
-- **GitHub Issues**: For bug reports and feature requests
-- **GitHub Discussions**: For questions and general discussion
-
 ---
 
 **Ready to create benchmarks?** Start with the [Quick Start Guide](docs/QUICK-START.md) or dive into [Adding Benchmarks](docs/ADDING-BENCHMARKS.md)!
