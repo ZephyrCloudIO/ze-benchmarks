@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend } from 'recharts'
+
 
 export const Route = createFileRoute('/agents')({
   component: AgentsPage,

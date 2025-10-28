@@ -252,4 +252,4 @@ cp .env.example .env
 
 ---
 
-**Ready to create benchmarks?** Start with the [Quick Start Guide](docs/QUICK-START.md) or dive into [Adding Benchmarks](docs/ADDING-BENCHMARKS.md)!
+**Ready to create benchmarks?** Check out our [Contributing Guide](CONTRIBUTING.md) for comprehensive instructions!

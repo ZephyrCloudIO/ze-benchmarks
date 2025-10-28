@@ -366,10 +366,10 @@ By contributing to this project, you agree that your contributions will be licen
 ## Getting Help
 
 ### Documentation
-- [Quick Start Guide](QUICK-START.md) - Get started in 30 minutes
-- [Adding Benchmarks](ADDING-BENCHMARKS.md) - Comprehensive benchmark guide
-- [Adding Evaluators](ADDING-EVALUATORS.md) - Detailed evaluator guide
-- [Configuration Reference](CONFIGURATION-REFERENCE.md) - Complete config guide
+- [Quick Start Guide](docs/QUICK-START.md) - Get started in 30 minutes
+- [Adding Benchmarks](docs/ADDING-BENCHMARKS.md) - Comprehensive benchmark guide
+- [Adding Evaluators](docs/ADDING-EVALUATORS.md) - Detailed evaluator guide
+- [Configuration Reference](docs/CONFIGURATION-REFERENCE.md) - Complete config guide
 
 ### Examples and Templates
 - [Template Files](templates/) - Ready-to-use templates
