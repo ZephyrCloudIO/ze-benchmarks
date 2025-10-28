@@ -2,9 +2,9 @@
 
 Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real software tasks. This system allows you to create realistic coding scenarios, test different AI agents, and measure their performance across multiple evaluation criteria.
 
-> **Environment Setup**: Create a `.env` file in the **project root directory** (`ze-benchmarks/.env`) with your API keys. See [Environment Variables](#-environment-variables) section below for details.
+> **Environment Setup**: Create a `.env` file in the **project root directory** (`ze-benchmarks/.env`) with your API keys. See [Environment Variables](#environment-variables) section below for details.
 
-## 🏗️ How the System Works
+## How the System Works
 
 ### Architecture Overview
 The system consists of four main components:
@@ -23,16 +23,16 @@ The system consists of four main components:
 6. **Web Dashboard** displays results in real-time
 
 ### Current Working Features
-- **✅ Interactive CLI**: Dynamic suite/scenario loading with progress tracking
-- **✅ Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code
-- **✅ Dynamic Tier System**: Automatic L0-L3 and Lx difficulty scanning
-- **✅ Batch Execution**: Run multiple agent/tier combinations
-- **✅ Real-time Database**: SQLite with timestamp-based auto-refresh
-- **✅ Web Dashboard**: React-based results viewer at `localhost:3000`
-- **✅ Comprehensive Evaluators**: Build, lint, typecheck, dependency analysis
-- **✅ Failure Detection**: Detailed error logging and categorization
+- **Interactive CLI**: Dynamic suite/scenario loading with progress tracking
+- **Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code
+- **Dynamic Tier System**: Automatic L0-L3 and Lx difficulty scanning
+- **Batch Execution**: Run multiple agent/tier combinations
+- **Real-time Database**: SQLite with timestamp-based auto-refresh
+- **Web Dashboard**: React-based results viewer at `localhost:3000`
+- **Comprehensive Evaluators**: Build, lint, typecheck, dependency analysis
+- **Failure Detection**: Detailed error logging and categorization
 
-## 🚀 Quick Setup
+## Quick Setup
 
 ### 1. Installation
 ```bash
@@ -76,7 +76,7 @@ pnpm dev
 # Open http://localhost:3000
 ```
 
-## 📁 Understanding Suites and Scenarios
+## Understanding Suites and Scenarios
 
 ### Suite Structure
 A **suite** is a collection of related benchmarks. Each suite contains:
@@ -95,7 +95,7 @@ Each scenario requires:
 3. **`repo-fixture/`**: Complete codebase with intentional issues
 4. **Prompts**: L0-L3 and Lx difficulty tiers
 
-## 🎯 Available Agents
+## Available Agents
 
 | Agent | Description | API Key Required |
 |-------|-------------|------------------|
@@ -104,7 +104,7 @@ Each scenario requires:
 | **OpenRouter** | Multiple LLM providers via OpenRouter | `OPENROUTER_API_KEY` |
 | **Claude Code** | Claude Code CLI tool integration | `ANTHROPIC_API_KEY` |
 
-## 📊 Prompt Tier System
+## Prompt Tier System
 
 The system automatically scans available difficulty tiers:
 
@@ -116,7 +116,7 @@ The system automatically scans available difficulty tiers:
 | **L3** | Migration specific | Technology transitions and upgrades |
 | **Lx** | Adversarial | Edge cases and challenging scenarios |
 
-## 🔍 Evaluation System
+## Evaluation System
 
 ### Automated Evaluators
 - **BuildEvaluator**: Validates project builds successfully
@@ -152,7 +152,7 @@ ze-benchmarks/
     └── templates/            # Ready-to-use templates
 ```
 
-## 🛠️ CLI Usage
+## CLI Usage
 
 ### Interactive Mode (Recommended)
 ```bash
@@ -297,7 +297,7 @@ npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --tier L1 --age
 npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --batch --agent anthropic
 ```
 
-## 📚 Documentation
+## Documentation
 
 ### Comprehensive Guides
 - **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Complete benchmark creation guide
@@ -310,7 +310,7 @@ npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --batch --agent
 - **[Evaluator Template](docs/templates/heuristic-evaluator.ts)** - Complete evaluator template
 - **[Quality Checklists](docs/BENCHMARK-CHECKLIST.md)** - Pre-submission validation
 
-## 🔧 Environment Variables
+## Environment Variables
 
 The system uses environment variables for configuration. Create a `.env` file from the example:
 
@@ -329,7 +329,7 @@ cp .env.example .env
 - **`DEBUG`**: Enable debug logging (default: `false`)
 - **`PORT`**: Web dashboard port (default: `3000`)
 
-## 🔍 Database and Results
+## Database and Results
 
 ### Database Location
 - **Primary Database**: `benchmark-report/public/benchmarks.db`
@@ -349,7 +349,7 @@ cp .env.example .env
 - **Run Details**: Individual run analysis and debugging
 - **Failure Analysis**: Detailed failure reasons and patterns
 
-## 🤝 Contributing
+## Contributing
 
 ### Getting Started
 1. **Fork and Clone**: `git clone https://github.com/your-username/ze-benchmarks.git`
@@ -363,7 +363,7 @@ cp .env.example .env
 - **Documentation**: Clear, complete, examples included
 - **Testing**: Comprehensive test coverage
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 - **Benchmark not loading**: Check YAML syntax and file structure
