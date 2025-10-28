@@ -43,7 +43,8 @@ function satisfiesComparator(comparator: string, cur: Ver): boolean {
 	const match = comparator.match(/^(>=|<=|>|<)?\s*(\d+(?:\.\d+){0,2})$/);
 	if (match) {
 		const op = match[1] || '>=';
-		const base = parseVer(match[2]!);
+		if (!match[2]) return false;
+		const base = parseVer(match[2]);
 		if (!base) return false;
 		const delta = compare(cur, base);
 		switch (op) {
