@@ -148,6 +148,8 @@ export interface BenchmarkRun {
   completed_at?: string;
   total_score?: number;
   weighted_score?: number;
+  is_successful?: boolean;
+  success_metric?: number;
   metadata?: string;
 }
 
