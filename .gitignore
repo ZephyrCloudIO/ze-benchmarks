@@ -107,4 +107,11 @@ dist
 results/summary.json
 results/**/*
 results/workspaces/**/*
+<<<<<<< HEAD
 results/summary.json
+=======
+results/summary.json
+
+# Snapshot files
+snapshot.json5
+>>>>>>> main

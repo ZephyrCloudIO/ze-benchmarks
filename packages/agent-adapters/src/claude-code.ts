@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { AgentAdapter, AgentRequest, AgentResponse } from './index.js';
+import type { AgentAdapter, AgentRequest, AgentResponse } from './index.ts';
 
 type ParsedClaudeResponse = {
 	content: string;
@@ -15,9 +15,9 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 	private defaultMaxTurns: number;
 	private permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
-	constructor(model?: string, defaultMaxTurns = 10, permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' = 'bypassPermissions') {
+	constructor(model?: string, permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' = 'bypassPermissions') {
 		this.model = model;
-		this.defaultMaxTurns = defaultMaxTurns;
+		this.defaultMaxTurns = 50; // Internal max iterations
 		this.permissionMode = permissionMode;
 	}
 
@@ -26,7 +26,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 		const prompt = this.convertMessagesToPrompt(request.messages);
 
 		try {
-			const maxTurns = Math.max(1, request.maxTurns ?? this.defaultMaxTurns);
+			const maxTurns = this.defaultMaxTurns;
 			const args = [
 				'-p',
 				'--output-format', 'json',
@@ -46,9 +46,6 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 				args.push('--add-dir', request.workspaceDir);
 			}
 
-			console.log('Executing Claude with args:', args);
-			console.log('Input prompt:', prompt);
-			console.log('Workspace directory:', request.workspaceDir || 'current directory');
 
 			const response = await this.executeClaudeCommand(args, prompt, request.workspaceDir);
 
@@ -94,12 +91,6 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 					return;
 				}
 
-				if (stderr) {
-					console.warn('Claude CLI stderr:', stderr);
-				}
-
-				// Debug: Log raw output
-				console.log('Raw Claude output:', stdout);
 
 				try {
 					const response = this.parseClaudeOutput(stdout);

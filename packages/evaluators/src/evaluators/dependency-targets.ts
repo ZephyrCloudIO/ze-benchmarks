@@ -1,8 +1,8 @@
 import { relative } from 'node:path';
 
-import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.js';
-import { getAllPackageJsonPaths, readJson } from '../utils/package-json.js';
-import { versionSatisfies } from '../utils/semver.js';
+import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
+import { getAllPackageJsonPaths, readJson } from '../utils/package-json.ts';
+import { versionSatisfies } from '../utils/semver.ts';
 
 export class DependencyTargetsEvaluator implements Evaluator {
 	meta = { name: 'DependencyTargetsEvaluator' } as const;

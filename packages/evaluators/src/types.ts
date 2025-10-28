@@ -17,6 +17,13 @@ export interface ScenarioConfig {
 	};
 	validation?: { commands?: { install?: string; test?: string; lint?: string; typecheck?: string } };
 	rubric_overrides?: { weights?: Record<string, number> };
+	llm_judge?: {
+		enabled?: boolean;
+		model?: string;
+		categories?: string[];
+		temperature?: number;
+		max_tokens?: number;
+	};
 }
 
 export interface FileDiff {

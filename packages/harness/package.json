@@ -9,13 +9,17 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsc -w -p tsconfig.json"
+    "dev": "tsc -w -p tsconfig.json",
+    "start": "tsx src/cli.ts",
+    "dev:tsx": "tsx src/cli.ts"
   },
   "dependencies": {
     "yaml": "^2.5.0",
     "zod": "^3.23.8",
     "globby": "^14.0.2",
-    "ze-evaluator": "workspace:*"
+    "openai": "^4.0.0",
+    "ze-evaluator": "workspace:*",
+    "@ze/database": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

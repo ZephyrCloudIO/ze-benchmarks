@@ -48,6 +48,11 @@ validation:
     typecheck: "pnpm -w -r -F @acme/app tsc --noEmit --project tsconfig.json"
 oracle:
   answers_file: "./oracle-answers.json"
+llm_judge:
+  enabled: true
+  model: "meta-llama/llama-3.1-8b-instruct"
+  temperature: 0.1
+  max_tokens: 2000
 rubric_overrides:
   weights:
     install_success: 1.0
@@ -62,3 +67,4 @@ rubric_overrides:
     monorepo_handling: 0.8
     user_questions_quality: 0.4
     efficiency: 0.5
+    llm_judge: 1.0
