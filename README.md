@@ -43,11 +43,8 @@ pnpm install
 
 ```
 
-### 2. Environment Setup
+### 2. Environment Setup (`.env`)
 ```bash
-# Copy the example environment file
-cp .env.example .env
-
 # Edit .env and add your API keys
 # Required for Anthropic Claude
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
@@ -63,10 +60,10 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 ### 3. Run Your First Benchmark
 ```bash
 # Start interactive CLI
-npx tsx packages/harness/src/cli.ts
+pnpm cli
 
 # Or run a specific benchmark
-npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
+pnpm bench update-deps nx-pnpm-monorepo L1 anthropic
 ```
 
 ### 4. View Results
@@ -157,7 +154,7 @@ ze-benchmarks/
 ### Interactive Mode (Recommended)
 ```bash
 # Start interactive CLI
-npx tsx packages/harness/src/cli.ts
+pnpm cli
 
 # Choose from:
 # - Run benchmarks (select suite, scenario, agent, tier)
@@ -169,26 +166,26 @@ npx tsx packages/harness/src/cli.ts
 ### Direct Execution
 ```bash
 # Run specific benchmark
-npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --tier L1 --agent anthropic
+pnpm bench update-deps nx-pnpm-monorepo L1 anthropic
 
 # Batch execution (all tiers)
-npx tsx packages/harness/src/cli.ts run update-deps nx-pnpm-monorepo --batch --agent anthropic
+pnpm bench update-deps nx-pnpm-monorepo --batch anthropic
 
 # View results
-npx tsx packages/harness/src/cli.ts --stats suite update-deps
-npx tsx packages/harness/src/cli.ts --batches
+pnpm stats suite update-deps
+pnpm batches
 ```
 
 ### Statistics and Analysis
 ```bash
 # View comprehensive statistics
-npx tsx packages/harness/src/cli.ts --stats
+pnpm stats
 
 # Compare batches
-npx tsx packages/harness/src/cli.ts --compare-batches
+pnpm compare-batches
 
 # View batch details
-npx tsx packages/harness/src/cli.ts --batch-details <batch-id>
+pnpm batch-details <batch-id>
 ```
 
 ## Creating New Suites and Scenarios
@@ -291,10 +288,10 @@ EOF
 ### Step 6: Test Your Scenario
 ```bash
 # Test with specific agent and tier
-npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --tier L1 --agent anthropic
+pnpm bench my-new-suite my-scenario L1 anthropic
 
 # Test all tiers
-npx tsx packages/harness/src/cli.ts run my-new-suite my-scenario --batch --agent anthropic
+pnpm bench my-new-suite my-scenario --batch anthropic
 ```
 
 ## Documentation
