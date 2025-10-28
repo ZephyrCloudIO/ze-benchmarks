@@ -24,6 +24,8 @@ export const SCHEMA = `
     completed_at DATETIME,
     total_score REAL,
     weighted_score REAL,
+    is_successful BOOLEAN DEFAULT 0,
+    success_metric REAL,
     metadata TEXT,
     FOREIGN KEY (batchId) REFERENCES batch_runs(batchId)
   );
@@ -55,5 +57,6 @@ export const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_runs_agent ON benchmark_runs(agent);
   CREATE INDEX IF NOT EXISTS idx_runs_status ON benchmark_runs(status);
   CREATE INDEX IF NOT EXISTS idx_runs_batchId ON benchmark_runs(batchId);
+  CREATE INDEX IF NOT EXISTS idx_runs_is_successful ON benchmark_runs(is_successful);
   CREATE INDEX IF NOT EXISTS idx_evals_run_id ON evaluation_results(run_id);
 `;

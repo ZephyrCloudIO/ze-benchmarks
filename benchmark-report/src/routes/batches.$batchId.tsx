@@ -490,7 +490,7 @@ function BatchDetailsPage() {
         {agentPerformance.length > 0 ? (
           <>
             {/* Bar Chart */}
-            <div className="h-64 mb-6">
+            <div className="h-48 mb-4">
             <ChartContainer
               config={{
                 score: {
@@ -498,6 +498,7 @@ function BatchDetailsPage() {
                   color: 'hsl(var(--primary))',
                 },
               }}
+              className="h-full w-full !aspect-auto"
             >
               <BarChart data={agentPerformance.map(a => ({
                 name: a.model && a.model !== 'default' ? `${a.agent} [${a.model}]` : a.agent,
@@ -564,7 +565,7 @@ function BatchDetailsPage() {
           </div>
           </>
         ) : (
-          <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+          <div className="h-32 flex flex-col items-center justify-center text-muted-foreground">
             <p className="text-lg font-medium">No agent performance data available</p>
             <p className="text-sm mt-2">This batch may not have completed runs yet</p>
           </div>
@@ -578,7 +579,7 @@ function BatchDetailsPage() {
             <h2 className="text-xl font-bold mb-4">Tier Distribution</h2>
             
             {/* Pie Chart */}
-            <div className="h-48 mb-4">
+            <div className="h-40 mb-4">
               <ChartContainer
                 config={tierDistribution.reduce((acc, tier, idx) => ({
                   ...acc,
@@ -587,6 +588,7 @@ function BatchDetailsPage() {
                     color: COLORS[idx % COLORS.length],
                   },
                 }), {})}
+                className="h-full w-full !aspect-auto"
               >
                 <PieChart>
                   <Pie
@@ -598,7 +600,7 @@ function BatchDetailsPage() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={60}
+                    outerRadius={50}
                   >
                     {tierDistribution.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
