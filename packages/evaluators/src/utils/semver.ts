@@ -9,7 +9,7 @@ function parseVer(version: string): Ver | null {
 	const match = cleaned.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
 	if (!match) return null;
 	return {
-		major: parseInt(match[1]!, 10),
+		major: parseInt(match[1] || '0', 10),
 		minor: parseInt(match[2] || '0', 10),
 		patch: parseInt(match[3] || '0', 10),
 	};
