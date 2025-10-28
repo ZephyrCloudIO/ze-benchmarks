@@ -102,8 +102,10 @@ function AgentsPage() {
         {agentStats.map((stat, idx) => (
           <div key={idx} className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold">{stat.model || 'Unknown Model'}</h3>
-              <p className="text-sm text-muted-foreground">{stat.agent}</p>
+              <h3 className="text-lg font-semibold">
+                {stat.model ? stat.model : `${stat.agent} (no model)`}
+              </h3>
+              <p className="text-sm text-muted-foreground">{stat.agent} agent</p>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -170,8 +172,10 @@ function AgentsPage() {
                 {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
               </div>
               <div className="flex-1">
-                <div className="font-medium">{stat.model || 'Unknown Model'}</div>
-                <div className="text-sm text-muted-foreground">{stat.agent}</div>
+                <div className="font-medium">
+                  {stat.model ? stat.model : `${stat.agent} (no model)`}
+                </div>
+                <div className="text-sm text-muted-foreground">{stat.agent} agent</div>
               </div>
               <div className="text-right">
                 <div className="font-bold">{stat.avgScore.toFixed(2)}</div>

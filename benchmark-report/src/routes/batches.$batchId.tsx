@@ -538,13 +538,17 @@ function BatchDetailsPage() {
             {agentPerformance.map((agent, index) => {
               const rankDisplay = index < 3 ? `#${index + 1}` : `${index + 1}.`
               const scoreColor = getScoreColor(agent.avgWeightedScore)
-              const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : ''
               
               return (
                 <div key={`${agent.agent}-${agent.model}`} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-sm w-8">{rankDisplay}</span>
-                    <span className="font-semibold">{agent.agent}{modelStr}</span>
+                    <span className="font-semibold">
+                      {agent.model ? agent.model : agent.agent}
+                    </span>
+                    {agent.model && (
+                      <span className="text-sm text-muted-foreground">({agent.agent})</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-6">
                     <span className="text-sm text-muted-foreground">

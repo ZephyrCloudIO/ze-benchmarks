@@ -177,11 +177,11 @@ function RunsPage() {
                         {run.tier}
                       </span>
                       <span>•</span>
-                      <span>{run.agent}</span>
+                      <span>{run.model ? run.model : run.agent}</span>
                       {run.model && (
                         <>
                           <span>•</span>
-                          <span className="truncate">{run.model}</span>
+                          <span className="text-xs text-muted-foreground">{run.agent}</span>
                         </>
                       )}
                       {run.batchId && (
