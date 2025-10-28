@@ -112,7 +112,7 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
   try {
     const parsedDetails = JSON.parse(details);
     if (parsedDetails.scores && Array.isArray(parsedDetails.scores)) {
-      console.log(`\n${chalk.bold.underline('LLM Judge Detailed Scores')}`);
+      console.log(`\\n${chalk.bold.underline('LLM Judge Detailed Scores')}`);
       console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
       console.log(`│ ${chalk.bold('Category'.padEnd(20))} ${chalk.bold('Score'.padEnd(8))} ${chalk.bold('Weight'.padEnd(8))} ${chalk.bold('Status'.padEnd(15))} │`);
       console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
@@ -154,11 +154,11 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
           const color = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
           const status = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'Excellent' : percent >= SCORE_THRESHOLDS.GOOD ? 'Good' : 'Needs Work';
           const statusColor = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          const categoryName = category.replace(/_/g, ' ').replace(/\\b\\w/g, (l: string) => l.toUpperCase());
           
           console.log(`│ ${chalk.cyan(categoryName.padEnd(20))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
         } else {
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          const categoryName = category.replace(/_/g, ' ').replace(/\\b\\w/g, (l: string) => l.toUpperCase());
           console.log(`│ ${chalk.red(categoryName.padEnd(20))} ${chalk.red('N/A'.padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
         }
       });
@@ -166,17 +166,17 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
       console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
       
       if (parsedDetails.overall_assessment) {
-        console.log(`\n${chalk.bold('LLM Judge Assessment:')}`);
+        console.log(`\\n${chalk.bold('LLM Judge Assessment:')}`);
         console.log(chalk.gray(parsedDetails.overall_assessment));
       }
       
       if (parsedDetails.input_tokens) {
-        console.log(`\n${chalk.bold('Token Usage:')}`);
+        console.log(`\\n${chalk.bold('Token Usage:')}`);
         console.log(chalk.blue(`Input tokens: ${parsedDetails.input_tokens}`));
       }
     }
   } catch (error) {
-    console.log(`\n${chalk.bold('LLM Judge Details:')}`);
+    console.log(`\\n${chalk.bold('LLM Judge Details:')}`);
     console.log(chalk.gray(details));
   }
 }
@@ -189,7 +189,7 @@ function displayRunInfo(run: { status: string; suite: string; scenario: string; 
     ? chalk.red('✗') 
     : chalk.yellow('○');
   
-  console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
+  console.log(`\\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
   console.log(`   ${formatStats('Agent', run.agent + (run.model ? ` (${run.model})` : ''))}`);
   console.log(`   ${formatStats('Score', run.weightedScore?.toFixed(4) || 'N/A', 'green')}`);
   console.log(`   ${chalk.gray(new Date(run.startedAt).toLocaleString())}`);
@@ -200,7 +200,7 @@ function displayRunInfo(run: { status: string; suite: string; scenario: string; 
 function displayModelPerformance(modelStats: Array<{ model: string; avgScore: number; runs: number }>) {
   if (modelStats.length === 0) return;
   
-  console.log('\n' + chalk.underline('Model Performance'));
+  console.log('\\n' + chalk.underline('Model Performance'));
   modelStats.forEach((model, index) => {
     const rank = index + 1;
     const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
@@ -212,7 +212,7 @@ function displayModelPerformance(modelStats: Array<{ model: string; avgScore: nu
   
   const bestModel = modelStats[0];
   const bestPercent = bestModel.avgScore > 1 ? bestModel.avgScore.toFixed(1) : (bestModel.avgScore * 100).toFixed(1);
-  console.log(`\n  ${chalk.cyan('Top Model:')} ${chalk.bold(bestModel.model)} ${chalk.green(bestPercent + '%')} ${chalk.gray(`(${bestModel.runs} runs)`)}`);
+  console.log(`\\n  ${chalk.cyan('Top Model:')} ${chalk.bold(bestModel.model)} ${chalk.green(bestPercent + '%')} ${chalk.gray(`(${bestModel.runs} runs)`)}`);
 }
 
 // ============================================================================
@@ -287,7 +287,7 @@ function getAvailableTiers(suite: string, scenario: string): Array<{value: strin
   }
   
   const files = readdirSync(promptDir);
-  const tierPattern = /^(L\d+|Lx)(-.*)?\.md$/;
+  const tierPattern = /^(L\\d+|Lx)(-.*)?\\.md$/;
   
   const tiers = new Set<string>();
   files.forEach(file => {
@@ -457,10 +457,10 @@ function showHelp() {
 	console.log(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' CLI Help '));
 	
-	console.log('\n' + chalk.bold('Usage:'));
+	console.log('\\n' + chalk.bold('Usage:'));
 	console.log(`  ${chalk.cyan('pnpm bench')} <suite> <scenario> [options]`);
 	
-	console.log('\n' + chalk.bold('Commands:'));
+	console.log('\\n' + chalk.bold('Commands:'));
 	console.log(`  ${chalk.cyan('--history')} [limit]              Show recent runs`);
 	console.log(`  ${chalk.cyan('--evaluators')}                  Show evaluator stats`);
 	console.log(`  ${chalk.cyan('--stats')} suite <name>          Suite statistics`);
@@ -471,18 +471,18 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--compare-batches')} <id1> <id2> Compare multiple batches`);
 	console.log(`  ${chalk.cyan('--clear-db')}                    Clear database`);
 	
-	console.log('\n' + chalk.bold('Options:'));
+	console.log('\\n' + chalk.bold('Options:'));
 	console.log(`  ${chalk.cyan('--tier')} <tier>                   Difficulty tier (varies by scenario)`);
 	console.log(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
 	console.log(`  ${chalk.cyan('--no-json')}                     Skip JSON output`);
 	
-	console.log('\n' + chalk.bold('Model Selection:'));
+	console.log('\\n' + chalk.bold('Model Selection:'));
 	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
 	console.log(`  ${chalk.gray('Search by:')} model name, provider, or description`);
-	console.log(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
+	console.log(`  ${chalk.gray('Example searches:')} \"gpt-4o\", \"llama-3\", \"gemma free\", \"claude sonnet\"`);
 	
-	console.log('\n' + chalk.bold('Web Dashboard:'));
+	console.log('\\n' + chalk.bold('Web Dashboard:'));
 	console.log(`  ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
 	console.log(`  ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}`);
 	
@@ -501,8 +501,8 @@ async function showInteractiveMenu() {
 	intro(chalk.bgBlue(' Interactive Mode '));
 	
 	// Show web dashboard info
-	console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')} ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
-	console.log(`   ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}\n`);
+	console.log(`\\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')} ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
+	console.log(`   ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}\\n`);
 	
 	while (true) {
 		const action = await select({
@@ -540,7 +540,7 @@ async function showInteractiveMenu() {
 		}
 		
 		// Add a small pause before showing the menu again
-		console.log('\n');
+		console.log('\\n');
 	}
 }
 
@@ -619,7 +619,7 @@ async function executeMultipleBenchmarks(
 	}
 	
 	// Show summary
-	console.log(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s):`));
+	console.log(chalk.bold.underline(`\\nRunning ${combinations.length} benchmark(s):`));
 	if (useParallel) {
 		console.log(chalk.gray(`Parallel execution with concurrency: ${concurrency}`));
 	}
@@ -685,7 +685,7 @@ async function executeMultipleBenchmarks(
 	const analytics = logger.getBatchAnalytics(batchId);
 	
 	// Show batch summary header
-	console.log('\n' + chalk.bold.underline('Batch Summary'));
+	console.log('\\n' + chalk.bold.underline('Batch Summary'));
 	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 	console.log(`│ ${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 8))}...`);
 	
@@ -717,7 +717,7 @@ async function executeMultipleBenchmarks(
 	
 	// Show suite breakdown if analytics available
 	if (analytics && analytics.suiteBreakdown.length > 0) {
-		console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
+		console.log(`\\n${chalk.bold.underline('Suite Breakdown')}`);
 		analytics.suiteBreakdown.forEach(suite => {
 			const successRate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
 			console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${successRate}% success, ${suite.runs} runs)`)}`);
@@ -726,7 +726,7 @@ async function executeMultipleBenchmarks(
 	
 	// Show agent performance
 	if (analytics && analytics.agentPerformance.length > 0) {
-		console.log(`\n${chalk.bold.underline('Agent Performance')}`);
+		console.log(`\\n${chalk.bold.underline('Agent Performance')}`);
 		analytics.agentPerformance.forEach((agent, index) => {
 			const rank = index + 1;
 			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
@@ -738,14 +738,14 @@ async function executeMultipleBenchmarks(
 	
 	// Show failed runs if any
 	if (analytics && analytics.failedRuns.length > 0) {
-		console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
+		console.log(`\\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
 		analytics.failedRuns.forEach(run => {
 			console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent} - ${run.error || 'Unknown error'}`);
 		});
 	}
 	
 	// Show completion summary
-	console.log('\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s)!`));
+	console.log('\\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s)!`));
 	
 	// Note: Database is now created directly in public/ directory
 }
@@ -864,7 +864,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const suitesToUse = selectedSuites.includes('__ALL__') ? suites : selectedSuites;
 	
 	// Get scenarios for all selected suites
@@ -905,7 +905,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection and filter by suite
+	// Expand \"All\" selection and filter by suite
 	const scenariosToUse = selectedScenarios.includes('__ALL__') 
 		? allScenarios.map(s => s.value)
 		: selectedScenarios;
@@ -951,7 +951,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const tiersToUse = selectedTiers.includes('__ALL__') 
 		? Array.from(availableTiersSet).sort()
 		: selectedTiers;
@@ -972,7 +972,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const agentsToUse = selectedAgents.includes('__ALL__') 
 		? ['echo', 'openrouter', 'anthropic', 'claude-code'] 
 		: selectedAgents;
@@ -1004,7 +1004,7 @@ async function runInteractiveBenchmark() {
 		};
 
 		// Show shortcuts
-		console.log(`\n${chalk.gray('Quick searches:')} ${Object.keys(QUICK_MODELS).join(', ')}`);
+		console.log(`\\n${chalk.gray('Quick searches:')} ${Object.keys(QUICK_MODELS).join(', ')}`);
 		
 		// Text-based search instead of dropdown
 		const modelSearch = await text({
@@ -1026,13 +1026,13 @@ async function runInteractiveBenchmark() {
 		const searchResults = openrouterAPI.searchModels(toolModels, modelSearch);
 		
 		if (searchResults.length === 0) {
-			log.warning(`No models found matching "${modelSearch}"`);
+			log.warning(`No models found matching \"${modelSearch}\"`);
 			log.info('Try searching for: gpt-4o, llama, gemma, claude, mistral');
 			return;
 		}
 
 		// Show search results with pricing info
-		console.log(`\n📋 Found ${searchResults.length} matching models:\n`);
+		console.log(`\\n📋 Found ${searchResults.length} matching models:\\n`);
 		
 		const selectedModel = await select({
 			message: 'Choose a model:',
@@ -1061,7 +1061,7 @@ async function runInteractiveBenchmark() {
 		const selectedModelInfo = toolModels.find(m => m.id === selectedModel);
 		
 		if (selectedModelInfo) {
-			console.log(`\n${chalk.bold.cyan('Model Details:')}`);
+			console.log(`\\n${chalk.bold.cyan('Model Details:')}`);
 			console.log(`  ${chalk.gray('Name:')} ${selectedModelInfo.name}`);
 			console.log(`  ${chalk.gray('ID:')} ${selectedModelInfo.id}`);
 			console.log(`  ${chalk.gray('Context:')} ${selectedModelInfo.context_length.toLocaleString()} tokens`);
@@ -1156,7 +1156,7 @@ async function runInteractiveBenchmark() {
 	}
 	
 	// Show summary of what will be executed
-	console.log(`\n${chalk.green('►')} Will run ${chalk.bold(totalCombinations.toString())} benchmark combination(s)`);
+	console.log(`\\n${chalk.green('►')} Will run ${chalk.bold(totalCombinations.toString())} benchmark combination(s)`);
 	console.log(`   ${chalk.cyan('Suites:')} ${suitesToUse.join(', ')}`);
 	console.log(`   ${chalk.cyan('Scenarios:')} ${scenariosToUse.join(', ')}`);
 	console.log(`   ${chalk.cyan('Tiers:')} ${tiersToUse.join(', ')}`);
@@ -1190,7 +1190,7 @@ async function runInteractiveHistory() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(chalk.gray(`\\nView in browser: ${serverUrl}`));
 	} catch (err) {
 		// Continue without web server
 	}
@@ -1237,7 +1237,7 @@ async function runInteractiveSuiteStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`\\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
 		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
 		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
@@ -1268,7 +1268,7 @@ async function runInteractiveSuiteStats() {
 			// Execute suite stats
 			const stats = logger.getSuiteStats(selectedSuite);
 		console.log(chalk.bold.bgBlue(` Suite: ${selectedSuite} `));
-			console.log('\n' + chalk.underline('Overview'));
+			console.log('\\n' + chalk.underline('Overview'));
 			console.log(formatStats('Total Runs', stats.totalRuns));
 			console.log(formatStats('Success Rate', `${stats.totalRuns > 0 ? ((stats.successfulRuns / stats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
 			console.log(formatStats('Avg Score', stats.avgScore.toFixed(4), 'yellow'));
@@ -1276,7 +1276,7 @@ async function runInteractiveSuiteStats() {
 			console.log(formatStats('Avg Duration', `${(stats.avgDuration / 1000).toFixed(2)}s`, 'blue'));
 			
 			if (stats.scenarioBreakdown.length > 0) {
-				console.log('\n' + chalk.underline('Scenario Breakdown'));
+				console.log('\\n' + chalk.underline('Scenario Breakdown'));
 				stats.scenarioBreakdown.forEach(scenario => {
 					console.log(`  ${chalk.cyan('•')} ${chalk.bold(scenario.scenario)}: ${chalk.yellow(scenario.avgScore.toFixed(4))} ${chalk.gray(`(${scenario.runs} runs)`)}`);
 				});
@@ -1295,7 +1295,7 @@ async function runInteractiveScenarioStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`\\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
 		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
 		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
@@ -1337,9 +1337,9 @@ async function runInteractiveScenarioStats() {
 			const barLength = 20;
 			const filled = Math.round((scorePercent / 100) * barLength);
 			const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(barLength - filled));
-			console.log(`\n${bar} ${chalk.bold(stats.avgWeightedScore.toFixed(2))}/10`);
+			console.log(`\\n${bar} ${chalk.bold(stats.avgWeightedScore.toFixed(2))}/10`);
 			
-			console.log('\n' + chalk.underline('Overview'));
+			console.log('\\n' + chalk.underline('Overview'));
 			console.log(formatStats('Total Runs', stats.totalRuns));
 			console.log(formatStats('Success Rate', `${stats.totalRuns > 0 ? ((stats.successfulRuns / stats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
 			console.log(formatStats('Avg Score', stats.avgScore.toFixed(4), 'yellow'));
@@ -1347,7 +1347,7 @@ async function runInteractiveScenarioStats() {
 			
 			// Agent comparison table
 			if (stats.agentComparison.length > 0) {
-				console.log('\n' + chalk.underline('Agent Performance'));
+				console.log('\\n' + chalk.underline('Agent Performance'));
 				stats.agentComparison.forEach((agent, i) => {
 					const rank = i + 1;
 					const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
@@ -1368,7 +1368,7 @@ async function runInteractiveRunStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`\\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
 		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
 		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
@@ -1399,7 +1399,7 @@ async function runInteractiveRunStats() {
 			// Execute run stats
 			const stats = logger.getDetailedRunStats(selectedRun);
 		console.log(chalk.bold.bgGreen(` Run Details `));
-			console.log(`\n${chalk.gray('ID:')} ${chalk.dim(selectedRun.substring(0, 8))}...`);
+			console.log(`\\n${chalk.gray('ID:')} ${chalk.dim(selectedRun.substring(0, 8))}...`);
 			console.log(formatStats('Suite', stats.run.suite));
 			console.log(formatStats('Scenario', stats.run.scenario));
 			console.log(formatStats('Tier', stats.run.tier));
@@ -1418,7 +1418,7 @@ async function runInteractiveRunStats() {
 			
 			// Evaluation breakdown with progress bars
 			if (stats.evaluationBreakdown.length > 0) {
-				console.log('\n' + chalk.underline('Evaluations'));
+				console.log('\\n' + chalk.underline('Evaluations'));
 				stats.evaluationBreakdown.forEach(evaluation => {
 					const percent = evaluation.percentage;
 					const color = percent === 100 ? 'green' : percent >= 80 ? 'yellow' : 'red';
@@ -1431,7 +1431,7 @@ async function runInteractiveRunStats() {
 			}
 			
 			if (stats.telemetrySummary) {
-				console.log('\n' + chalk.underline('Telemetry'));
+				console.log('\\n' + chalk.underline('Telemetry'));
 				console.log(formatStats('Tool Calls', stats.telemetrySummary.toolCalls, 'blue'));
 				console.log(formatStats('Tokens', stats.telemetrySummary.tokens, 'blue'));
 				console.log(formatStats('Cost', `$${stats.telemetrySummary.cost.toFixed(6)}`, 'blue'));
@@ -1451,7 +1451,7 @@ async function runInteractiveBatchStats() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(chalk.gray(`\\nView in browser: ${serverUrl}`));
 	} catch (err) {
 		// Continue without web server
 	}
@@ -1484,7 +1484,7 @@ async function runInteractiveBatchStats() {
 			}
 			
 		console.log(chalk.bold.bgGreen(` Batch Details `));
-			console.log(`\n${chalk.gray('ID:')} ${chalk.dim(selectedBatch.substring(0, 8))}...`);
+			console.log(`\\n${chalk.gray('ID:')} ${chalk.dim(selectedBatch.substring(0, 8))}...`);
 			console.log(formatStats('Total Runs', batchStats.totalRuns));
 			console.log(formatStats('Successful', batchStats.successfulRuns, 'green'));
 			console.log(formatStats('Success Rate', `${batchStats.totalRuns > 0 ? ((batchStats.successfulRuns / batchStats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
@@ -1498,7 +1498,7 @@ async function runInteractiveBatchStats() {
 			
 			// Show runs in batch with ranking
 			if (batchStats.runs.length > 0) {
-				console.log('\n' + chalk.underline('Runs in Batch'));
+				console.log('\\n' + chalk.underline('Runs in Batch'));
 				const sortedRuns = batchStats.runs
 					.filter(run => run.weightedScore !== null && run.weightedScore !== undefined)
 					.sort((a, b) => (b.weightedScore || 0) - (a.weightedScore || 0));
@@ -1525,7 +1525,7 @@ async function runInteractiveEvaluators() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		console.log(chalk.gray(`\\nView in browser: ${serverUrl}`));
 	} catch (err) {
 		// Continue without web server
 	}
@@ -1546,7 +1546,7 @@ async function runInteractiveEvaluators() {
 		// Sort by performance
 		const sorted = Object.entries(stats.evaluatorStats).sort((a, b) => b[1].averageScore - a[1].averageScore);
 		
-		console.log('\n' + chalk.underline('Performance Ranking'));
+		console.log('\\n' + chalk.underline('Performance Ranking'));
 		sorted.forEach(([name, stat], index) => {
 			const rank = index + 1;
 			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
@@ -1560,7 +1560,7 @@ async function runInteractiveEvaluators() {
 		const best = sorted[0];
 		const worst = sorted[sorted.length - 1];
 		
-		console.log('\n' + chalk.underline('Performance Summary'));
+		console.log('\\n' + chalk.underline('Performance Summary'));
 		console.log(`  ${chalk.green('Best:')} ${chalk.bold(best[0])} ${chalk.green((best[1].averageScore * 100).toFixed(1) + '%')}`);
 		console.log(`  ${chalk.red('Needs Work:')} ${chalk.bold(worst[0])} ${chalk.red((worst[1].averageScore * 100).toFixed(1) + '%')}`);
 		
@@ -1583,7 +1583,7 @@ async function runInteractiveBatchHistory() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		console.log(`\\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
 		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
 		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
@@ -1620,7 +1620,7 @@ async function runInteractiveBatchHistory() {
 				? chalk.green('✓') 
 				: chalk.yellow('○');
 			
-			console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
+			console.log(`\\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
 			console.log(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns}`, 'green')}`);
 			console.log(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
 			console.log(`   ${chalk.gray(new Date(batch.createdAt).toLocaleString())}`);
@@ -1798,49 +1798,8 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			
 			// Build system prompt with tool usage guidance
 			const systemPrompt = agent === 'anthropic' 
-				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
-
-IMPORTANT: You are working in the directory: ${workspaceDir}
-This is a prepared workspace with the files you need to modify.
-
-Available Tools:
-- readFile: Read any file in the workspace
-- writeFile: Modify files (e.g., package.json files)
-- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
-- listFiles: Explore directory structure
-- askUser: Ask questions when you need clarification or approval for major changes
-
-Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
-				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
-			
-			// Load oracle if available
-			let oracle: Oracle | undefined;
-			const oracleFile = scenarioCfg.oracle?.answers_file;
-			if (oracleFile) {
-				const scenarioDir = getScenarioDir(suite, scenario);
-				const oraclePath = join(scenarioDir, oracleFile);
-				if (existsSync(oraclePath)) {
-					oracle = new Oracle(oraclePath);
-					console.log('Oracle loaded from:', oraclePath);
-				}
-			}
-			
-			// Build system prompt with tool usage guidance
-			const systemPrompt = agent === 'anthropic' 
-				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
-
-IMPORTANT: You are working in the directory: ${workspaceDir}
-This is a prepared workspace with the files you need to modify.
-
-Available Tools:
-- readFile: Read any file in the workspace
-- writeFile: Modify files (e.g., package.json files)
-- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
-- listFiles: Explore directory structure
-- askUser: Ask questions when you need clarification or approval for major changes
-
-Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
-				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
+				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.\n\nAvailable Tools:\n- readFile: Read any file in the workspace\n- writeFile: Modify files (e.g., package.json files)\n- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)\n- listFiles: Explore directory structure\n- askUser: Ask questions when you need clarification or approval for major changes\n\nWork efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
+				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\\n\\nIMPORTANT: You are working in the directory: ${workspaceDir}\\nThis is a prepared workspace with the files you need to modify.`;
 			
 			// Build the request
 			const request: AgentRequest = {
@@ -2017,7 +1976,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 		return;
 	}
 	
-	console.log(`\n${chalk.bold.underline('Benchmark Results')}`);
+	console.log(`\\n${chalk.bold.underline('Benchmark Results')}`);
 	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 	console.log(`│ ${chalk.bold('Agent:')} ${chalk.cyan(agent.padEnd(15))} ${chalk.bold('Tier:')} ${chalk.cyan(tier.padEnd(8))} ${chalk.bold('Duration:')} ${chalk.blue(duration.toFixed(2) + 's')} │`);
 	console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
@@ -2027,7 +1986,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 	
 	// Print evaluation breakdown in table format
 	if (result.scores) {
-		console.log(`\n${chalk.bold.underline('Evaluation Breakdown')}`);
+		console.log(`\\n${chalk.bold.underline('Evaluation Breakdown')}`);
 		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 		console.log(`│ ${chalk.bold('Evaluator'.padEnd(25))} ${chalk.bold('Score'.padEnd(10))} ${chalk.bold('Status'.padEnd(15))} │`);
 		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
@@ -2052,7 +2011,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 
 	// Print telemetry in table format
 	if (result.telemetry) {
-		console.log(`\n${chalk.bold.underline('Telemetry')}`);
+		console.log(`\\n${chalk.bold.underline('Telemetry')}`);
 		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 		console.log(`│ ${chalk.bold('Metric'.padEnd(20))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Unit'.padEnd(15))} │`);
 		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
@@ -2066,7 +2025,7 @@ Work efficiently: read files to understand the current state, make necessary cha
 	// Show database summary in table format
 	try {
 		const stats = logger.getStats();
-		console.log(`\n${chalk.bold.underline('Database Summary')}`);
+		console.log(`\\n${chalk.bold.underline('Database Summary')}`);
 		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 		console.log(`│ ${chalk.bold('Metric'.padEnd(25))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Status'.padEnd(10))} │`);
 		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
@@ -2084,15 +2043,15 @@ Work efficiently: read files to understand the current state, make necessary cha
 	// Optionally write JSON
 	if (!noJson) {
 	writeResult(result, suite, scenario);
-		console.log(`\n${chalk.green('✓')} Results saved to database and JSON`);
+		console.log(`\\n${chalk.green('✓')} Results saved to database and JSON`);
 	} else {
-		console.log(`\n${chalk.yellow('⚠')} JSON output disabled, results saved to database only`);
+		console.log(`\\n${chalk.yellow('⚠')} JSON output disabled, results saved to database only`);
 	}
 	
 	// Note: Database is now created directly in public/ directory
 	
 		// Show completion outro
-		console.log(`\n${chalk.green('✓')} Benchmark completed successfully`);
+		console.log(`\\n${chalk.green('✓')} Benchmark completed successfully`);
 		
 	} catch (error) {
 		// Catch-all for unexpected errors
@@ -2115,7 +2074,7 @@ async function validateEnvironment() {
 	if (missingVars.length > 0) {
 		console.log(chalk.red('❌ Missing required environment variables:'));
 		console.log(chalk.yellow(`   ${missingVars.join(', ')}`));
-		console.log('\n' + chalk.cyan('Setup Instructions:'));
+		console.log('\\n' + chalk.cyan('Setup Instructions:'));
 		console.log(chalk.gray('1. Get API keys from:'));
 		console.log(chalk.gray('   - OpenRouter: https://openrouter.ai/keys'));
 		console.log(chalk.gray('   - Anthropic: https://console.anthropic.com/settings/keys'));
@@ -2127,7 +2086,7 @@ async function validateEnvironment() {
 		console.log(chalk.gray('4. Or set environment variables directly:'));
 		console.log(chalk.gray('   Windows: set OPENROUTER_API_KEY=your_key_here'));
 		console.log(chalk.gray('   Linux/Mac: export OPENROUTER_API_KEY=your_key_here'));
-		console.log('\n' + chalk.red('Please set up your environment variables and try again.'));
+		console.log('\\n' + chalk.red('Please set up your environment variables and try again.'));
 		process.exit(1);
 	}
 }
@@ -2226,7 +2185,7 @@ async function run() {
 			
 			// Show overall stats
 			const stats = logger.getStats();
-			console.log('\n' + chalk.underline('Overall Statistics'));
+			console.log('\\n' + chalk.underline('Overall Statistics'));
 			console.log(formatStats('Total Runs', stats.totalRuns));
 			console.log(formatStats('Success Rate', `${(stats.successRate * 100).toFixed(1)}%`, 'green'));
 			console.log(formatStats('Avg Score', stats.averageScore.toFixed(4), 'yellow'));
@@ -2268,7 +2227,7 @@ async function run() {
 				const duration = batch.duration ? `${(batch.duration / 1000).toFixed(2)}s` : 'Running...';
 				const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(0) : 0;
 				
-				console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
+				console.log(`\\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
 				console.log(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns} (${successRate}%)`, 'green')}`);
 				console.log(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
 				console.log(`   ${formatStats('Duration', duration, 'blue')}`);
@@ -2311,7 +2270,7 @@ async function run() {
 			const duration = batch.duration / 1000;
 			const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(1) : 0;
 			
-			console.log(`\n${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 16))}...`);
+			console.log(`\\n${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 16))}...`);
 			console.log(formatStats('Status', batch.completedAt ? 'Completed' : 'Running', batch.completedAt ? 'green' : 'yellow'));
 			console.log(formatStats('Total Runs', `${batch.totalRuns}`, 'blue'));
 			console.log(formatStats('Successful', `${batch.successfulRuns}/${batch.totalRuns} (${successRate}%)`, 'green'));
@@ -2321,7 +2280,7 @@ async function run() {
 			
 			// Suite breakdown
 			if (analytics.suiteBreakdown.length > 0) {
-				console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
+				console.log(`\\n${chalk.bold.underline('Suite Breakdown')}`);
 				analytics.suiteBreakdown.forEach(suite => {
 					const rate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
 					console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${rate}% success, ${suite.runs} runs)`)}`);
@@ -2330,7 +2289,7 @@ async function run() {
 			
 			// Agent performance
 			if (analytics.agentPerformance.length > 0) {
-				console.log(`\n${chalk.bold.underline('Agent Performance')}`);
+				console.log(`\\n${chalk.bold.underline('Agent Performance')}`);
 				analytics.agentPerformance.forEach((agent, i) => {
 					const rankDisplay = i < 3 ? `#${i + 1}` : `${i + 1}.`;
 					const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : '';
@@ -2341,7 +2300,7 @@ async function run() {
 			
 			// Tier distribution
 			if (analytics.tierDistribution.length > 0) {
-				console.log(`\n${chalk.bold.underline('Tier Distribution')}`);
+				console.log(`\\n${chalk.bold.underline('Tier Distribution')}`);
 				analytics.tierDistribution.forEach(tier => {
 					console.log(`  ${chalk.cyan(tier.tier)}: ${tier.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${tier.successfulRuns}/${tier.runs} runs)`)}`);
 				});
@@ -2349,7 +2308,7 @@ async function run() {
 			
 			// Failed runs
 			if (analytics.failedRuns.length > 0) {
-				console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
+				console.log(`\\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
 				analytics.failedRuns.forEach(run => {
 					console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent}`);
 				});
@@ -2387,7 +2346,7 @@ async function run() {
 			
 			intro(chalk.bgMagenta(' Batch Comparison '));
 			
-			console.log(`\n${chalk.bold('Comparing')} ${batches.length} batches:\n`);
+			console.log(`\\n${chalk.bold('Comparing')} ${batches.length} batches:\\n`);
 			
 			// Create comparison table
 			console.log(chalk.bold('Batch'.padEnd(12)) + ' | ' + 
@@ -2417,7 +2376,7 @@ async function run() {
 				(current.avgWeightedScore || 0) > (best.avgWeightedScore || 0) ? current : best
 			);
 			
-			console.log(`\n${chalk.green('Best performing batch:')} ${chalk.dim(bestBatch.batchId.substring(0, 8))}... with score ${chalk.bold(bestBatch.avgWeightedScore?.toFixed(4) || 'N/A')}`);
+			console.log(`\\n${chalk.green('Best performing batch:')} ${chalk.dim(bestBatch.batchId.substring(0, 8))}... with score ${chalk.bold(bestBatch.avgWeightedScore?.toFixed(4) || 'N/A')}`);
 			
 			outro(chalk.green('Comparison complete'));
 			
@@ -2439,16 +2398,16 @@ async function run() {
 	
 	// Show modern CLI intro with hyperfine-style header
 	console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
-	console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agent}'`)}`);
+	console.log(`\\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agent}'`)}`);
 	
 	log.info(chalk.bold(`Running: ${suite}/${scenario}`));
 	log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agent)}`);
 	
 	// Warn if OpenRouter agent but no model specified
 	if (agent === 'openrouter' && !model && !process.env.OPENROUTER_MODEL) {
-		console.log(chalk.yellow(`\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
+		console.log(chalk.yellow(`\\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
 		console.log(chalk.gray(`   Tip: Use --model flag or set OPENROUTER_MODEL environment variable`));
-		console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\n`));
+		console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\\n`));
 	}
 	
 	// Execute the benchmark
@@ -2461,31 +2420,31 @@ process.on('exit', () => {
 });
 
 process.on('SIGINT', () => {
-	console.log('\nShutting down...');
+	console.log('\\nShutting down...');
 	stopDevServer();
 	process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-	console.log('\nShutting down...');
+	console.log('\\nShutting down...');
 	stopDevServer();
 	process.exit(0);
 });
 
 process.on('uncaughtException', (err) => {
-	console.error('\nUncaught Exception:', err);
+	console.error('\\nUncaught Exception:', err);
 	stopDevServer();
 	process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-	console.error('\nUnhandled Rejection at:', promise, 'reason:', reason);
+	console.error('\\nUnhandled Rejection at:', promise, 'reason:', reason);
 	stopDevServer();
 	process.exit(1);
 });
 
 run().catch((err) => {
-	console.log(`\n${chalk.red('✗')} Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
+	console.log(`\\n${chalk.red('✗')} Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
 	
 	// Try to log the error to database if logger is available
 	try {
