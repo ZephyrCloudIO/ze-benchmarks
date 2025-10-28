@@ -188,124 +188,28 @@ pnpm compare-batches
 pnpm batch-details <batch-id>
 ```
 
-## Creating New Suites and Scenarios
+## Contributing
 
-### Step 1: Create Suite Structure
-```bash
-# Create new suite directory
-mkdir -p suites/my-new-suite/prompts/my-scenario
-mkdir -p suites/my-new-suite/scenarios/my-scenario/repo-fixture
-```
+We welcome contributions! Whether you want to add new benchmarks, create evaluators, or improve documentation, we have comprehensive guides to help you get started.
 
-### Step 2: Create Scenario Configuration
-```bash
-# Copy and customize the template
-cp docs/templates/scenario.yaml suites/my-new-suite/scenarios/my-scenario/scenario.yaml
-```
+### Quick Start
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - Complete contribution guidelines
+- **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Step-by-step benchmark creation
+- **[Adding Evaluators](docs/ADDING-EVALUATORS.md)** - Evaluator development guide
 
-Edit `scenario.yaml` with your specific requirements:
-```yaml
-id: "my-scenario"
-suite: "my-new-suite"
-title: "My Custom Scenario"
-description: "Description of what this scenario tests"
+### Propose New Benchmarks
+Use our GitHub issue template to propose new benchmarks:
+1. Go to [GitHub Issues](https://github.com/your-org/ze-benchmarks/issues)
+2. Click "New Issue" → "New Benchmark Proposal"
+3. Fill out the template with your benchmark idea
+4. We'll review and help you implement it!
 
-# Define what needs to be updated
-targets:
-  required:
-    - name: "react"
-      to: "^18.0.0"
-    - name: "@types/react"
-      to: "^18.0.0"
-  optional:
-    - name: "typescript"
-      to: "^5.0.0"
-
-# Define validation commands
-validation:
-  commands:
-    install: "npm install"
-    build: "npm run build"
-    test: "npm test"
-```
-
-### Step 3: Create Repository Fixture
-Create a complete codebase with intentional issues:
-
-```bash
-# Create package.json with outdated dependencies
-cat > suites/my-new-suite/scenarios/my-scenario/repo-fixture/package.json << 'EOF'
-{
-  "name": "test-project",
-  "version": "1.0.0",
-  "dependencies": {
-    "react": "^17.0.0",
-    "@types/react": "^17.0.0"
-  },
-  "devDependencies": {
-    "typescript": "^4.0.0"
-  },
-  "scripts": {
-    "build": "tsc",
-    "test": "echo 'Tests pass'"
-  }
-}
-EOF
-
-# Add source files, config files, etc.
-```
-
-### Step 4: Create Prompts
-Create different difficulty tiers:
-
-```bash
-# L0 - Minimal context
-echo "Update the dependencies in this project." > suites/my-new-suite/prompts/my-scenario/L0-minimal.md
-
-# L1 - Basic context  
-echo "This React project needs its dependencies updated. Please update React and related packages to their latest compatible versions while ensuring the project still builds and tests pass." > suites/my-new-suite/prompts/my-scenario/L1-basic.md
-
-# L2 - Directed guidance
-echo "Update the dependencies in this React project:
-1. Update React to the latest 18.x version
-2. Update @types/react to match React version  
-3. Update TypeScript to latest 5.x version
-4. Ensure all tests pass
-5. Maintain TypeScript compatibility" > suites/my-new-suite/prompts/my-scenario/L2-directed.md
-```
-
-### Step 5: Create Oracle Answers
-```bash
-cat > suites/my-new-suite/scenarios/my-scenario/oracle-answers.json << 'EOF'
-{
-  "react": "^18.0.0",
-  "@types/react": "^18.0.0", 
-  "typescript": "^5.0.0"
-}
-EOF
-```
-
-### Step 6: Test Your Scenario
-```bash
-# Test with specific agent and tier
-pnpm bench my-new-suite my-scenario L1 anthropic
-
-# Test all tiers
-pnpm bench my-new-suite my-scenario --batch anthropic
-```
-
-## Documentation
-
-### Comprehensive Guides
-- **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Complete benchmark creation guide
-- **[Adding Evaluators](docs/ADDING-EVALUATORS.md)** - Evaluator development guide  
-- **[Quick Start](docs/QUICK-START.md)** - Fast-track onboarding
-- **[Contributing](docs/CONTRIBUTING.md)** - Contribution guidelines
-
-### Templates
-- **[Scenario Template](docs/templates/scenario.yaml)** - Annotated configuration
-- **[Evaluator Template](docs/templates/heuristic-evaluator.ts)** - Complete evaluator template
-- **[Quality Checklists](docs/BENCHMARK-CHECKLIST.md)** - Pre-submission validation
+### Ready to Contribute?
+Check out our [Contributing Guide](docs/CONTRIBUTING.md) for detailed instructions on:
+- Setting up your development environment
+- Creating new benchmarks and evaluators
+- Submitting pull requests
+- Code quality standards
 
 ## Environment Variables
 

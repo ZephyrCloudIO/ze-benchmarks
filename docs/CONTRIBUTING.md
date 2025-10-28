@@ -14,11 +14,161 @@ We are committed to providing a welcoming and inclusive environment for all cont
 
 ## How to Contribute
 
-### 1. Adding Benchmarks
-- Create realistic, challenging scenarios
-- Follow the directory structure guidelines
-- Include comprehensive documentation
-- Test with multiple agents and tiers
+## Creating New Benchmarks
+
+### Overview
+Benchmarks are the core of ze-benchmarks. They test how well AI agents can perform real-world coding tasks. Each benchmark consists of:
+
+- **Suite**: A collection of related benchmarks
+- **Scenario**: Individual test cases within a suite
+- **Prompts**: Difficulty tiers (L0-L3, Lx) for each scenario
+- **Repository Fixture**: Real codebase with intentional issues
+- **Oracle Answers**: Expected outcomes for validation
+
+### File Structure
+Every benchmark must follow this exact structure:
+
+```
+suites/YOUR-SUITE/
+├── prompts/YOUR-SCENARIO/
+│   ├── L0-minimal.md
+│   ├── L1-basic.md
+│   ├── L2-directed.md
+│   ├── L3-migration.md (optional)
+│   └── Lx-adversarial.md (optional)
+└── scenarios/YOUR-SCENARIO/
+    ├── scenario.yaml
+    ├── oracle-answers.json
+    └── repo-fixture/
+        ├── package.json
+        ├── [source files]
+        └── [config files]
+```
+
+### Step-by-Step Creation
+
+#### Step 1: Create Suite Structure
+```bash
+# Create new suite directory
+mkdir -p suites/my-new-suite/prompts/my-scenario
+mkdir -p suites/my-new-suite/scenarios/my-scenario/repo-fixture
+```
+
+#### Step 2: Create Scenario Configuration (`scenario.yaml`)
+```yaml
+id: "my-scenario"
+suite: "my-new-suite"
+title: "My Custom Scenario"
+description: "Description of what this scenario tests"
+
+# Define what needs to be updated
+targets:
+  required:
+    - name: "react"
+      to: "^18.0.0"
+    - name: "@types/react"
+      to: "^18.0.0"
+  optional:
+    - name: "typescript"
+      to: "^5.0.0"
+
+# Define validation commands
+validation:
+  commands:
+    install: "npm install"
+    build: "npm run build"
+    test: "npm test"
+    lint: "npm run lint"
+    typecheck: "tsc --noEmit"
+```
+
+#### Step 3: Create Repository Fixture
+Create a complete codebase with intentional issues:
+
+```bash
+# Create package.json with outdated dependencies
+cat > suites/my-new-suite/scenarios/my-scenario/repo-fixture/package.json << 'EOF'
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "^17.0.0",
+    "@types/react": "^17.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo 'Tests pass'"
+  }
+}
+EOF
+
+# Add source files, config files, etc.
+```
+
+#### Step 4: Create Prompts
+Create different difficulty tiers:
+
+**L0 - Minimal context:**
+```bash
+echo "Update the dependencies in this project." > suites/my-new-suite/prompts/my-scenario/L0-minimal.md
+```
+
+**L1 - Basic context:**
+```bash
+echo "This React project needs its dependencies updated. Please update React and related packages to their latest compatible versions while ensuring the project still builds and tests pass." > suites/my-new-suite/prompts/my-scenario/L1-basic.md
+```
+
+**L2 - Directed guidance:**
+```bash
+echo "Update the dependencies in this React project:
+1. Update React to the latest 18.x version
+2. Update @types/react to match React version  
+3. Update TypeScript to latest 5.x version
+4. Ensure all tests pass
+5. Maintain TypeScript compatibility" > suites/my-new-suite/prompts/my-scenario/L2-directed.md
+```
+
+#### Step 5: Create Oracle Answers (`oracle-answers.json`)
+```bash
+cat > suites/my-new-suite/scenarios/my-scenario/oracle-answers.json << 'EOF'
+{
+  "react": "^18.0.0",
+  "@types/react": "^18.0.0", 
+  "typescript": "^5.0.0"
+}
+EOF
+```
+
+#### Step 6: Test Your Scenario
+```bash
+# Test with specific agent and tier
+pnpm bench my-new-suite my-scenario L1 anthropic
+
+# Test all tiers
+pnpm bench my-new-suite my-scenario --batch anthropic
+```
+
+### Quality Checklist
+Before submitting your benchmark:
+
+- [ ] Repository fixture is realistic and complete
+- [ ] Dependencies have intentional version mismatches
+- [ ] Prompts are clear and appropriately detailed for each tier
+- [ ] Validation commands match the project setup
+- [ ] Oracle answers are correct
+- [ ] Benchmark runs successfully with different agents
+- [ ] All tiers provide appropriate challenge levels
+- [ ] Documentation is clear and complete
+
+### Proposing New Benchmarks
+Use our GitHub issue template to propose new benchmarks:
+1. Go to [GitHub Issues](https://github.com/your-org/ze-benchmarks/issues)
+2. Click "New Issue" → "New Benchmark Proposal"
+3. Fill out the template with your benchmark idea
+4. We'll review and help you implement it!
 
 ### 2. Adding Evaluators
 - Implement the Evaluator interface correctly
