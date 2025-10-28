@@ -11,10 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { submodules: true }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm ci
-      - run: npm -w packages/harness run build
+        with: { node-version: 20, cache: 'pnpm' }
+      - run: pnpm install
+      - run: pnpm --filter packages/harness build
       - run: node packages/harness/dist/cli.js run ${{ matrix.suite }} ${{ matrix.scenario }} --tier ${{ matrix.tier }}
       - uses: actions/upload-artifact@v4
         with:
