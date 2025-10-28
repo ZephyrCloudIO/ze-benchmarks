@@ -27,7 +27,7 @@ suites/
     scenarios/
       <scenario-name>/            # Task configuration
         scenario.yaml             # Main configuration
-        oracle-answers.json       # Expected agent responses
+        oracle-answers.json       # Expected agent questions 
         repo-fixture/             # Starting repository state
 ```
 
@@ -39,8 +39,8 @@ The main configuration file defining the benchmark scenario.
 
 **Required fields:**
 - `title`: Human-readable title
-- `description`: Detailed description
-- `id`: Unique identifier for the scenario
+- `description`: Detailed description on the scenario and task
+- `id`: Unique identifier for the scenario (make it start with `ZE` i.e `ZE_update_bench`)
 - `suite`: Parent suite name
 - `workspace`: Node version and package manager settings
 - `baseline`: Commands to run before agent execution

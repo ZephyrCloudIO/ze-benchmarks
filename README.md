@@ -192,7 +192,7 @@ pnpm batch-details <batch-id>
 
 We welcome contributions! Whether you want to add new benchmarks, create evaluators, or improve documentation, we have comprehensive guides to help you get started.
 
-### Quick Start
+### Quick Start - IMPORTANT
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - Complete contribution guidelines
 - **[Adding Benchmarks](docs/ADDING-BENCHMARKS.md)** - Step-by-step benchmark creation
 - **[Adding Evaluators](docs/ADDING-EVALUATORS.md)** - Evaluator development guide
