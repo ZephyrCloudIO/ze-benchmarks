@@ -1813,6 +1813,35 @@ Available Tools:
 Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
 				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
 			
+			// Load oracle if available
+			let oracle: Oracle | undefined;
+			const oracleFile = scenarioCfg.oracle?.answers_file;
+			if (oracleFile) {
+				const scenarioDir = getScenarioDir(suite, scenario);
+				const oraclePath = join(scenarioDir, oracleFile);
+				if (existsSync(oraclePath)) {
+					oracle = new Oracle(oraclePath);
+					console.log('Oracle loaded from:', oraclePath);
+				}
+			}
+			
+			// Build system prompt with tool usage guidance
+			const systemPrompt = agent === 'anthropic' 
+				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
+
+IMPORTANT: You are working in the directory: ${workspaceDir}
+This is a prepared workspace with the files you need to modify.
+
+Available Tools:
+- readFile: Read any file in the workspace
+- writeFile: Modify files (e.g., package.json files)
+- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
+- listFiles: Explore directory structure
+- askUser: Ask questions when you need clarification or approval for major changes
+
+Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
+				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
+			
 			// Build the request
 			const request: AgentRequest = {
 				messages: [
