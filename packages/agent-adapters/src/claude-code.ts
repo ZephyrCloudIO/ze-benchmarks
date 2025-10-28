@@ -9,13 +9,24 @@ type ParsedClaudeResponse = {
 	toolCalls?: number;
 };
 
+type ClaudeCodeAdapterOptions = {
+	model?: string;
+	defaultMaxTurns?: number;
+	permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+};
+
 export class ClaudeCodeAdapter implements AgentAdapter {
 	name = 'claude-code';
 	private model?: string;
 	private defaultMaxTurns: number;
 	private permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
-	constructor(model?: string, defaultMaxTurns = 10, permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' = 'bypassPermissions') {
+	constructor(options: ClaudeCodeAdapterOptions = {}) {
+		const {
+			model,
+			defaultMaxTurns = 10,
+			permissionMode = 'bypassPermissions',
+		} = options;
 		this.model = model;
 		this.defaultMaxTurns = defaultMaxTurns;
 		this.permissionMode = permissionMode;
