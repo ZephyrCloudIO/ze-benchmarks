@@ -431,7 +431,9 @@ function Dashboard() {
             topPerformers.map((performer, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex-1">
-                  <div className="font-medium">{performer.model || 'Unknown Model'}</div>
+                  <div className="font-medium">
+                    {performer.model ? performer.model : `${performer.agent} (no model)`}
+                  </div>
                   <div className="text-sm text-muted-foreground">{performer.agent} agent</div>
                 </div>
                 <div className="text-right mr-4">
