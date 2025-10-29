@@ -1,8 +1,10 @@
 import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 import { OpenAI } from 'openai';
 import * as dotenv from 'dotenv';
+import { resolve } from 'node:path';
 
-dotenv.config();
+// Load environment variables from .env file in project root
+dotenv.config({ path: resolve(process.cwd(), '.env') });
 
 // Simple token counting function (approximation)
 function countTokens(text: string): number {

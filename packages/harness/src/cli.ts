@@ -1,8 +1,12 @@
 #!/usr/bin/env tsx
+import { config } from 'dotenv';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
+
+// Load environment variables from .env file in project root
+config({ path: resolve(process.cwd(), '.env') });
 import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
 import { OpenAI } from 'openai';
 import { runEvaluators } from '../../evaluators/src/index.ts';
@@ -659,16 +663,21 @@ async function executeMultipleBenchmarks(
 	// Calculate batch statistics
 	const batchStats = logger.getBatchDetails(batchId);
 	if (batchStats) {
-		successfulRuns = batchStats.successfulRuns;
-		totalScore = batchStats.avgScore * batchStats.totalRuns;
-		totalWeightedScore = batchStats.avgWeightedScore * batchStats.totalRuns;
+		// Calculate successful runs directly from individual runs in the batch
+		// This ensures we use the new is_successful field
+		successfulRuns = logger.getBatchSuccessfulRunsCount(batchId);
+		
+		// Calculate average scores directly from individual runs in the batch
+		const scoreStats = logger.getBatchScoreStats(batchId);
+		totalScore = scoreStats.avgScore;
+		totalWeightedScore = scoreStats.avgWeightedScore;
 	}
 	
 	logger.completeBatch(batchId, {
 		totalRuns: combinations.length,
 		successfulRuns,
-		avgScore: combinations.length > 0 ? totalScore / combinations.length : 0,
-		avgWeightedScore: combinations.length > 0 ? totalWeightedScore / combinations.length : 0,
+		avgScore: totalScore,
+		avgWeightedScore: totalWeightedScore,
 		metadata: {
 			suites,
 			scenarios,
@@ -1678,7 +1687,72 @@ async function runInteractiveClear() {
 }
 
 // ============================================================================
-// SECTION 8: MAIN BENCHMARK RUNNER
+// SECTION 8: SUCCESS CALCULATION LOGIC
+// ============================================================================
+
+interface CommandResult {
+  tool: 'shell';
+  type: 'install' | 'test' | 'lint' | 'typecheck';
+  raw: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+}
+
+interface SuccessCalculationResult {
+  isSuccessful: boolean;
+  successMetric: number;
+}
+
+function calculateSuccess(
+  commandLog: CommandResult[],
+  scores: Record<string, number>,
+  scenario: any
+): SuccessCalculationResult {
+  
+  // Validation score (commands passed / total commands)
+  const passedCommands = commandLog.filter(cmd => cmd.exitCode === 0).length;
+  const validationScore = commandLog.length > 0 
+    ? passedCommands / commandLog.length 
+    : 0;
+  
+  // Critical commands (install, build, test must pass)
+  const criticalCommands = ['install', 'test']; // Note: 'build' is not in CommandKind, using 'test' as critical
+  const criticalPassed = criticalCommands.every(cmd => {
+    const result = commandLog.find(c => c.type === cmd);
+    return result && result.exitCode === 0;
+  });
+  
+  // Evaluator average score
+  const evaluatorScore = Object.values(scores).length > 0
+    ? Object.values(scores).reduce((sum, s) => sum + s, 0) / Object.values(scores).length
+    : 0;
+  
+  // LLM judge score (if available)
+  const llmJudgeScore = scores.llm_judge || 0;
+  
+  // Weighted metric (from scenario.yaml or default)
+  const weights = scenario.success_weights || {
+    validation: 0.4,
+    evaluators: 0.3,
+    llm_judge: 0.3
+  };
+  
+  const successMetric = (
+    validationScore * weights.validation +
+    evaluatorScore * weights.evaluators +
+    llmJudgeScore * weights.llm_judge
+  );
+  
+  // Success criteria: critical commands must pass AND success metric >= 0.7
+  const isSuccessful = criticalPassed && successMetric >= 0.7;
+  
+  return { isSuccessful, successMetric };
+}
+
+// ============================================================================
+// SECTION 9: MAIN BENCHMARK RUNNER
 // ============================================================================
 
 async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, noJson?: boolean, batchId?: string, quiet?: boolean) {
@@ -1691,12 +1765,12 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	const progress = quiet ? null : createProgress();
 	
 	try {
-		// Stage 1: Setup
+	// Stage 1: Setup
 		if (progress) updateProgress(progress, 1, 'Loading scenario configuration');
-		const scenarioCfg = loadScenario(suite, scenario);
-		
+	const scenarioCfg = loadScenario(suite, scenario);
+	
 		if (progress) updateProgress(progress, 1, 'Loading prompt');
-		const promptContent = loadPrompt(suite, scenario, tier);
+	const promptContent = loadPrompt(suite, scenario, tier);
 		
 		// Early failure check: prompt missing for non-echo agents
 		if (!promptContent && agent !== 'echo') {
@@ -1705,10 +1779,10 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
 			return;
 		}
-		
-		// Stage 2: Workspace
+	
+	// Stage 2: Workspace
 		if (progress) updateProgress(progress, 2, 'Preparing workspace');
-		const workspacePrep = prepareWorkspaceFromFixture(suite, scenario);
+	const workspacePrep = prepareWorkspaceFromFixture(suite, scenario);
 		
 		// Early failure check: workspace preparation failed
 		if (!workspacePrep) {
@@ -1847,7 +1921,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 					}));
 				} else {
 					// Anthropic uses ToolDefinition format directly
-					request.tools = tools;
+				request.tools = tools;
 				}
 				
 				request.toolHandlers = toolHandlers;
@@ -1949,6 +2023,10 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 	// Complete the run in database
 	const totalScore = Object.values(result.scores || {}).reduce((sum, score) => sum + (typeof score === 'number' ? score : 0), 0) / Object.keys(result.scores || {}).length;
+	
+	// Calculate success based on validation commands and evaluator scores
+	const { isSuccessful, successMetric } = calculateSuccess(commandLog, result.scores || {}, scenarioCfg);
+	
 	logger.completeRun(
 		totalScore,
 		result.totals?.weighted,
@@ -1956,7 +2034,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			diffSummary: diffArtifacts.diffSummary,
 			depsDelta: diffArtifacts.depsDelta,
 			oracleQuestions: (result as any).oracle_questions
-		}
+		},
+		isSuccessful,
+		successMetric
 	);
 
 	// Stage 6: Results
@@ -1970,9 +2050,10 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	
 	// In quiet mode, show compact one-line output
 	if (quiet) {
-		const status = totalScore >= 0.9 ? chalk.green('✓') : totalScore >= 0.7 ? chalk.yellow('~') : chalk.red('✗');
+		const status = isSuccessful ? chalk.green('✓') : chalk.red('✗');
 		const modelStr = model ? ` [${model}]` : '';
-		console.log(`${status} ${suite}/${scenario} (${tier}) ${agent}${modelStr} - ${weightedScore.toFixed(2)}/10`);
+		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
+		console.log(`${status} ${suite}/${scenario} (${tier}) ${agent}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
 		return;
 	}
 	
@@ -2050,8 +2131,8 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	
 	// Note: Database is now created directly in public/ directory
 	
-		// Show completion outro
-		console.log(`\\n${chalk.green('✓')} Benchmark completed successfully`);
+	// Show completion outro
+	console.log(`\n${chalk.green('✓')} Benchmark completed successfully`);
 		
 	} catch (error) {
 		// Catch-all for unexpected errors

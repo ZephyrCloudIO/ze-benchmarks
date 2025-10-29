@@ -1,6 +1,11 @@
+import { config } from 'dotenv';
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParams, ContentBlock, TextBlock, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages";
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
+import { resolve } from 'node:path';
+
+// Load environment variables from .env file in project root
+config({ path: resolve(process.cwd(), '.env') });
 
 
 interface ToolResult {

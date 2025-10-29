@@ -1,5 +1,10 @@
+import { config } from 'dotenv';
 import { OpenAI } from 'openai';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
+import { resolve } from 'node:path';
+
+// Load environment variables from .env file in project root
+config({ path: resolve(process.cwd(), '.env') });
 
 interface ToolResult {
   tool_call_id: string;

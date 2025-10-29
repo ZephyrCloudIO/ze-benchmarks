@@ -158,6 +158,7 @@ export class BenchmarkLogger {
   private initializeSchema() {
     this.db.exec(SCHEMA);
     this.addBatchIdColumnIfNeeded();
+    this.addSuccessTrackingColumnsIfNeeded();
   }
 
   private addBatchIdColumnIfNeeded() {
@@ -174,6 +175,36 @@ export class BenchmarkLogger {
       }
     } catch (error) {
       console.warn('Failed to add batchId column:', error);
+    }
+  }
+
+  private addSuccessTrackingColumnsIfNeeded() {
+    try {
+      // Check if success tracking columns exist
+      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const hasIsSuccessful = columns.some(col => col.name === 'is_successful');
+      const hasSuccessMetric = columns.some(col => col.name === 'success_metric');
+      
+      if (!hasIsSuccessful) {
+        console.log('Adding is_successful column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN is_successful BOOLEAN DEFAULT 0');
+        console.log('✓ is_successful column added successfully');
+      }
+      
+      if (!hasSuccessMetric) {
+        console.log('Adding success_metric column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN success_metric REAL');
+        console.log('✓ success_metric column added successfully');
+      }
+      
+      // Add index for is_successful if it doesn't exist
+      try {
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_is_successful ON benchmark_runs(is_successful)');
+      } catch (error) {
+        // Index might already exist, ignore error
+      }
+    } catch (error) {
+      console.warn('Failed to add success tracking columns:', error);
     }
   }
 
@@ -253,14 +284,14 @@ export class BenchmarkLogger {
     return runId;
   }
 
-  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>) {
+  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number) {
     if (!this.currentRunId) throw new Error('No active run');
     
     this.db.prepare(`
       UPDATE benchmark_runs 
-      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, total_score = ?, weighted_score = ?, metadata = ?
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, total_score = ?, weighted_score = ?, is_successful = ?, success_metric = ?, metadata = ?
       WHERE run_id = ?
-    `).run(totalScore, weightedScore, JSON.stringify(metadata), this.currentRunId);
+    `).run(totalScore, weightedScore, isSuccessful ? 1 : 0, successMetric, JSON.stringify(metadata), this.currentRunId);
     
     this.updateTimestamp();
   }
@@ -420,7 +451,7 @@ export class BenchmarkLogger {
   }
 
   getStats(filters?: { suite?: string; scenario?: string; agent?: string; days?: number }): RunStatistics {
-    let whereClause = "WHERE status = 'completed'";
+    let whereClause = "WHERE status = 'completed' AND is_successful = 1";
     const params: any[] = [];
 
     if (filters?.suite) {
@@ -492,7 +523,7 @@ export class BenchmarkLogger {
     return this.db.prepare(`
       SELECT agent, AVG(weighted_score) as avg_score, COUNT(*) as run_count
       FROM benchmark_runs 
-      WHERE status = 'completed' AND weighted_score IS NOT NULL
+      WHERE status = 'completed' AND is_successful = 1 AND weighted_score IS NOT NULL
       GROUP BY agent
       ORDER BY avg_score DESC
       LIMIT ?
@@ -508,7 +539,7 @@ export class BenchmarkLogger {
         MIN(weighted_score) as minScore,
         MAX(weighted_score) as maxScore
       FROM benchmark_runs 
-      WHERE status = 'completed' AND model IS NOT NULL AND model != 'default'
+      WHERE status = 'completed' AND is_successful = 1 AND model IS NOT NULL AND model != 'default'
       GROUP BY model
       ORDER BY avgScore DESC
     `).all() as any[];
@@ -528,10 +559,10 @@ export class BenchmarkLogger {
     const stats = this.db.prepare(`
       SELECT 
         COUNT(*) as totalRuns,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-        AVG(CASE WHEN status = 'completed' THEN total_score END) as avgScore,
-        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore,
-        AVG(CASE WHEN status = 'completed' THEN 
+        COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN total_score END) as avgScore,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgWeightedScore,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN 
           (julianday(completed_at) - julianday(started_at)) * 24 * 60 * 60 * 1000 
         END) as avgDuration
       FROM benchmark_runs 
@@ -545,7 +576,7 @@ export class BenchmarkLogger {
         COUNT(*) as runs,
         AVG(total_score) as avgScore
       FROM benchmark_runs 
-      WHERE suite = ? AND status = 'completed'
+      WHERE suite = ? AND status = 'completed' AND is_successful = 1
       GROUP BY scenario
     `).all(suite) as any[];
 
@@ -567,9 +598,9 @@ export class BenchmarkLogger {
     const stats = this.db.prepare(`
       SELECT 
         COUNT(*) as totalRuns,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-        AVG(CASE WHEN status = 'completed' THEN total_score END) as avgScore,
-        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore,
+        COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN total_score END) as avgScore,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgWeightedScore,
         MIN(weighted_score) as minScore,
         MAX(weighted_score) as maxScore
       FROM benchmark_runs 
@@ -583,7 +614,7 @@ export class BenchmarkLogger {
         COUNT(*) as runs,
         AVG(total_score) as avgScore
       FROM benchmark_runs 
-      WHERE suite = ? AND scenario = ? AND status = 'completed'
+      WHERE suite = ? AND scenario = ? AND status = 'completed' AND is_successful = 1
       GROUP BY agent
       ORDER BY avgScore DESC
     `).all(suite, scenario) as any[];
@@ -595,7 +626,7 @@ export class BenchmarkLogger {
         COUNT(*) as runs,
         AVG(total_score) as avgScore
       FROM benchmark_runs 
-      WHERE suite = ? AND scenario = ? AND status = 'completed'
+      WHERE suite = ? AND scenario = ? AND status = 'completed' AND is_successful = 1
       GROUP BY tier
     `).all(suite, scenario) as any[];
 
@@ -655,6 +686,31 @@ export class BenchmarkLogger {
     `).run(batchId, now);
     
     return batchId;
+  }
+
+  getBatchSuccessfulRunsCount(batchId: string): number {
+    const result = this.db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM benchmark_runs 
+      WHERE batchId = ? AND status = 'completed' AND is_successful = 1
+    `).get(batchId) as any;
+    
+    return result.count || 0;
+  }
+
+  getBatchScoreStats(batchId: string): { avgScore: number; avgWeightedScore: number } {
+    const result = this.db.prepare(`
+      SELECT 
+        AVG(total_score) as avgScore,
+        AVG(weighted_score) as avgWeightedScore
+      FROM benchmark_runs 
+      WHERE batchId = ? AND status = 'completed' AND is_successful = 1
+    `).get(batchId) as any;
+    
+    return {
+      avgScore: result.avgScore || 0,
+      avgWeightedScore: result.avgWeightedScore || 0
+    };
   }
 
   completeBatch(batchId: string, summary: {
@@ -812,9 +868,9 @@ export class BenchmarkLogger {
         suite,
         scenario,
         COUNT(*) as runs,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-        AVG(CASE WHEN status = 'completed' THEN total_score END) as avgScore,
-        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
+        COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN total_score END) as avgScore,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgWeightedScore
       FROM benchmark_runs 
       WHERE batchId = ?
       GROUP BY suite, scenario
@@ -827,10 +883,10 @@ export class BenchmarkLogger {
         agent,
         model,
         COUNT(*) as runs,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore,
-        MIN(CASE WHEN status = 'completed' THEN weighted_score END) as minScore,
-        MAX(CASE WHEN status = 'completed' THEN weighted_score END) as maxScore
+        COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgWeightedScore,
+        MIN(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as minScore,
+        MAX(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as maxScore
       FROM benchmark_runs 
       WHERE batchId = ?
       GROUP BY agent, model
@@ -842,8 +898,8 @@ export class BenchmarkLogger {
       SELECT 
         tier,
         COUNT(*) as runs,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-        AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
+        COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
+        AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgWeightedScore
       FROM benchmark_runs 
       WHERE batchId = ?
       GROUP BY tier
@@ -859,7 +915,7 @@ export class BenchmarkLogger {
         COUNT(*) as count
       FROM evaluation_results er
       JOIN benchmark_runs br ON er.run_id = br.run_id
-      WHERE br.batchId = ? AND br.status = 'completed'
+      WHERE br.batchId = ? AND br.status = 'completed' AND br.is_successful = 1
       GROUP BY er.evaluator_name
       ORDER BY avgScore DESC
     `).all(batchId) as any[];
