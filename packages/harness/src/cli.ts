@@ -187,11 +187,13 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
 
 // Common display functions
 function displayRunInfo(run: { status: string; suite: string; scenario: string; tier: string; agent: string; model?: string; weightedScore?: number | null; runId: string; startedAt: string | number }, index: number) {
-  const status = run.status === 'completed' 
-    ? chalk.green('✓') 
-    : run.status === 'failed' 
-    ? chalk.red('✗') 
-    : chalk.yellow('○');
+  const status = run.status === 'completed'
+    ? chalk.green('✓')
+    : run.status === 'failed'
+    ? chalk.red('✗')
+    : run.status === 'incomplete'
+    ? chalk.yellow('◐')
+    : chalk.blue('○');
   
   console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
   console.log(`   ${formatStats('Agent', run.agent + (run.model ? ` (${run.model})` : ''))}`);
@@ -1508,14 +1510,20 @@ async function runInteractiveBatchStats() {
 			// Show runs in batch with ranking
 			if (batchStats.runs.length > 0) {
 				console.log('\n' + chalk.underline('Runs in Batch'));
-				const sortedRuns = batchStats.runs
+                const sortedRuns = batchStats.runs
 					.filter(run => run.weightedScore !== null && run.weightedScore !== undefined)
 					.sort((a, b) => (b.weightedScore || 0) - (a.weightedScore || 0));
 				
-				sortedRuns.forEach((run, index) => {
+                sortedRuns.forEach((run, index) => {
 					const rank = index + 1;
 					const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
-					const status = run.status === 'completed' ? chalk.green('✓') : run.status === 'failed' ? chalk.red('✗') : chalk.yellow('○');
+                    const status = run.status === 'completed'
+                      ? chalk.green('✓')
+                      : run.status === 'failed'
+                      ? chalk.red('✗')
+                      : run.status === 'incomplete'
+                      ? chalk.yellow('◐')
+                      : chalk.blue('○');
 					console.log(`  ${rankDisplay} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)} ${chalk.cyan(run.agent)} ${chalk.yellow(run.weightedScore?.toFixed(4) || 'N/A')}`);
 				});
 		}
@@ -1760,6 +1768,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	const logger = BenchmarkLogger.getInstance();
 	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
 	const startTime = Date.now();
+
+	// Timeout watchdog based on scenario timeout_minutes (default 60)
+	let timeoutId: NodeJS.Timeout | null = null;
 	
 	// Initialize progress tracker (only if not in quiet mode)
 	const progress = quiet ? null : createProgress();
@@ -1768,6 +1779,16 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	// Stage 1: Setup
 		if (progress) updateProgress(progress, 1, 'Loading scenario configuration');
 	const scenarioCfg = loadScenario(suite, scenario);
+
+		// Start timeout watchdog after loading scenario config
+		const scenarioTimeoutMin = Number(scenarioCfg.timeout_minutes || 60);
+		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
+		timeoutId = setTimeout(() => {
+			try {
+				logger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
+				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
+			} catch {}
+		}, timeoutMs);
 	
 		if (progress) updateProgress(progress, 1, 'Loading prompt');
 	const promptContent = loadPrompt(suite, scenario, tier);
@@ -2153,6 +2174,11 @@ Work efficiently: read files to understand the current state, make necessary cha
 		if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 	} finally {
 		if (progress) completeProgress(progress);
+		// Clear timeout watchdog if set
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+			timeoutId = null;
+		}
 	}
 }
 
@@ -2513,15 +2539,26 @@ process.on('exit', () => {
 });
 
 process.on('SIGINT', () => {
-	console.log('\nShutting down...');
-	stopDevServer();
-	process.exit(0);
+    console.log('\nShutting down...');
+    try {
+        const logger = BenchmarkLogger.getInstance();
+        // Mark current run incomplete if any
+        (logger as any).markRunIncomplete?.('Interrupted by user (SIGINT)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+    } catch {}
+    stopDevServer();
+    process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-	console.log('\nShutting down...');
-	stopDevServer();
-	process.exit(0);
+    console.log('\nShutting down...');
+    try {
+        const logger = BenchmarkLogger.getInstance();
+        (logger as any).markRunIncomplete?.('Interrupted by system (SIGTERM)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+    } catch {}
+    stopDevServer();
+    process.exit(0);
 });
 
 process.on('uncaughtException', (err) => {
