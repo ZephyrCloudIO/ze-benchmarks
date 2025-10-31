@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
+import { computeQuantiles } from '@/lib/chart-utils'
 import { useEffect, useState } from 'react'
 
 
@@ -19,7 +20,7 @@ interface AgentStats {
 
 interface AgentModelHeatmap {
   agent: string;
-  models: { [key: string]: number };
+  models: { [key: string]: { avg: number; n: number; p50: number; p95: number } };
 }
 
 function AgentsPage() {
@@ -60,19 +61,36 @@ function AgentsPage() {
         }));
         setAgentStats(stats);
 
-        // Process data for heatmap
-        const agentModelMap: { [agent: string]: { [model: string]: number } } = {};
-        stats.forEach(stat => {
-          if (!agentModelMap[stat.agent]) {
-            agentModelMap[stat.agent] = {};
-          }
-          agentModelMap[stat.agent][stat.model || 'unknown'] = stat.avgScore;
-        });
-
-        const heatmap = Object.keys(agentModelMap).map(agent => ({
-          agent,
-          models: agentModelMap[agent],
-        }));
+        // Build heatmap with quantiles per agent/model
+        const perRun = db.exec(`
+          SELECT br.agent, br.model, br.weighted_score
+          FROM benchmark_runs br
+          WHERE br.weighted_score IS NOT NULL
+        `);
+        const seriesMap = new Map<string, number[]>();
+        if (perRun[0]) {
+          perRun[0].values.forEach((row) => {
+            const ag = (row[0] as string) || 'unknown';
+            const mo = (row[1] as string) || 'unknown';
+            const sc = (row[2] as number) ?? 0;
+            const key = `${ag}|||${mo}`;
+            if (!seriesMap.has(key)) seriesMap.set(key, []);
+            seriesMap.get(key)!.push(sc);
+          });
+        }
+        const agentModelMap: { [agent: string]: { [model: string]: { avg: number; n: number; p50: number; p95: number } } } = {};
+        for (const stat of stats) {
+          const agent = stat.agent;
+          const model = stat.model || 'unknown';
+          const key = `${agent}|||${model}`;
+          const values = seriesMap.get(key) || [];
+          const n = values.length;
+          const avg = n ? values.reduce((a, b) => a + b, 0) / n : 0;
+          const [, q50, , q95] = computeQuantiles(values, [0.25, 0.5, 0.75, 0.95]);
+          if (!agentModelMap[agent]) agentModelMap[agent] = {};
+          agentModelMap[agent][model] = { avg, n, p50: isNaN(q50) ? 0 : q50, p95: isNaN(q95) ? 0 : q95 };
+        }
+        const heatmap = Object.keys(agentModelMap).map(agent => ({ agent, models: agentModelMap[agent] }));
         setHeatmapData(heatmap);
       }
     } catch (err) {
@@ -85,7 +103,7 @@ function AgentsPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64 text-destructive">Error: {error.message}</div>;
   }
 
   return (
@@ -137,23 +155,30 @@ function AgentsPage() {
       <div className="rounded-lg border bg-card p-6">
         <h2 className="text-2xl font-semibold mb-4">Agent vs Model Performance</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Average scores by agent and model combination
+          Average scores by agent and model combination. Color intensity reflects avg score (0–10).
         </p>
+        <div className="mb-4">
+          <div className="text-xs text-muted-foreground mb-1">Low ↔ High</div>
+          <div className="h-2 rounded" style={{
+            background: 'linear-gradient(90deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,1) 100%)'
+          }} />
+        </div>
         <div className="grid gap-3">
           {heatmapData.map((item, idx) => (
             <div key={idx}>
               <div className="font-medium mb-2">{item.agent}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {Object.entries(item.models).map(([model, score]) => (
+                {Object.entries(item.models).map(([model, stats]) => (
                   <div
                     key={model}
                     className="p-3 rounded border text-center"
                     style={{
-                      backgroundColor: `rgba(34, 197, 94, ${score / 10})`,
+                      backgroundColor: `rgba(34, 197, 94, ${Math.max(0, Math.min(1, (stats.avg || 0) / 10))})`,
                     }}
                   >
                     <div className="text-xs font-medium truncate">{model}</div>
-                    <div className="text-lg font-bold mt-1">{score.toFixed(2)}</div>
+                    <div className="text-lg font-bold mt-1">{(stats.avg || 0).toFixed(2)}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">n={stats.n} · p50={(stats.p50 || 0).toFixed(2)} · p95={(stats.p95 || 0).toFixed(2)}</div>
                   </div>
                 ))}
               </div>

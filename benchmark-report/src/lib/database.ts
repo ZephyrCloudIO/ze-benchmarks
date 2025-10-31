@@ -143,7 +143,7 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   model?: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'incomplete';
   started_at: string;
   completed_at?: string;
   total_score?: number;
@@ -183,4 +183,174 @@ export interface BatchRun {
   avgScore?: number;
   avgWeightedScore?: number;
   metadata?: string;
+}
+
+/**
+ * Centralized, typed query helpers for charts and pages
+ */
+export interface GetRunsFilter {
+  statusIn?: Array<'running' | 'completed' | 'failed' | 'incomplete'>;
+  suite?: string;
+  scenario?: string;
+  tier?: string;
+  agent?: string;
+  model?: string;
+  batchId?: string;
+}
+
+export async function getRuns(filter: GetRunsFilter = {}): Promise<BenchmarkRun[]> {
+  const where: string[] = [];
+  const params: any[] = [];
+
+  if (filter.statusIn && filter.statusIn.length > 0) {
+    where.push(`status IN (${filter.statusIn.map(() => '?').join(',')})`);
+    params.push(...filter.statusIn);
+  }
+  if (filter.suite) { where.push('suite = ?'); params.push(filter.suite); }
+  if (filter.scenario) { where.push('scenario = ?'); params.push(filter.scenario); }
+  if (filter.tier) { where.push('tier = ?'); params.push(filter.tier); }
+  if (filter.agent) { where.push('agent = ?'); params.push(filter.agent); }
+  if (filter.model) { where.push('model = ?'); params.push(filter.model); }
+  if (filter.batchId) { where.push('batchId = ?'); params.push(filter.batchId); }
+
+  const sql = `
+    SELECT id, run_id, batchId, suite, scenario, tier, agent, model, status,
+           started_at, completed_at, total_score, weighted_score,
+           is_successful, success_metric, metadata
+    FROM benchmark_runs
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY datetime(started_at) DESC
+  `;
+
+  return query<BenchmarkRun>(sql, params);
+}
+
+export async function getTelemetryByRun(runIds?: string[]): Promise<RunTelemetry[]> {
+  const where: string[] = [];
+  const params: any[] = [];
+  if (runIds && runIds.length > 0) {
+    where.push(`run_id IN (${runIds.map(() => '?').join(',')})`);
+    params.push(...runIds);
+  }
+  const sql = `
+    SELECT id, run_id, tool_calls, tokens_in, tokens_out, cost_usd, duration_ms, workspace_dir
+    FROM run_telemetry
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+  `;
+  return query<RunTelemetry>(sql, params);
+}
+
+export interface BatchAggregate {
+  batchId: string;
+  totalRuns: number;
+  successfulRuns: number;
+  avgScore: number | null;
+  avgWeightedScore: number | null;
+}
+
+export async function getBatchAggregates(batchIds?: string[]): Promise<BatchAggregate[]> {
+  const where: string[] = [];
+  const params: any[] = [];
+  if (batchIds && batchIds.length > 0) {
+    where.push(`br.batchId IN (${batchIds.map(() => '?').join(',')})`);
+    params.push(...batchIds);
+  }
+  const sql = `
+    SELECT br.batchId,
+           COUNT(*) as totalRuns,
+           SUM(CASE WHEN br.status = 'completed' THEN 1 ELSE 0 END) as successfulRuns,
+           AVG(br.total_score) as avgScore,
+           AVG(br.weighted_score) as avgWeightedScore
+    FROM benchmark_runs br
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    GROUP BY br.batchId
+    ORDER BY MAX(datetime(br.started_at)) DESC
+  `;
+  return query<BatchAggregate>(sql, params);
+}
+
+export interface HistogramBin {
+  range: string; // e.g. "6.0–7.0"
+  count: number;
+  from: number; // inclusive, 0–1
+  to: number;   // exclusive except last, 0–1
+}
+
+export async function getScoreDistribution(bins = 10): Promise<HistogramBin[]> {
+  // Fetch weighted scores and compute histogram client-side for flexibility
+  const rows = await query<{ weighted_score: number }>(
+    `SELECT weighted_score FROM benchmark_runs WHERE weighted_score IS NOT NULL`
+  );
+  const scores = rows.map(r => r.weighted_score).filter(s => typeof s === 'number');
+  if (scores.length === 0 || bins <= 0) return [];
+
+  const min = 0;
+  const max = 1;
+  const width = (max - min) / bins;
+  const buckets: HistogramBin[] = Array.from({ length: bins }, (_, i) => {
+    const from = min + i * width;
+    const to = i === bins - 1 ? max : from + width;
+    const label = `${(from * 10).toFixed(1)}–${(to * 10).toFixed(1)}`;
+    return { range: label, count: 0, from, to };
+  });
+
+  for (const s of scores) {
+    const clamped = Math.max(0, Math.min(1, s));
+    let idx = Math.floor((clamped - min) / width);
+    if (idx >= bins) idx = bins - 1; // include 1.0 in last bin
+    buckets[idx].count += 1;
+  }
+
+  return buckets;
+}
+
+export type TimeBucket = 'day' | 'week';
+export interface TimeSeriesPoint {
+  bucket: string; // ISO date (day) or ISO week start
+  avgWeightedScore: number | null;
+  runs: number;
+}
+
+export async function getRunsTimeSeries(bucket: TimeBucket = 'day'): Promise<TimeSeriesPoint[]> {
+  // Use SQLite date functions to bucket; returns 0–1 weighted scores
+  const dateExpr = bucket === 'week' ? `strftime('%Y-%W-1', started_at)` : `date(started_at)`;
+  const sql = `
+    SELECT ${dateExpr} as bucket,
+           AVG(weighted_score) as avgWeightedScore,
+           COUNT(*) as runs
+    FROM benchmark_runs
+    WHERE weighted_score IS NOT NULL
+    GROUP BY bucket
+    ORDER BY bucket ASC
+  `;
+  return query<TimeSeriesPoint>(sql);
+}
+
+export interface AgentModelStat {
+  agent: string;
+  model: string | null;
+  avgScore: number | null;
+  successRate: number; // 0–100
+  avgCost: number | null;
+  avgDuration: number | null;
+  totalRuns: number;
+}
+
+export async function getAgentModelStats(): Promise<AgentModelStat[]> {
+  const sql = `
+    SELECT
+      br.agent,
+      br.model,
+      AVG(br.weighted_score) as avgScore,
+      CAST(SUM(CASE WHEN br.status = 'completed' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as successRate,
+      AVG(rt.cost_usd) as avgCost,
+      AVG(rt.duration_ms) as avgDuration,
+      COUNT(*) as totalRuns
+    FROM benchmark_runs br
+    LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
+    WHERE br.weighted_score IS NOT NULL
+    GROUP BY br.agent, br.model
+    ORDER BY avgScore DESC
+  `;
+  return query<AgentModelStat>(sql);
 }

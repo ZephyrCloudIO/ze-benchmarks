@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, LineChart, Line } from 'recharts'
 import { RefreshCw } from 'lucide-react'
-import { getScoreDistributionRanges, safeScore } from '@/lib/chart-utils'
+import { buildHistogram } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -59,6 +60,7 @@ function Dashboard() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<ScoreDistribution[]>([]);
   const [recentBatches, setRecentBatches] = useState<RecentBatch[]>([]);
+  const [scoreTrend, setScoreTrend] = useState<{ date: string; avg: number }[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -119,7 +121,7 @@ function Dashboard() {
         const performers = topPerformersResult[0].values.map((row) => ({
           agent: row[0] as string,
           model: row[1] as string,
-          avgScore: safeScore(row[2] as number),
+          avgScore: (row[2] as number) ?? 0,
           runCount: row[3] as number,
           avgCost: row[4] as number || 0,
         }));
@@ -151,31 +153,47 @@ function Dashboard() {
           agent: row[3] as string,
           model: row[4] as string,
           status: row[5] as string,
-          weightedScore: safeScore(row[6] as number | null),
+          weightedScore: (row[6] as number | null),
           startedAt: row[7] as string,
           completedAt: row[8] as string | null,
         }));
         setRecentRuns(runs);
       }
 
-      // Query score distribution (using 0-1 scale)
-      const scoreDistResult = db.exec(`
-        SELECT
-          ${getScoreDistributionRanges()},
-          COUNT(*) as count
+      // Build histogram for weighted_score (stored 0–10); convert to 0–1 for bucketing
+      const scoresResult = db.exec(`
+        SELECT weighted_score FROM benchmark_runs WHERE weighted_score IS NOT NULL
+      `);
+      const rawScores = scoresResult[0]?.values.map(v => (v[0] as number)) || [];
+      const bins = buildHistogram(rawScores.map(s => s / 10), 10);
+      setScoreDistribution(bins.map(b => ({ range: b.range, count: b.count })));
+
+      // Build 7-day score trend (fill missing days)
+      const trendResult = db.exec(`
+        SELECT date(started_at) as d, AVG(weighted_score) as avg
         FROM benchmark_runs
         WHERE weighted_score IS NOT NULL
-        GROUP BY range
-        ORDER BY range DESC
+          AND started_at >= date('now', '-7 day')
+        GROUP BY d
+        ORDER BY d ASC
       `);
-
-      if (scoreDistResult[0]) {
-        const distribution = scoreDistResult[0].values.map((row) => ({
-          range: row[0] as string,
-          count: row[1] as number,
-        }));
-        setScoreDistribution(distribution);
+      const dataMap = new Map<string, number>();
+      if (trendResult[0]) {
+        trendResult[0].values.forEach((row) => {
+          const d = row[0] as string;
+          const avg = (row[1] as number) ?? 0;
+          dataMap.set(d, avg);
+        });
       }
+      const today = new Date();
+      const days: { date: string; avg: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const iso = d.toISOString().slice(0, 10);
+        days.push({ date: iso, avg: dataMap.get(iso) ?? 0 });
+      }
+      setScoreTrend(days);
 
       // Query recent batches
       const batchesResult = db.exec(`
@@ -199,7 +217,7 @@ function Dashboard() {
           completedAt: row[2] as number | null,
           totalRuns: row[3] as number,
           successfulRuns: row[4] as number,
-          avgWeightedScore: safeScore(row[5] as number | null),
+          avgWeightedScore: (row[5] as number | null),
         }));
         setRecentBatches(batches);
       }
@@ -213,7 +231,7 @@ function Dashboard() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64 text-destructive">Error: {error.message}</div>;
   }
 
   return (
@@ -258,7 +276,19 @@ function Dashboard() {
 
         <div className="rounded-lg border bg-card p-6 shadow-sm">
           <div className="text-sm font-medium text-muted-foreground">Avg Score</div>
-          <div className="text-3xl font-bold mt-2">{stats ? stats.avgScore.toFixed(2) : '-'}</div>
+          <div className="flex items-end justify-between gap-4 mt-2">
+            <div className="text-3xl font-bold">{stats ? stats.avgScore.toFixed(2) : '-'}</div>
+            <div className="h-10 w-32">
+              <ChartContainer
+                config={{ score: { label: 'Avg score', color: 'hsl(var(--chart-1))' } }}
+                className="h-full w-full !aspect-auto"
+              >
+                <LineChart data={scoreTrend}>
+                  <Line type="monotone" dataKey="avg" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ChartContainer>
+            </div>
+          </div>
           <div className="text-xs text-muted-foreground mt-1">out of 10.0</div>
         </div>
 
@@ -346,13 +376,15 @@ function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`px-2 py-1 rounded text-xs font-medium ${
-                    run.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                    run.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  }`}>
+                  <Badge
+                    variant={
+                      run.status === 'completed' ? 'success' :
+                      run.status === 'failed' ? 'destructive' :
+                      run.status === 'running' ? 'info' : 'warning'
+                    }
+                  >
                     {run.status}
-                  </div>
+                  </Badge>
                 </div>
                 <div className="text-right min-w-[60px]">
                   {run.weightedScore !== null ? (

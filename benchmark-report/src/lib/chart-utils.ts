@@ -82,3 +82,66 @@ export const generateSeriesColors = (count: number): string[] => {
   }
   return colors;
 };
+
+/** Formatters */
+export const currencyFormatter = (value: number | null | undefined): string => {
+  if (value === null || value === undefined || isNaN(value)) return '—';
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+};
+
+export const durationFormatter = (ms: number | null | undefined): string => {
+  if (ms === null || ms === undefined || isNaN(ms)) return '—';
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)} s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}m ${rem.toFixed(0)}s`;
+};
+
+export const tokenFormatter = (tokens: number | null | undefined): string => {
+  if (tokens === null || tokens === undefined || isNaN(tokens)) return '—';
+  return new Intl.NumberFormat().format(tokens);
+};
+
+/** Basic statistics */
+export const computeQuantiles = (values: number[], quantiles: number[] = [0.25, 0.5, 0.75, 0.95]): number[] => {
+  const xs = values.filter(v => typeof v === 'number' && !isNaN(v)).slice().sort((a, b) => a - b);
+  if (xs.length === 0) return quantiles.map(() => NaN);
+  const q = (p: number) => {
+    const idx = (xs.length - 1) * p;
+    const lo = Math.floor(idx);
+    const hi = Math.ceil(idx);
+    if (lo === hi) return xs[lo];
+    const w = idx - lo;
+    return xs[lo] * (1 - w) + xs[hi] * w;
+  };
+  return quantiles.map(q);
+};
+
+export interface HistogramBin {
+  range: string; // label in 0–10 scale
+  count: number;
+  from: number; // 0–1
+  to: number;   // 0–1
+}
+
+export const buildHistogram = (values: number[], bins = 10): HistogramBin[] => {
+  const xs = values.filter(v => typeof v === 'number' && !isNaN(v)).map(v => Math.max(0, Math.min(1, v)));
+  if (xs.length === 0 || bins <= 0) return [];
+  const min = 0;
+  const max = 1;
+  const width = (max - min) / bins;
+  const buckets: HistogramBin[] = Array.from({ length: bins }, (_, i) => {
+    const from = min + i * width;
+    const to = i === bins - 1 ? max : from + width;
+    const label = `${(from * 10).toFixed(1)}–${(to * 10).toFixed(1)}`;
+    return { range: label, count: 0, from, to };
+  });
+  for (const s of xs) {
+    let idx = Math.floor((s - min) / width);
+    if (idx >= bins) idx = bins - 1;
+    buckets[idx].count += 1;
+  }
+  return buckets;
+};

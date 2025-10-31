@@ -3,6 +3,7 @@ import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { RefreshCw } from 'lucide-react'
 
 export const Route = createFileRoute('/runs/')({
@@ -27,7 +28,7 @@ interface Run {
 function RunsPage() {
   const { db, isLoading, error, refreshDatabase, isRefreshing } = useDatabase();
   const [runs, setRuns] = useState<Run[]>([]);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'failed'>('all');
+  const [filter, setFilter] = useState<'all' | 'completed' | 'failed' | 'incomplete' | 'running'>('all');
 
   useEffect(() => {
     if (!db) return;
@@ -54,6 +55,10 @@ function RunsPage() {
         query += " WHERE status = 'completed'";
       } else if (filter === 'failed') {
         query += " WHERE status = 'failed'";
+      } else if (filter === 'incomplete') {
+        query += " WHERE status = 'incomplete'";
+      } else if (filter === 'running') {
+        query += " WHERE status = 'running'";
       }
 
       query += ' ORDER BY started_at DESC LIMIT 100';
@@ -90,7 +95,7 @@ function RunsPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64 text-destructive">Error: {error.message}</div>;
   }
 
   return (
@@ -99,7 +104,7 @@ function RunsPage() {
         <div>
           <h1 className="text-4xl font-bold tracking-tight">Benchmark Runs</h1>
           <p className="text-muted-foreground mt-2">
-            Browse and search all benchmark runs
+            Browse and analyze all benchmark runs
           </p>
         </div>
         <Button 
@@ -115,75 +120,83 @@ function RunsPage() {
 
       {/* Filter Buttons */}
       <div className="flex gap-2">
-        <button
+        <Button
+          variant={filter === 'all' ? 'default' : 'outline'}
+          size="sm"
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted hover:bg-muted/80'
-          }`}
         >
           All
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={filter === 'completed' ? 'default' : 'outline'}
+          size="sm"
           onClick={() => setFilter('completed')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'completed'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted hover:bg-muted/80'
-          }`}
         >
           Completed
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={filter === 'failed' ? 'default' : 'outline'}
+          size="sm"
           onClick={() => setFilter('failed')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'failed'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted hover:bg-muted/80'
-          }`}
         >
           Failed
-        </button>
+        </Button>
+        <Button
+          variant={filter === 'incomplete' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilter('incomplete')}
+        >
+          Incomplete
+        </Button>
+        <Button
+          variant={filter === 'running' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilter('running')}
+        >
+          Running
+        </Button>
       </div>
 
-      {/* Runs Table */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">
-              {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)} Runs
-            </h2>
-            <div className="text-sm text-muted-foreground">
-              {runs.length} run{runs.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {runs.length > 0 ? (
-              runs.map((run) => (
-                <Link
-                  key={run.runId}
-                  to="/runs/$runId"
-                  params={{ runId: run.runId }}
-                  className="flex items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{run.scenario}</div>
-                    <div className="text-sm text-muted-foreground flex gap-2 items-center flex-wrap">
+      {/* Runs List */}
+      {runs.length === 0 ? (
+        <Card className="p-12 text-center">
+          <p className="text-muted-foreground mb-2">
+            {filter === 'all' && 'No runs yet'}
+            {filter === 'completed' && 'No completed runs'}
+            {filter === 'failed' && 'No failed runs'}
+            {filter === 'incomplete' && 'No incomplete runs'}
+            {filter === 'running' && 'No running runs'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {filter === 'all' && 'Run some benchmarks to get started'}
+            {filter === 'completed' && 'Completed runs will appear here'}
+            {filter === 'failed' && 'Failed runs will appear here'}
+            {filter === 'incomplete' && 'Incomplete runs will appear here'}
+            {filter === 'running' && 'Running runs will appear here'}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {runs.map((run) => (
+            <Card key={run.runId} className="p-6 hover:shadow-md transition-shadow">
+              <Link
+                to="/runs/$runId"
+                params={{ runId: run.runId }}
+                className="block"
+              >
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="text-lg font-semibold hover:underline truncate">
+                      {run.scenario}
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                       <span>{run.suite}</span>
                       <span>•</span>
                       <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">
                         {run.tier}
                       </span>
                       <span>•</span>
-                      <span>{run.model ? run.model : run.agent}</span>
-                      {run.model && (
-                        <>
-                          <span>•</span>
-                          <span className="text-xs text-muted-foreground">{run.agent}</span>
-                        </>
-                      )}
+                      <span>{run.model || run.agent}</span>
                       {run.batchId && (
                         <>
                           <span>•</span>
@@ -193,17 +206,18 @@ function RunsPage() {
                             className="text-blue-600 hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            Batch
+                            batch
                           </Link>
                         </>
                       )}
                     </div>
                     {run.status === 'failed' && run.metadata && (
-                      <div className="text-xs text-red-600 mt-1">
+                      <div className="text-xs text-destructive-foreground bg-destructive/20 px-3 py-2 rounded-lg">
                         {(() => {
                           try {
                             const metadata = JSON.parse(run.metadata);
-                            return metadata.error || 'Unknown error';
+                            const error = metadata.error || 'Unknown error';
+                            return error.length > 80 ? error.substring(0, 80) + '...' : error;
                           } catch {
                             return 'Parse error';
                           }
@@ -211,50 +225,36 @@ function RunsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-6 shrink-0">
                     <Badge
                       variant={
-                        run.status === 'completed' ? 'default' :
+                        run.status === 'completed' ? 'success' :
                         run.status === 'failed' ? 'destructive' :
+                        run.status === 'incomplete' ? 'incomplete' :
+                        run.status === 'running' ? 'running' :
                         'secondary'
                       }
                     >
                       {run.status}
                     </Badge>
-                  </div>
-                  <div className="text-right min-w-[80px]">
                     {run.weightedScore !== null ? (
-                      <>
-                        <div className="font-bold text-lg">{run.weightedScore.toFixed(2)}</div>
+                      <div className="text-center min-w-[60px]">
+                        <div className="font-bold text-2xl">{run.weightedScore.toFixed(2)}</div>
                         <div className="text-xs text-muted-foreground">score</div>
-                      </>
+                      </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground">-</div>
+                      <div className="text-center text-muted-foreground min-w-[60px]">—</div>
                     )}
+                    <div className="text-right text-xs text-muted-foreground min-w-[100px]">
+                      {new Date(run.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
                   </div>
-                  <div className="text-right text-xs text-muted-foreground min-w-[140px]">
-                    <div>{new Date(run.startedAt).toLocaleDateString()}</div>
-                    <div>{new Date(run.startedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="text-center py-12">
-                <div className="text-muted-foreground mb-2">
-                  {filter === 'all' && 'No benchmark runs found'}
-                  {filter === 'completed' && 'No completed runs yet'}
-                  {filter === 'failed' && 'No failed runs - great job! 🎉'}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {filter === 'all' && 'Run some benchmarks to see them here'}
-                  {filter === 'completed' && 'Completed runs will appear here'}
-                  {filter === 'failed' && 'Failed runs will appear here for debugging'}
-                </div>
-              </div>
-            )}
-          </div>
+              </Link>
+            </Card>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }
