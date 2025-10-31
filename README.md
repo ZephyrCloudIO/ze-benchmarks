@@ -60,19 +60,14 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 ### 3. Run Your First Benchmark
 ```bash
 # Start interactive CLI
-pnpm cli
-
-# Or run a specific benchmark
-pnpm bench update-deps nx-pnpm-monorepo L1 anthropic
+pnpm bench
 ```
 
 ### 4. View Results
-```bash
-# Start web dashboard
-pnpm dev
-# Open http://localhost:3000
 ```
-
+pnpm bench
+# --> statistics --> run details
+```
 ## Understanding Suites and Scenarios
 
 ### Suite Structure
