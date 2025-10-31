@@ -1,6 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
-  BarChart3,
   CircleDollarSign,
   Home,
   Users,
@@ -10,6 +9,7 @@ import {
   Layers,
   GitCompare,
 } from 'lucide-react'
+import { LogoIconZephyr } from '@/components/ui/LogoZephyr'
 
 import {
   Sidebar,
@@ -96,9 +96,8 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-4 py-4">
-        <Link to="/" className="flex items-center gap-2">
-          <BarChart3 className="h-6 w-6" />
-          <span className="text-lg font-bold">Ze Benchmarks</span>
+        <Link to="/" className="flex items-center">
+          <LogoIconZephyr className="h-8 w-auto" />
         </Link>
       </SidebarHeader>
       <SidebarContent>

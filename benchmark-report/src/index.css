@@ -132,10 +132,52 @@
 }
 
 @layer base {
+    html {
+        @apply bg-background text-foreground;
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+    }
     * {
         @apply border-border outline-ring/50;
     }
     body {
         @apply bg-background text-foreground;
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+    }
+    #root {
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+        min-height: 100vh;
+    }
+    
+    /* Chart text colors - ensure all chart text is white */
+    .recharts-cartesian-axis-tick,
+    .recharts-cartesian-axis-tick text,
+    .recharts-polar-angle-axis-tick text,
+    .recharts-radial-bar-axis-tick text,
+    .recharts-legend-item-text,
+    .recharts-tooltip,
+    .recharts-tooltip-item,
+    .recharts-tooltip-label,
+    .recharts-label {
+        fill: rgb(var(--foreground)) !important;
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    /* Chart tooltip background and text */
+    .recharts-default-tooltip {
+        background-color: rgb(var(--background)) !important;
+        border-color: rgb(var(--border)) !important;
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    .recharts-default-tooltip .recharts-tooltip-label {
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    .recharts-default-tooltip .recharts-tooltip-item-name,
+    .recharts-default-tooltip .recharts-tooltip-item-value {
+        color: rgb(var(--foreground)) !important;
     }
 }
