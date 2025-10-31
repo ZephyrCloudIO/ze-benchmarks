@@ -1,0 +1,33 @@
+id: ZE_nextjs_draft_mode
+suite: next.js
+title: "Draft Mode"
+description: |
+  This evaluation tests the ability to implement draft mode in Next.js App Router for previewing draft content from headless CMS systems.
+
+workspace:
+  node: "20.x"
+  manager: auto
+  managers_allowed: [pnpm]
+  workspaces: pnpm
+
+baseline:
+  run:
+    - cmd: "pnpm install"
+    - cmd: "pnpm build"
+    - cmd: "pnpm lint"
+    - cmd: "pnpm test"
+
+validation:
+  commands:
+    install: "pnpm install"
+    test: "pnpm test"
+    lint: "pnpm lint"
+
+oracle:
+  answers_file: "./oracle-answers.json"
+
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-3.5-sonnet"
+  temperature: 0.1
+  max_tokens: 2000
