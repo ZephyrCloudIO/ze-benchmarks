@@ -9,7 +9,7 @@ function parseVer(version: string): Ver | null {
 	const match = cleaned.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
 	if (!match) return null;
 	return {
-		major: parseInt(match[1]!, 10),
+		major: parseInt(match[1] || '0', 10),
 		minor: parseInt(match[2] || '0', 10),
 		patch: parseInt(match[3] || '0', 10),
 	};
@@ -43,7 +43,8 @@ function satisfiesComparator(comparator: string, cur: Ver): boolean {
 	const match = comparator.match(/^(>=|<=|>|<)?\s*(\d+(?:\.\d+){0,2})$/);
 	if (match) {
 		const op = match[1] || '>=';
-		const base = parseVer(match[2]!);
+		if (!match[2]) return false;
+		const base = parseVer(match[2]);
 		if (!base) return false;
 		const delta = compare(cur, base);
 		switch (op) {
