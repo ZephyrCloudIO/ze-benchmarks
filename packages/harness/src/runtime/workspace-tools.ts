@@ -113,6 +113,11 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 			return `Error: Access to node_modules is not allowed. Please focus on your project files.`;
 		}
 
+		// Security: block access to README.md files (these are documentation, not part of the codebase)
+		if (input.path.endsWith('README.md') || input.path.endsWith('/README.md')) {
+			return `Error: Access to README.md files is not allowed. These are documentation files and not part of the codebase.`;
+		}
+
 		if (!existsSync(fullPath)) {
 			return `Error: File '${input.path}' does not exist`;
 		}
@@ -192,8 +197,8 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 			}
 
 			const entries = readdirSync(fullPath);
-			// Filter out node_modules directories from the listing
-			const filteredEntries = entries.filter(entry => entry !== 'node_modules');
+			// Filter out node_modules directories and README.md files from the listing
+			const filteredEntries = entries.filter(entry => entry !== 'node_modules' && entry !== 'README.md');
 			const details = filteredEntries.map(entry => {
 				const entryPath = join(fullPath, entry);
 				const entryStat = statSync(entryPath);
