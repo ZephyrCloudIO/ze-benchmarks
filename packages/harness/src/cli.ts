@@ -255,6 +255,338 @@ function findRepoRoot(): string {
 	return resolve(fileURLToPath(import.meta.url), '../../../..');
 }
 
+// ============================================================================
+// SECTION 2.5: VALIDATION HELPERS FOR SUITE/SCENARIO CREATION
+// ============================================================================
+
+function validateName(name: string, type: 'suite' | 'scenario'): { valid: boolean; error?: string } {
+	if (!name || name.trim().length === 0) {
+		return { valid: false, error: `${type} name cannot be empty` };
+	}
+	
+	// Check kebab-case: lowercase, alphanumeric + hyphens, no spaces or special chars
+	const kebabCasePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+	if (!kebabCasePattern.test(name)) {
+		return { 
+			valid: false, 
+			error: `${type} name must be in kebab-case (lowercase, alphanumeric and hyphens only, e.g., "my-benchmark")` 
+		};
+	}
+	
+	return { valid: true };
+}
+
+function checkSuiteExists(suiteName: string): boolean {
+	const root = findRepoRoot();
+	const suitePath = join(root, 'suites', suiteName);
+	return existsSync(suitePath);
+}
+
+function checkScenarioExists(suiteName: string, scenarioName: string): boolean {
+	const root = findRepoRoot();
+	const scenarioPath = join(root, 'suites', suiteName, 'scenarios', scenarioName);
+	return existsSync(scenarioPath);
+}
+
+async function createNewSuite(name?: string): Promise<void> {
+	const root = findRepoRoot();
+	const suitesDir = join(root, 'suites');
+	
+	// Get suite name from argument or prompt
+	let suiteName: string | undefined = name;
+	if (!suiteName) {
+		intro(chalk.bgGreen(' Create New Suite '));
+		const input = await text({
+			message: 'Enter suite name (kebab-case):',
+			placeholder: 'e.g., my-benchmark-suite',
+			validate: (value) => {
+				const validation = validateName(value, 'suite');
+				if (!validation.valid) {
+					return validation.error;
+				}
+				if (checkSuiteExists(value)) {
+					return `Suite "${value}" already exists`;
+				}
+				return;
+			}
+		});
+		
+		if (isCancel(input)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		suiteName = input as string;
+	}
+	
+	// Validate name - TypeScript guard
+	if (!suiteName) {
+		log.error('Suite name is required');
+		return;
+	}
+	
+	// TypeScript type narrowing - suiteName is guaranteed to be string here
+	const finalSuiteName = suiteName as string;
+	const validation = validateName(finalSuiteName, 'suite');
+	if (!validation.valid) {
+		log.error(validation.error || 'Invalid suite name');
+		return;
+	}
+	
+	// Check if suite exists
+	if (checkSuiteExists(finalSuiteName)) {
+		log.error(`Suite "${finalSuiteName}" already exists at suites/${finalSuiteName}/`);
+		return;
+	}
+	
+	// Create directory structure
+	const suitePath = join(suitesDir, finalSuiteName);
+	const promptsPath = join(suitePath, 'prompts');
+	const scenariosPath = join(suitePath, 'scenarios');
+	
+	const s = spinner();
+	s.start('Creating suite directory structure...');
+	
+	try {
+		mkdirSync(suitePath, { recursive: true });
+		mkdirSync(promptsPath, { recursive: true });
+		mkdirSync(scenariosPath, { recursive: true });
+		s.stop('Suite created');
+		
+		// Show relative path
+		const relativePath = join('suites', finalSuiteName);
+		console.log(`\\n${chalk.green('✓')} Suite created at: ${chalk.cyan(relativePath)}`);
+		console.log(`   ${chalk.gray('Structure:')} ${relativePath}/{prompts,scenarios}`);
+		
+		outro(chalk.green(`Suite "${finalSuiteName}" created successfully`));
+	} catch (error) {
+		s.stop('Failed to create suite');
+		log.error(`Failed to create suite: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
+async function createNewScenario(suite?: string, scenarioName?: string): Promise<void> {
+	const root = findRepoRoot();
+	const suitesDir = join(root, 'suites');
+	
+	// Get suite name
+	let suiteName = suite;
+	if (!suiteName) {
+		intro(chalk.bgGreen(' Create New Scenario '));
+		
+		// Check if any suites exist
+		if (!existsSync(suitesDir)) {
+			log.error('No suites directory found. Create a suite first.');
+			return;
+		}
+		
+		const existingSuites = readdirSync(suitesDir).filter(dir => 
+			existsSync(join(suitesDir, dir, 'scenarios'))
+		);
+		
+		if (existingSuites.length === 0) {
+			const shouldCreate = await confirm({
+				message: 'No existing suites found. Create a new suite first?',
+				initialValue: true
+			});
+			
+			if (isCancel(shouldCreate) || !shouldCreate) {
+				cancel('Operation cancelled.');
+				return;
+			}
+			
+			await createNewSuite();
+			// Refresh suites list
+			const refreshedSuites = readdirSync(suitesDir).filter(dir => 
+				existsSync(join(suitesDir, dir, 'scenarios'))
+			);
+			if (refreshedSuites.length === 0) {
+				log.error('Failed to create suite or no suites available');
+				return;
+			}
+			existingSuites.push(...refreshedSuites);
+		}
+		
+		const selectedSuite = await select({
+			message: 'Select suite to add scenario to:',
+			options: existingSuites.map(s => ({ value: s, label: s }))
+		});
+		
+		if (isCancel(selectedSuite)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		suiteName = selectedSuite as string;
+	}
+	
+	// TypeScript guard - suiteName must be string at this point
+	if (!suiteName) {
+		log.error('Suite name is required');
+		return;
+	}
+	
+	// Validate suite exists
+	if (!checkSuiteExists(suiteName)) {
+		log.error(`Suite "${suiteName}" does not exist. Create it first with --new-suite.`);
+		return;
+	}
+	
+	// Get scenario name
+	let name: string | undefined = scenarioName;
+	if (!name) {
+		const input = await text({
+			message: 'Enter scenario name (kebab-case):',
+			placeholder: 'e.g., my-test-scenario',
+			validate: (value) => {
+				const validation = validateName(value, 'scenario');
+				if (!validation.valid) {
+					return validation.error;
+				}
+				if (checkScenarioExists(suiteName, value)) {
+					return `Scenario "${value}" already exists in suite "${suiteName}"`;
+				}
+				return;
+			}
+		});
+		
+		if (isCancel(input)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		name = input as string;
+	}
+	
+	// Validate name - TypeScript guard
+	if (!name) {
+		log.error('Scenario name is required');
+		return;
+	}
+	
+	// TypeScript type narrowing - name is guaranteed to be string here
+	const finalName = name as string;
+	const validation = validateName(finalName, 'scenario');
+	if (!validation.valid) {
+		log.error(validation.error || 'Invalid scenario name');
+		return;
+	}
+	
+	// Check if scenario exists
+	if (checkScenarioExists(suiteName, finalName)) {
+		log.error(`Scenario "${finalName}" already exists in suite "${suiteName}" at suites/${suiteName}/scenarios/${finalName}/`);
+		return;
+	}
+	
+	const s = spinner();
+	s.start('Creating scenario structure...');
+	
+	try {
+		// Create scenario directory
+		const scenarioPath = join(suitesDir, suiteName, 'scenarios', finalName);
+		mkdirSync(scenarioPath, { recursive: true });
+		
+		// Create prompts directory for this scenario
+		const promptsPath = join(suitesDir, suiteName, 'prompts', finalName);
+		mkdirSync(promptsPath, { recursive: true });
+		
+		s.message('Copying scenario template...');
+		
+		// Copy and customize scenario.yaml template
+		const templatePath = join(root, 'docs', 'templates', 'scenario.yaml');
+		if (!existsSync(templatePath)) {
+			throw new Error(`Template file not found: ${templatePath}`);
+		}
+		
+		let templateContent = readFileSync(templatePath, 'utf8');
+		// Replace placeholders
+		templateContent = templateContent.replace(/^id: my-scenario$/m, `id: ${finalName}`);
+		templateContent = templateContent.replace(/^suite: my-suite$/m, `suite: ${suiteName}`);
+		
+		const scenarioYamlPath = join(scenarioPath, 'scenario.yaml');
+		writeFileSync(scenarioYamlPath, templateContent);
+		
+		s.message('Creating oracle-answers.json...');
+		
+		// Create oracle-answers.json
+		const oraclePath = join(scenarioPath, 'oracle-answers.json');
+		writeFileSync(oraclePath, '{}\n');
+		
+		s.message('Creating repo-fixture directory...');
+		
+		// Create repo-fixture directory
+		const repoFixturePath = join(scenarioPath, 'repo-fixture');
+		mkdirSync(repoFixturePath, { recursive: true });
+		
+		s.message('Copying repo-fixture guide to README.md...');
+		
+		// Copy repo-fixture.md template content into README.md inside repo-fixture
+		const repoFixtureTemplatePath = join(root, 'docs', 'templates', 'repo-fixture.md');
+		if (existsSync(repoFixtureTemplatePath)) {
+			const templateContent = readFileSync(repoFixtureTemplatePath, 'utf8');
+			const repoFixtureReadmePath = join(repoFixturePath, 'README.md');
+			writeFileSync(repoFixtureReadmePath, templateContent);
+		} else {
+			log.warning(`Template file not found: ${repoFixtureTemplatePath}`);
+			// Create a basic README if template is missing
+			const repoFixtureReadmePath = join(repoFixturePath, 'README.md');
+			const basicContent = `# Repository Fixture
+
+This directory contains the starting codebase state for this scenario.
+
+## Setup Instructions
+
+1. Add a \`package.json\` file with your project dependencies
+2. Include source files, tests, and configuration files
+3. Ensure the fixture represents the starting state before the agent performs the task
+4. Test that baseline commands (install, build, test) work correctly
+`;
+			writeFileSync(repoFixtureReadmePath, basicContent);
+		}
+		
+		s.message('Creating default prompt tiers...');
+		
+		// Create default prompt tier files
+		const promptTiers = [
+			{ file: 'L0-minimal.md', content: 'Complete the task with minimal guidance.\n' },
+			{ file: 'L1-basic.md', content: 'Complete the task with basic context and requirements.\n\nConstraints and goals:\n- Follow best practices\n- Ensure correctness\n' },
+			{ file: 'L2-directed.md', content: 'Complete the task with detailed guidance.\n\nConstraints and goals:\n- Follow all specified requirements\n- Maintain code quality\n- Ensure tests pass\n- Handle edge cases appropriately\n\nIf major changes are required, ask before proceeding.\n' }
+		];
+		
+		for (const tier of promptTiers) {
+			const tierPath = join(promptsPath, tier.file);
+			writeFileSync(tierPath, tier.content);
+		}
+		
+		s.stop('Scenario created');
+		
+		// Show relative paths
+		const scenarioRelativePath = join('suites', suiteName, 'scenarios', finalName);
+		const promptsRelativePath = join('suites', suiteName, 'prompts', finalName);
+		
+		console.log(`\\n${chalk.green('✓')} Scenario created:`);
+		console.log(`   ${chalk.cyan('Scenario:')} ${scenarioRelativePath}/`);
+		console.log(`   ${chalk.cyan('Prompts:')} ${promptsRelativePath}/`);
+		const repoFixtureRelativePath = join('suites', suiteName, 'scenarios', finalName, 'repo-fixture');
+		
+		console.log(`\\n${chalk.gray('Created files:')}`);
+		console.log(`   - ${scenarioRelativePath}/scenario.yaml`);
+		console.log(`   - ${scenarioRelativePath}/oracle-answers.json`);
+		console.log(`   - ${repoFixtureRelativePath}/README.md ${chalk.dim('(setup guide)')}`);
+		console.log(`   - ${repoFixtureRelativePath}/ ${chalk.dim('(empty - add your fixture files here)')}`);
+		console.log(`   - ${promptsRelativePath}/L0-minimal.md`);
+		console.log(`   - ${promptsRelativePath}/L1-basic.md`);
+		console.log(`   - ${promptsRelativePath}/L2-directed.md`);
+		console.log(`\\n${chalk.yellow('Next steps:')}`);
+		console.log(`   ${chalk.cyan('1.')} Read ${chalk.bold('repo-fixture/README.md')} for setup instructions`);
+		console.log(`   ${chalk.cyan('2.')} Add your starting codebase to ${chalk.bold('repo-fixture/')} directory`);
+		console.log(`   ${chalk.cyan('3.')} Customize ${chalk.bold('scenario.yaml')} with your scenario configuration`);
+		console.log(`   ${chalk.cyan('4.')} Update prompt files in ${chalk.bold('prompts/')} directory`);
+		
+		outro(chalk.green(`Scenario "${finalName}" created successfully in suite "${suiteName}"`));
+	} catch (error) {
+		s.stop('Failed to create scenario');
+		log.error(`Failed to create scenario: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
 function loadScenario(suite: string, scenario: string) {
 	const root = findRepoRoot();
 	const scenarioPath = join(root, 'suites', suite, 'scenarios', scenario, 'scenario.yaml');
@@ -324,7 +656,15 @@ function prepareWorkspaceFromFixture(suite: string, scenario: string): { workspa
 	mkdirSync(workspacesDir, { recursive: true });
 	const workspaceDir = mkdtempSync(join(workspacesDir, `${suite}-${scenario}-`));
 	try {
-		cpSync(fixtureDir, workspaceDir, { recursive: true });
+		// Copy fixture directory while excluding README.md files
+		cpSync(fixtureDir, workspaceDir, { 
+			recursive: true,
+			filter: (src: string) => {
+				// Exclude README.md files from being copied (check filename and path)
+				const fileName = src.split(/[/\\]/).pop() || '';
+				return fileName !== 'README.md';
+			}
+		});
 		return { workspaceDir, fixtureDir };
 	} catch (err) {
 		console.error('Failed to copy fixture directory:', err);
@@ -437,6 +777,19 @@ function parseArgs(argv: string[]) {
 		return { cmd: 'compare-batches', batchIds } as const;
 	}
 	
+	// Check for new-suite command
+	if (args[0] === '--new-suite') {
+		const name = args[1];
+		return { cmd: 'new-suite', name } as const;
+	}
+	
+	// Check for new-scenario command
+	if (args[0] === '--new-scenario') {
+		const suite = args[1];
+		const name = args[2];
+		return { cmd: 'new-scenario', suite, name } as const;
+	}
+	
 	const cmd = 'bench';
 	const suite = args[0];
 	const scenario = args[1];
@@ -473,6 +826,8 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--batches')} [limit]             List recent batches`);
 	console.log(`  ${chalk.cyan('--batch-details')} <id>          Detailed batch analytics`);
 	console.log(`  ${chalk.cyan('--compare-batches')} <id1> <id2> Compare multiple batches`);
+	console.log(`  ${chalk.cyan('--new-suite')} [name]            Create a new benchmark suite`);
+	console.log(`  ${chalk.cyan('--new-scenario')} [suite] [name] Create a new scenario in a suite`);
 	console.log(`  ${chalk.cyan('--clear-db')}                    Clear database`);
 	
 	console.log('\\n' + chalk.bold('Options:'));
@@ -515,6 +870,8 @@ async function showInteractiveMenu() {
 				{ value: 'benchmark', label: 'Run Benchmarks' },
 				{ value: 'history', label: 'History' },
 				{ value: 'statistics', label: 'Statistics' },
+				{ value: 'new-suite', label: 'Create New Suite' },
+				{ value: 'new-scenario', label: 'Create New Scenario' },
 				{ value: 'clear', label: 'Clear Database' },
 				{ value: 'help', label: 'Show Help' },
 				{ value: 'exit', label: 'Exit' }
@@ -530,6 +887,12 @@ async function showInteractiveMenu() {
 				break;
 			case 'statistics':
 				await runInteractiveStatisticsMenu();
+				break;
+			case 'new-suite':
+				await createNewSuite();
+				break;
+			case 'new-scenario':
+				await createNewScenario();
 				break;
 			case 'clear':
 				await runInteractiveClear();
@@ -2177,12 +2540,17 @@ async function validateEnvironment() {
 // ============================================================================
 
 async function run() {
-	// Check for required environment variables first
-	await validateEnvironment();
+	const parsedArgs = parseArgs(process.argv);
+	
+	// Skip environment validation for creation commands (they don't need API keys)
+	const skipValidation = parsedArgs.cmd === 'new-suite' || parsedArgs.cmd === 'new-scenario';
+	
+	// Check for required environment variables first (unless skipping for creation commands)
+	if (!skipValidation) {
+		await validateEnvironment();
+	}
 	
 	// Dev server will be started only when viewing statistics
-	
-	const parsedArgs = parseArgs(process.argv);
 	
 	// If no arguments provided, show interactive menu
 	if (process.argv.length <= 2) {
@@ -2468,6 +2836,24 @@ async function run() {
 		} finally {
 			logger.close();
 		}
+		return;
+	}
+	
+	// Handle new-suite command
+	if (parsedArgs.cmd === 'new-suite') {
+		await createNewSuite(parsedArgs.name);
+		return;
+	}
+	
+	// Handle new-scenario command
+	if (parsedArgs.cmd === 'new-scenario') {
+		const { suite, name } = parsedArgs;
+		if (!suite || !name) {
+			log.warning('Usage: pnpm bench --new-scenario <suite> <name>');
+			console.log('  Or run without arguments for interactive mode');
+			return;
+		}
+		await createNewScenario(suite, name);
 		return;
 	}
 	
