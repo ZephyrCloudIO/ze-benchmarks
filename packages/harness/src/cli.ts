@@ -623,7 +623,7 @@ function getAvailableTiers(suite: string, scenario: string): Array<{value: strin
   }
   
   const files = readdirSync(promptDir);
-  const tierPattern = /^(L\\d+|Lx)(-.*)?\\.md$/;
+  const tierPattern = /^(L\d+|Lx)(-.*)?\.md$/;
   
   const tiers = new Set<string>();
   files.forEach(file => {
