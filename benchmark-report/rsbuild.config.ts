@@ -1,7 +1,7 @@
-import {defineConfig} from '@rsbuild/core';
-import {pluginReact} from '@rsbuild/plugin-react';
-import {tanstackRouter} from '@tanstack/router-plugin/rspack';
-import {pluginNodePolyfill} from "@rsbuild/plugin-node-polyfill";
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
+import { tanstackRouter } from '@tanstack/router-plugin/rspack';
+import { pluginNodePolyfill } from "@rsbuild/plugin-node-polyfill";
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -39,7 +39,7 @@ export default defineConfig({
     },
     postcss: {
       postcssOptions: (context) => {
-        return context.resourcePath.endsWith('.css') ? {plugins: [require('@tailwindcss/postcss')]} : {};
+        return context.resourcePath.endsWith('.css') ? { plugins: [require('@tailwindcss/postcss')] } : {};
       },
     },
   },

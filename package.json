@@ -6,7 +6,9 @@
     "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/harness run build",
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
-    "dev": "pnpm --filter @ze/harness run dev",
+    "dev": "mprocs",
+    "dev:worker": "cd worker && pnpm dev",
+    "dev:frontend": "cd benchmark-report && pnpm dev",
     "bench": "tsx packages/harness/src/cli.ts",
     "harness": "tsx packages/harness/src/cli.ts",
     "start:report": "pnpm --filter benchmark-report run dev"

@@ -1,0 +1,14 @@
+name = "ze-benchmarks-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[[ d1_databases ]]
+binding = "DB"
+database_name = "ze-benchmarks"
+database_id = "" # Run: wrangler d1 create ze-benchmarks
+
+[vars]
+ENVIRONMENT = "development"
+
+# For production secrets (use wrangler secret put):
+# - API_SECRET_KEY: For POST /api/results authentication

@@ -1,0 +1,27 @@
+procs:
+  worker:
+    cmd: cd worker && pnpm dev
+    stop: SIGTERM
+    autostart: true
+
+  frontend:
+    cmd: cd benchmark-report && pnpm dev
+    stop: SIGTERM
+    autostart: true
+    env:
+      VITE_API_URL: http://localhost:8787
+
+keymap:
+  toggle-focus: Ctrl+A
+
+keymap_procs:
+  add: A
+  focus-next: J
+  focus-prev: K
+  quit: Q
+  restart: R
+  start: S
+  stop: X
+  term: Ctrl+C
+
+hide_keymap_window: false

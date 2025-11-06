@@ -1,0 +1,23 @@
+{
+  "name": "ze-benchmarks-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:generate": "drizzle-kit generate",
+    "db:push:local": "wrangler d1 execute ze-benchmarks --local --file=./drizzle/0000_init.sql",
+    "db:push:remote": "wrangler d1 execute ze-benchmarks --remote --file=./drizzle/0000_init.sql",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "itty-router": "^4.0.0",
+    "drizzle-orm": "^0.36.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0",
+    "wrangler": "^3.0.0",
+    "typescript": "^5.0.0",
+    "drizzle-kit": "^0.28.0"
+  }
+}

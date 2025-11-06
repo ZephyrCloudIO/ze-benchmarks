@@ -46,28 +46,26 @@ CLI → POST to Worker API → D1 Database
 ```
 worker/
 ├── wrangler.toml                 # Cloudflare configuration
-├── package.json                  # Dependencies
+├── package.json                  # Dependencies (Drizzle ORM + itty-router)
 ├── tsconfig.json                 # TypeScript config
+├── drizzle.config.ts             # Drizzle Kit configuration
+├── drizzle/                      # Generated migrations (by Drizzle Kit)
 ├── src/
-│   ├── index.ts                  # Main worker entry point
-│   ├── router.ts                 # Request router
+│   ├── index.ts                  # Main worker entry point with router
 │   ├── api/
 │   │   ├── runs.ts               # Benchmark runs endpoints
 │   │   ├── batches.ts            # Batch operations
 │   │   ├── stats.ts              # Statistics endpoints
-│   │   ├── submit.ts             # Result submission (POST)
-│   │   └── types.ts              # Shared types
+│   │   └── submit.ts             # Result submission (POST)
 │   ├── db/
-│   │   ├── queries.ts            # D1 query functions
-│   │   └── migrations/
-│   │       └── 0001_initial.sql  # Schema migration
+│   │   └── schema.ts             # Drizzle ORM schema definition
 │   ├── middleware/
 │   │   ├── cors.ts               # CORS handling
 │   │   ├── auth.ts               # API key validation
 │   │   └── error.ts              # Error handling
-│   └── utils/
-│       ├── response.ts           # Response helpers
-│       └── validation.ts         # Request validation
+│   ├── utils/
+│   │   └── response.ts           # Response helpers
+│   └── types.ts                  # Shared TypeScript types
 ```
 
 ---
@@ -102,16 +100,19 @@ ENVIRONMENT = "production"
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "migrations:create": "wrangler d1 migrations create ze-benchmarks",
-    "migrations:apply": "wrangler d1 migrations apply ze-benchmarks"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "itty-router": "^4.0.0"
+    "itty-router": "^4.0.0",
+    "drizzle-orm": "^0.36.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240000.0",
     "wrangler": "^3.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "drizzle-kit": "^0.28.0"
   }
 }
 ```
@@ -136,11 +137,107 @@ ENVIRONMENT = "production"
 }
 ```
 
+### drizzle.config.ts
+
+```typescript
+import type { Config } from 'drizzle-kit';
+
+export default {
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dialect: 'sqlite',
+  driver: 'd1-http',
+} satisfies Config;
+```
+
 ---
 
-## 3. Database Schema (D1 Migration)
+## 3. Database Schema (Drizzle ORM)
 
-### src/db/migrations/0001_initial.sql
+### src/db/schema.ts
+
+```typescript
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+
+// Batch runs table
+export const batchRuns = sqliteTable('batch_runs', {
+  batchId: text('batchId').primaryKey(),
+  createdAt: integer('createdAt').notNull(),
+  completedAt: integer('completedAt'),
+  totalRuns: integer('totalRuns').default(0),
+  successfulRuns: integer('successfulRuns').default(0),
+  avgScore: real('avgScore'),
+  avgWeightedScore: real('avgWeightedScore'),
+  metadata: text('metadata'),
+});
+
+// Benchmark runs table
+export const benchmarkRuns = sqliteTable('benchmark_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: text('run_id').unique().notNull(),
+  batchId: text('batchId').references(() => batchRuns.batchId),
+  suite: text('suite').notNull(),
+  scenario: text('scenario').notNull(),
+  tier: text('tier').notNull(),
+  agent: text('agent').notNull(),
+  model: text('model'),
+  status: text('status').notNull(),
+  startedAt: text('started_at').notNull(),
+  completedAt: text('completed_at'),
+  totalScore: real('total_score'),
+  weightedScore: real('weighted_score'),
+  isSuccessful: integer('is_successful', { mode: 'boolean' }),
+  successMetric: real('success_metric'),
+  metadata: text('metadata'),
+}, (table) => ({
+  suiteScenarioIdx: index('idx_runs_suite_scenario').on(table.suite, table.scenario),
+  agentIdx: index('idx_runs_agent').on(table.agent),
+  statusIdx: index('idx_runs_status').on(table.status),
+  batchIdIdx: index('idx_runs_batchId').on(table.batchId),
+  isSuccessfulIdx: index('idx_runs_is_successful').on(table.isSuccessful),
+}));
+
+// Evaluation results table
+export const evaluationResults = sqliteTable('evaluation_results', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: text('run_id').notNull().references(() => benchmarkRuns.runId),
+  evaluatorName: text('evaluator_name').notNull(),
+  score: real('score').notNull(),
+  maxScore: real('max_score').notNull(),
+  details: text('details'),
+  createdAt: text('created_at').notNull(),
+}, (table) => ({
+  runIdIdx: index('idx_evals_run_id').on(table.runId),
+}));
+
+// Run telemetry table
+export const runTelemetry = sqliteTable('run_telemetry', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: text('run_id').notNull().references(() => benchmarkRuns.runId),
+  toolCalls: integer('tool_calls'),
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  costUsd: real('cost_usd'),
+  durationMs: integer('duration_ms'),
+  workspaceDir: text('workspace_dir'),
+});
+```
+
+Drizzle Kit will automatically generate migrations from this schema when you run `pnpm db:generate`.
+
+### Applying Migrations
+
+```bash
+# Local development
+cd worker
+pnpm db:generate  # Generate migrations from schema
+wrangler d1 migrations apply ze-benchmarks --local
+
+# Production
+wrangler d1 migrations apply ze-benchmarks --remote
+```
+
+### Original SQL Schema (for reference)
 
 ```sql
 -- Batch runs table
@@ -292,60 +389,125 @@ export default {
 ### src/api/runs.ts
 
 ```typescript
-import { Env } from '../index';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq, and, desc } from 'drizzle-orm';
+import type { Env } from '../types';
 import { jsonResponse } from '../utils/response';
-import * as queries from '../db/queries';
+import * as schema from '../db/schema';
 
 export async function listRuns(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const limit = parseInt(url.searchParams.get('limit') || '50');
-  const suite = url.searchParams.get('suite');
-  const scenario = url.searchParams.get('scenario');
-  const agent = url.searchParams.get('agent');
-  const status = url.searchParams.get('status');
+  try {
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const suite = url.searchParams.get('suite');
+    const scenario = url.searchParams.get('scenario');
+    const agent = url.searchParams.get('agent');
+    const status = url.searchParams.get('status');
 
-  const runs = await queries.getRunHistory(env.DB, {
-    limit,
-    suite: suite || undefined,
-    scenario: scenario || undefined,
-    agent: agent || undefined,
-    status: status as any || undefined
-  });
+    const db = drizzle(env.DB);
 
-  return jsonResponse(runs);
+    // Build where conditions
+    const conditions = [];
+    if (suite) conditions.push(eq(schema.benchmarkRuns.suite, suite));
+    if (scenario) conditions.push(eq(schema.benchmarkRuns.scenario, scenario));
+    if (agent) conditions.push(eq(schema.benchmarkRuns.agent, agent));
+    if (status) conditions.push(eq(schema.benchmarkRuns.status, status));
+
+    const runs = await db
+      .select()
+      .from(schema.benchmarkRuns)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(schema.benchmarkRuns.startedAt))
+      .limit(limit);
+
+    return jsonResponse(runs);
+  } catch (err: any) {
+    console.error('Failed to list runs:', err);
+    return jsonResponse({ error: 'Failed to list runs', details: err.message }, 500);
+  }
 }
 
 export async function getRunDetails(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const runId = url.pathname.split('/').pop();
+  try {
+    const url = new URL(request.url);
+    const runId = url.pathname.split('/').pop();
 
-  if (!runId) {
-    return jsonResponse({ error: 'Run ID required' }, 400);
+    if (!runId) {
+      return jsonResponse({ error: 'Run ID required' }, 400);
+    }
+
+    const db = drizzle(env.DB);
+
+    const run = await db
+      .select()
+      .from(schema.benchmarkRuns)
+      .where(eq(schema.benchmarkRuns.runId, runId))
+      .get();
+
+    if (!run) {
+      return jsonResponse({ error: 'Run not found' }, 404);
+    }
+
+    const evaluations = await db
+      .select()
+      .from(schema.evaluationResults)
+      .where(eq(schema.evaluationResults.runId, runId));
+
+    const telemetry = await db
+      .select()
+      .from(schema.runTelemetry)
+      .where(eq(schema.runTelemetry.runId, runId))
+      .get();
+
+    return jsonResponse({
+      run,
+      evaluations,
+      telemetry
+    });
+  } catch (err: any) {
+    console.error('Failed to get run details:', err);
+    return jsonResponse({ error: 'Failed to get run details', details: err.message }, 500);
   }
-
-  const run = await queries.getRunById(env.DB, runId);
-
-  if (!run) {
-    return jsonResponse({ error: 'Run not found' }, 404);
-  }
-
-  return jsonResponse(run);
 }
 
 export async function getRunEvaluations(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const runId = url.pathname.split('/')[3]; // /api/runs/:runId/evaluations
+  try {
+    const url = new URL(request.url);
+    const runId = url.pathname.split('/')[3]; // /api/runs/:runId/evaluations
 
-  const evaluations = await queries.getEvaluationsByRunId(env.DB, runId);
-  return jsonResponse(evaluations);
+    const db = drizzle(env.DB);
+
+    const evaluations = await db
+      .select()
+      .from(schema.evaluationResults)
+      .where(eq(schema.evaluationResults.runId, runId))
+      .orderBy(schema.evaluationResults.createdAt);
+
+    return jsonResponse(evaluations);
+  } catch (err: any) {
+    console.error('Failed to get evaluations:', err);
+    return jsonResponse({ error: 'Failed to get evaluations', details: err.message }, 500);
+  }
 }
 
 export async function getRunTelemetry(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const runId = url.pathname.split('/')[3]; // /api/runs/:runId/telemetry
+  try {
+    const url = new URL(request.url);
+    const runId = url.pathname.split('/')[3]; // /api/runs/:runId/telemetry
 
-  const telemetry = await queries.getTelemetryByRunId(env.DB, runId);
-  return jsonResponse(telemetry || null);
+    const db = drizzle(env.DB);
+
+    const telemetry = await db
+      .select()
+      .from(schema.runTelemetry)
+      .where(eq(schema.runTelemetry.runId, runId))
+      .get();
+
+    return jsonResponse(telemetry || null);
+  } catch (err: any) {
+    console.error('Failed to get telemetry:', err);
+    return jsonResponse({ error: 'Failed to get telemetry', details: err.message }, 500);
+  }
 }
 ```
 
@@ -600,12 +762,276 @@ export async function submitBatchResults(request: Request, env: Env): Promise<Re
 
 ---
 
-## 6. Database Queries
+## 6. CLI Modifications
 
-### src/db/queries.ts
+The CLI has been updated to POST results to the Worker API instead of writing directly to SQLite.
+
+### packages/database/src/worker-logger.ts (NEW FILE)
+
+A new worker-logger.ts file was created that collects benchmark data in memory and POSTs it to the Worker API when the run completes:
 
 ```typescript
-// Run queries
+import { v4 as uuidv4 } from 'uuid';
+
+export class BenchmarkLogger {
+  private static instance: BenchmarkLogger | null = null;
+  private currentRunId: string | null = null;
+  private currentBatchId: string | null = null;
+  private workerUrl: string | null = null;
+  private apiKey: string | null = null;
+
+  // Store data in memory to submit at the end
+  private pendingRun: any = null;
+  private pendingEvaluations: any[] = [];
+  private pendingTelemetry: any = null;
+
+  constructor() {
+    this.workerUrl = process.env.ZE_BENCHMARKS_WORKER_URL || null;
+    this.apiKey = process.env.ZE_BENCHMARKS_API_KEY || 'dev-local-key';
+
+    if (!this.workerUrl) {
+      console.warn('⚠️  ZE_BENCHMARKS_WORKER_URL not set. Results will not be submitted.');
+      console.warn('   Set it to http://localhost:8787 for local development');
+      console.warn('   or https://your-worker.workers.dev for production');
+    } else {
+      console.log(`📊 Benchmark results will be submitted to: ${this.workerUrl}`);
+    }
+  }
+
+  static getInstance(): BenchmarkLogger {
+    if (!BenchmarkLogger.instance) {
+      BenchmarkLogger.instance = new BenchmarkLogger();
+    }
+    return BenchmarkLogger.instance;
+  }
+
+  startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string): string {
+    const runId = uuidv4();
+    this.currentRunId = runId;
+    this.currentBatchId = batchId;
+
+    this.pendingRun = {
+      runId,
+      batchId,
+      suite,
+      scenario,
+      tier,
+      agent,
+      model,
+      status: 'running',
+      startedAt: new Date().toISOString()
+    };
+
+    console.log(`📊 Started benchmark run: ${runId}`);
+    if (batchId) {
+      console.log(`   Batch ID: ${batchId}`);
+    }
+
+    return runId;
+  }
+
+  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number) {
+    if (!this.currentRunId) throw new Error('No active run');
+
+    this.pendingRun = {
+      ...this.pendingRun,
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      totalScore,
+      weightedScore,
+      isSuccessful,
+      successMetric,
+      metadata
+    };
+
+    // Submit to Worker API
+    this.submitToWorker();
+  }
+
+  failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'unknown') {
+    if (!this.currentRunId) throw new Error('No active run');
+
+    this.pendingRun = {
+      ...this.pendingRun,
+      status: 'failed',
+      completedAt: new Date().toISOString(),
+      metadata: { error, errorType: errorType || 'unknown' }
+    };
+
+    // Submit to Worker API
+    this.submitToWorker();
+  }
+
+  logEvaluation(evaluatorName: string, score: number, maxScore: number, details?: string) {
+    if (!this.currentRunId) throw new Error('No active run');
+
+    this.pendingEvaluations.push({
+      evaluatorName,
+      score,
+      maxScore,
+      details
+    });
+  }
+
+  logTelemetry(toolCalls?: number, tokensIn?: number, tokensOut?: number, costUsd?: number, durationMs?: number, workspaceDir?: string) {
+    if (!this.currentRunId) throw new Error('No active run');
+
+    this.pendingTelemetry = {
+      toolCalls,
+      tokensIn,
+      tokensOut,
+      costUsd,
+      durationMs,
+      workspaceDir
+    };
+  }
+
+  private async submitToWorker() {
+    if (!this.workerUrl) {
+      console.log('⚠️  Skipping Worker submission (no URL configured)');
+      this.clearPendingData();
+      return;
+    }
+
+    try {
+      const payload = {
+        ...this.pendingRun,
+        evaluations: this.pendingEvaluations,
+        telemetry: this.pendingTelemetry
+      };
+
+      console.log(`📤 Submitting results to ${this.workerUrl}/api/results`);
+
+      const response = await fetch(`${this.workerUrl}/api/results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`HTTP ${response.status}: ${error}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Results submitted successfully: ${result.runId}`);
+
+      this.clearPendingData();
+    } catch (error: any) {
+      console.error('❌ Failed to submit results to Worker:', error.message);
+      console.error('   Results were not persisted to database');
+      throw error;
+    }
+  }
+
+  private clearPendingData() {
+    this.pendingRun = null;
+    this.pendingEvaluations = [];
+    this.pendingTelemetry = null;
+    this.currentRunId = null;
+  }
+
+  // Batch operations
+  startBatch(): string {
+    const batchId = uuidv4();
+    this.currentBatchId = batchId;
+    console.log(`📦 Started batch: ${batchId}`);
+    return batchId;
+  }
+
+  async completeBatch(batchId: string, summary: {
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore: number;
+    avgWeightedScore: number;
+    metadata?: Record<string, any>;
+  }) {
+    if (!this.workerUrl) {
+      console.log('⚠️  Skipping batch submission (no URL configured)');
+      return;
+    }
+
+    try {
+      const payload = {
+        batchId,
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        ...summary
+      };
+
+      console.log(`📤 Submitting batch results to ${this.workerUrl}/api/results/batch`);
+
+      const response = await fetch(`${this.workerUrl}/api/results/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`HTTP ${response.status}: ${error}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Batch results submitted successfully: ${result.batchId}`);
+    } catch (error: any) {
+      console.error('❌ Failed to submit batch results:', error.message);
+      throw error;
+    }
+  }
+
+  // Deprecated methods that are no longer needed (queries now go to Worker API)
+  getRunHistory() { throw new Error('Use Worker API: GET /api/runs'); }
+  getRunDetails() { throw new Error('Use Worker API: GET /api/runs/:runId'); }
+  getStats() { throw new Error('Use Worker API: GET /api/stats'); }
+  getSuiteStats() { throw new Error('Use Worker API: GET /api/stats/suites/:suite'); }
+  getScenarioStats() { throw new Error('Use Worker API: GET /api/stats/scenarios/:suite/:scenario'); }
+  getAverageScoresByAgent() { throw new Error('Use Worker API: GET /api/stats/agents'); }
+  getBatchHistory() { throw new Error('Use Worker API: GET /api/batches'); }
+  getBatchDetails() { throw new Error('Use Worker API: GET /api/batches/:batchId'); }
+
+  close() {
+    BenchmarkLogger.instance = null;
+  }
+}
+```
+
+### packages/database/src/index.ts (UPDATED)
+
+The exports have been updated to use the worker-logger instead of the old SQLite-based logger:
+
+```typescript
+// Export the Worker-based logger (POSTs to Worker API)
+export { BenchmarkLogger } from './worker-logger';
+
+// Legacy exports for backward compatibility
+// Note: Direct database queries are deprecated - use Worker API endpoints instead
+export { SCHEMA } from './schema';
+export type {
+  RunStatistics,
+  BenchmarkRun,
+  EvaluationResult,
+  RunTelemetry,
+  SuiteStatistics,
+  ScenarioStatistics,
+  DetailedRunStatistics,
+  BatchRun,
+  BatchStatistics
+} from './logger';
+```
+
+### packages/database/src/logger.ts (UNCHANGED)
+
+The original SQLite-based logger remains in the codebase for backward compatibility. Its query methods now throw errors directing users to use the Worker API instead:
+
+```typescript
+// Original logger with SQLite
 export async function getRunHistory(db: D1Database, filters: {
   limit: number;
   suite?: string;
@@ -1334,99 +1760,221 @@ Results will flow: CLI → Worker → D1 → Frontend (auto-updates)
 
 ## 10. Frontend Updates
 
+The frontend has been migrated from sql.js (reading local SQLite files) to using the Worker API with TanStack Query for data fetching and caching.
+
+### benchmark-report/package.json (UPDATED)
+
+Added TanStack Query and removed sql.js:
+
+```json
+{
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.0",
+    "@tanstack/react-router": "^1.133.25",
+    // ... other dependencies
+    // sql.js removed
+  }
+}
+```
+
 ### benchmark-report/src/lib/api-client.ts (NEW FILE)
 
+API client with typed methods for all Worker endpoints:
+
 ```typescript
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://your-worker.workers.dev';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
-export async function fetchRuns(filters?: {
-  limit?: number;
-  suite?: string;
-  scenario?: string;
-  agent?: string;
-  status?: string;
-}) {
-  const params = new URLSearchParams();
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined) params.append(key, value.toString());
-    });
+export class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string = API_BASE_URL) {
+    this.baseUrl = baseUrl;
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/runs?${params}`);
-  if (!response.ok) throw new Error('Failed to fetch runs');
-  return response.json();
-}
-
-export async function fetchRunDetails(runId: string) {
-  const response = await fetch(`${API_BASE_URL}/api/runs/${runId}`);
-  if (!response.ok) throw new Error('Failed to fetch run details');
-  return response.json();
-}
-
-export async function fetchBatches(filters?: {
-  limit?: number;
-  status?: string;
-  sortBy?: string;
-}) {
-  const params = new URLSearchParams();
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined) params.append(key, value.toString());
+  private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
     });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`API Error (${response.status}): ${error}`);
+    }
+
+    return await response.json();
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/batches?${params}`);
-  if (!response.ok) throw new Error('Failed to fetch batches');
-  return response.json();
+  // Runs API
+  async listRuns(params?: { limit?: number; suite?: string; scenario?: string; agent?: string; status?: string }): Promise<BenchmarkRun[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    // ... build query params
+    const query = searchParams.toString();
+    return this.fetch<BenchmarkRun[]>(`/api/runs${query ? `?${query}` : ''}`);
+  }
+
+  async getRunDetails(runId: string): Promise<RunDetails> {
+    return this.fetch<RunDetails>(`/api/runs/${runId}`);
+  }
+
+  // Batches API
+  async listBatches(limit: number = 20): Promise<BatchRun[]> {
+    return this.fetch<BatchRun[]>(`/api/batches?limit=${limit}`);
+  }
+
+  async getBatchDetails(batchId: string): Promise<BatchDetails> {
+    return this.fetch<BatchDetails>(`/api/batches/${batchId}`);
+  }
+
+  // Stats API
+  async getGlobalStats(): Promise<GlobalStats> {
+    return this.fetch<GlobalStats>('/api/stats');
+  }
+
+  async getAgentStats(): Promise<AgentStats[]> {
+    return this.fetch<AgentStats[]>('/api/stats/agents');
+  }
+
+  // Client-side aggregations
+  async getDashboardStats(): Promise<DashboardStats> {
+    // Fetches data from multiple endpoints and aggregates on client
+    const [stats, runs, telemetries] = await Promise.all([...]);
+    return { totalRuns, successRate, avgScore, avgCost };
+  }
+
+  async getTopPerformers(limit: number = 5): Promise<TopPerformer[]> {
+    // Groups runs by agent+model and calculates averages
+  }
+
+  async getScoreDistribution(): Promise<ScoreDistribution[]> {
+    // Buckets scores into ranges
+  }
 }
 
-export async function fetchBatchDetails(batchId: string) {
-  const response = await fetch(`${API_BASE_URL}/api/batches/${batchId}`);
-  if (!response.ok) throw new Error('Failed to fetch batch details');
-  return response.json();
+export const apiClient = new ApiClient();
+```
+
+### benchmark-report/src/hooks/use-api-queries.ts (NEW FILE)
+
+TanStack Query hooks for all API operations:
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+
+// Query keys for cache management
+export const queryKeys = {
+  runs: {
+    all: ['runs'] as const,
+    list: (params) => [...queryKeys.runs.all, 'list', params] as const,
+    detail: (runId: string) => [...queryKeys.runs.all, 'detail', runId] as const,
+  },
+  batches: {
+    all: ['batches'] as const,
+    list: (limit) => [...queryKeys.batches.all, 'list', limit] as const,
+  },
+  stats: {
+    all: ['stats'] as const,
+    global: () => [...queryKeys.stats.all, 'global'] as const,
+    agents: () => [...queryKeys.stats.all, 'agents'] as const,
+    dashboard: () => [...queryKeys.stats.all, 'dashboard'] as const,
+  },
+};
+
+// Custom hooks
+export function useRuns(params?, options?) {
+  return useQuery({
+    queryKey: queryKeys.runs.list(params),
+    queryFn: () => apiClient.listRuns(params),
+    staleTime: 30000, // 30 seconds
+    ...options,
+  });
 }
 
-export async function fetchBatchAnalytics(batchId: string) {
-  const response = await fetch(`${API_BASE_URL}/api/batches/${batchId}/analytics`);
-  if (!response.ok) throw new Error('Failed to fetch batch analytics');
-  return response.json();
+export function useRunDetails(runId: string, options?) {
+  return useQuery({
+    queryKey: queryKeys.runs.detail(runId),
+    queryFn: () => apiClient.getRunDetails(runId),
+    staleTime: 60000,
+    ...options,
+  });
 }
 
-export async function fetchGlobalStats(days: number = 30) {
-  const response = await fetch(`${API_BASE_URL}/api/stats?days=${days}`);
-  if (!response.ok) throw new Error('Failed to fetch stats');
-  return response.json();
+export function useDashboardStats(options?) {
+  return useQuery({
+    queryKey: queryKeys.stats.dashboard(),
+    queryFn: () => apiClient.getDashboardStats(),
+    staleTime: 30000,
+    ...options,
+  });
 }
 
-export async function fetchAgentStats() {
-  const response = await fetch(`${API_BASE_URL}/api/stats/agents`);
-  if (!response.ok) throw new Error('Failed to fetch agent stats');
-  return response.json();
-}
+// ... more hooks
+```
 
-export async function fetchSuiteStats(suite: string) {
-  const response = await fetch(`${API_BASE_URL}/api/stats/suites/${suite}`);
-  if (!response.ok) throw new Error('Failed to fetch suite stats');
-  return response.json();
-}
+### benchmark-report/src/DatabaseProvider.tsx (UPDATED)
 
-export async function fetchScenarioStats(suite: string, scenario: string) {
-  const response = await fetch(`${API_BASE_URL}/api/stats/scenarios/${suite}/${scenario}`);
-  if (!response.ok) throw new Error('Failed to fetch scenario stats');
-  return response.json();
-}
+Replaced sql.js database provider with TanStack Query's QueryClientProvider:
 
-export async function fetchModelStats() {
-  const response = await fetch(`${API_BASE_URL}/api/stats/models`);
-  if (!response.ok) throw new Error('Failed to fetch model stats');
-  return response.json();
-}
+```typescript
+import React, { type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-export async function fetchEvaluatorTrends(name: string, days: number = 30) {
-  const response = await fetch(`${API_BASE_URL}/api/stats/evaluators/${name}/trends?days=${days}`);
-  if (!response.ok) throw new Error('Failed to fetch evaluator trends');
-  return response.json();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000, // 30 seconds
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+export const DatabaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
+```
+
+### benchmark-report/src/routes/index.tsx (UPDATED)
+
+Dashboard route now uses TanStack Query hooks instead of sql.js queries:
+
+```typescript
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useDashboardStats,
+  useTopPerformers,
+  useRuns,
+  useScoreDistribution,
+  useBatches,
+  queryKeys
+} from '@/hooks/use-api-queries';
+
+function Dashboard() {
+  const queryClient = useQueryClient();
+
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: topPerformers = [] } = useTopPerformers(5);
+  const { data: recentRuns = [] } = useRuns({ limit: 15 });
+  const { data: scoreDistribution = [] } = useScoreDistribution();
+  const { data: recentBatches = [] } = useBatches(5);
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.runs.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.batches.all });
+  };
+
+  // Render dashboard using fetched data
 }
 ```
 
@@ -1435,7 +1983,11 @@ export async function fetchEvaluatorTrends(name: string, days: number = 30) {
 Create `.env` file in `benchmark-report/`:
 
 ```env
-VITE_API_URL=https://ze-benchmarks-api.workers.dev
+# For local development
+VITE_API_URL=http://localhost:8787
+
+# For production
+# VITE_API_URL=https://ze-benchmarks-api.your-account.workers.dev
 ```
 
 ---
@@ -1617,30 +2169,37 @@ curl -X POST http://localhost:8787/api/results \
 
 ### Public Endpoints (No Auth)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| GET | `/api/runs` | List benchmark runs |
-| GET | `/api/runs/:runId` | Get run details |
-| GET | `/api/runs/:runId/evaluations` | Get run evaluations |
-| GET | `/api/runs/:runId/telemetry` | Get run telemetry |
-| GET | `/api/batches` | List batches |
-| GET | `/api/batches/:batchId` | Get batch details |
-| GET | `/api/batches/:batchId/analytics` | Get batch analytics |
-| GET | `/api/batches/compare?ids=x,y` | Compare batches |
-| GET | `/api/stats` | Global statistics |
-| GET | `/api/stats/agents` | Agent performance |
-| GET | `/api/stats/suites/:suite` | Suite statistics |
-| GET | `/api/stats/scenarios/:suite/:scenario` | Scenario statistics |
-| GET | `/api/stats/models` | Model performance |
-| GET | `/api/stats/evaluators/:name/trends` | Evaluator trends |
+| Method | Endpoint | Query Params | Description |
+|--------|----------|--------------|-------------|
+| GET | `/health` | - | Health check |
+| GET | `/api/runs` | `limit`, `suite`, `scenario`, `agent`, `status` | List benchmark runs with optional filters |
+| GET | `/api/runs/:runId` | - | Get run details with evaluations and telemetry |
+| GET | `/api/runs/:runId/evaluations` | - | Get run evaluations only |
+| GET | `/api/runs/:runId/telemetry` | - | Get run telemetry only |
+| GET | `/api/batches` | `limit` | List batches |
+| GET | `/api/batches/:batchId` | - | Get batch details with all runs |
+| GET | `/api/stats` | - | Global statistics (total runs, success rate, avg scores) |
+| GET | `/api/stats/agents` | - | Agent performance comparison |
 
-### Protected Endpoints (Requires Auth)
+### Protected Endpoints (Requires Bearer Token Auth)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/results` | Submit benchmark result |
-| POST | `/api/results/batch` | Submit batch result |
+| POST | `/api/results` | Submit benchmark result with evaluations and telemetry |
+| POST | `/api/results/batch` | Submit or update batch summary |
+
+### Authentication
+
+Protected endpoints require a Bearer token in the `Authorization` header:
+
+```bash
+curl -X POST https://your-worker.workers.dev/api/results \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"runId": "...", ...}'
+```
+
+The API key must match the `API_SECRET_KEY` environment variable set in the Worker.
 
 ---
 
