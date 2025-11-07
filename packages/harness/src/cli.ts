@@ -12,6 +12,7 @@ import { OpenAI } from 'openai';
 import { runEvaluators } from '../../evaluators/src/index.ts';
 import { runValidationCommands } from './runtime/validation.ts';
 import { buildDiffArtifacts } from './runtime/diff.ts';
+import { detectPackageManager, extractPackageManagerFromCommand, extractTestResults } from './runtime/extractors.ts';
 import { Oracle } from './runtime/oracle.ts';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
@@ -2039,6 +2040,18 @@ Work efficiently: read files to understand the current state, make necessary cha
 	// Calculate success based on validation commands and evaluator scores
 	const { isSuccessful, successMetric } = calculateSuccess(commandLog, result.scores || {}, scenarioCfg);
 	
+	// Extract package manager and test results
+	let packageManager: string | undefined;
+	if (workspaceDir) {
+		packageManager = detectPackageManager(workspaceDir);
+		if (packageManager === 'unknown') {
+			packageManager = extractPackageManagerFromCommand(commandLog);
+		}
+	}
+	
+	const testResults = extractTestResults(commandLog);
+	const testResultsJson = testResults ? JSON.stringify(testResults) : undefined;
+	
 	logger.completeRun(
 		totalScore,
 		result.totals?.weighted,
@@ -2048,7 +2061,9 @@ Work efficiently: read files to understand the current state, make necessary cha
 			oracleQuestions: (result as any).oracle_questions
 		},
 		isSuccessful,
-		successMetric
+		successMetric,
+		packageManager,
+		testResultsJson
 	);
 
 	// Stage 6: Results
