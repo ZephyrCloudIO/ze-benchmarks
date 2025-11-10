@@ -75,7 +75,7 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   model?: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'incomplete';
   startedAt: string;
   completedAt?: string;
   totalScore?: number | null;
@@ -293,6 +293,16 @@ export class BenchmarkLogger {
       WHERE run_id = ?
     `).run(totalScore, weightedScore, isSuccessful ? 1 : 0, successMetric, JSON.stringify(metadata), this.currentRunId);
     
+    this.updateTimestamp();
+  }
+
+  markRunIncomplete(reason?: string, stage?: string) {
+    if (!this.currentRunId) throw new Error('No active run');
+    this.db.prepare(`
+      UPDATE benchmark_runs 
+      SET status = 'incomplete', completed_at = CURRENT_TIMESTAMP, metadata = ?
+      WHERE run_id = ?
+    `).run(JSON.stringify({ reason: reason || 'Run interrupted', stage: stage || 'unknown', incomplete: true }), this.currentRunId);
     this.updateTimestamp();
   }
 
