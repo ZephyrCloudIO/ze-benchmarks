@@ -23,6 +23,8 @@ interface RunDetails {
   completedAt: string | null;
   totalScore: number | null;
   weightedScore: number | null;
+  packageManager: string | null;
+  testResults: string | null;
 }
 
 interface Telemetry {
@@ -56,7 +58,8 @@ function RunDetailsPage() {
       const runResult = db.exec(`
         SELECT
           run_id, batchId, suite, scenario, tier, agent, model, status,
-          started_at, completed_at, total_score, weighted_score
+          started_at, completed_at, total_score, weighted_score,
+          package_manager, test_results
         FROM benchmark_runs
         WHERE run_id = ?
       `, [runId]);
@@ -76,6 +79,8 @@ function RunDetailsPage() {
           completedAt: row[9] as string | null,
           totalScore: row[10] as number | null,
           weightedScore: row[11] as number | null,
+          packageManager: row[12] as string | null,
+          testResults: row[13] as string | null,
         });
       }
 
@@ -206,6 +211,16 @@ function RunDetailsPage() {
               </div>
             </div>
           )}
+          {runDetails.packageManager && (
+            <div>
+              <div className="text-sm text-muted-foreground">Package Manager</div>
+              <div className="font-semibold mt-1">
+                <Badge variant="outline" className="uppercase">
+                  {runDetails.packageManager}
+                </Badge>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Batch Action Button */}
@@ -219,6 +234,50 @@ function RunDetailsPage() {
           </div>
         )}
       </div>
+
+      {/* Test Results */}
+      {runDetails.testResults && (() => {
+        try {
+          const testResults = JSON.parse(runDetails.testResults);
+          return (
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="text-2xl font-semibold mb-4">Test Results</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+                <div className="p-4 rounded-lg border">
+                  <div className="text-sm text-muted-foreground">Total Tests</div>
+                  <div className="text-2xl font-bold mt-1">{testResults.total || 0}</div>
+                </div>
+                <div className="p-4 rounded-lg border border-green-200 bg-green-50">
+                  <div className="text-sm text-muted-foreground">Passed</div>
+                  <div className="text-2xl font-bold mt-1 text-green-600">{testResults.passed || 0}</div>
+                </div>
+                <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+                  <div className="text-sm text-muted-foreground">Failed</div>
+                  <div className="text-2xl font-bold mt-1 text-red-600">{testResults.failed || 0}</div>
+                </div>
+                {testResults.skipped !== undefined && (
+                  <div className="p-4 rounded-lg border border-yellow-200 bg-yellow-50">
+                    <div className="text-sm text-muted-foreground">Skipped</div>
+                    <div className="text-2xl font-bold mt-1 text-yellow-600">{testResults.skipped || 0}</div>
+                  </div>
+                )}
+              </div>
+              {testResults.failedTests && testResults.failedTests.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-lg font-semibold mb-2 text-red-600">Failed Tests</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {testResults.failedTests.map((test: string, idx: number) => (
+                      <li key={idx} className="text-sm text-red-700 font-mono">{test}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
 
       {/* Error Details for Failed Runs */}
       {runDetails.status === 'failed' && (

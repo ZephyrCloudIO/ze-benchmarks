@@ -150,6 +150,8 @@ export interface BenchmarkRun {
   weighted_score?: number;
   is_successful?: boolean;
   success_metric?: number;
+  package_manager?: string;
+  test_results?: string;
   metadata?: string;
 }
 
