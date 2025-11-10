@@ -7,9 +7,9 @@ import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell, ErrorBar } from 'recharts'
 import { Copy, Download, RefreshCw } from 'lucide-react'
-import { scoreTickFormatter, formatTooltipScore, safeScore } from '@/lib/chart-utils'
+import { scoreTickFormatter, formatTooltipScore, computeQuantiles } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/batches/$batchId')({
   component: BatchDetailsPage,
@@ -402,7 +402,7 @@ function BatchDetailsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div>
             <p className="text-sm text-muted-foreground mb-1">Status</p>
-            <Badge variant={batchDetails.completedAt ? 'default' : 'secondary'} className="text-sm">
+            <Badge variant={batchDetails.completedAt ? 'success' : 'info'} className="text-sm">
               {batchDetails.completedAt ? 'Completed' : 'Running'}
             </Badge>
           </div>
@@ -500,10 +500,23 @@ function BatchDetailsPage() {
               }}
               className="h-full w-full !aspect-auto"
             >
-              <BarChart data={agentPerformance.map(a => ({
-                name: a.model && a.model !== 'default' ? `${a.agent} [${a.model}]` : a.agent,
-                score: safeScore(a.avgWeightedScore),
-              }))}>
+              <BarChart data={agentPerformance.map(a => {
+                const valuesResult = db!.exec(`
+                  SELECT weighted_score FROM benchmark_runs
+                  WHERE batchId = '${batchId}' AND agent = '${a.agent}' AND ${a.model ? `model = '${a.model}'` : `model IS NULL`}
+                    AND status = 'completed' AND weighted_score IS NOT NULL
+                `);
+                const values = valuesResult[0]?.values.map(v => v[0] as number) || [];
+                const [, p50, , p75] = computeQuantiles(values, [0.25, 0.5, 0.75]);
+                const p25 = computeQuantiles(values, [0.25])[0];
+                return {
+                  name: a.model && a.model !== 'default' ? `${a.agent} [${a.model}]` : a.agent,
+                  score: (a.avgWeightedScore ?? 0) / 10,
+                  q25: (isNaN(p25) ? 0 : p25) / 10,
+                  q75: (isNaN(p75) ? 0 : p75) / 10,
+                  p50: (isNaN(p50) ? 0 : p50) / 10,
+                };
+              })}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="name" 
@@ -529,7 +542,10 @@ function BatchDetailsPage() {
                     );
                   }}
                 />
-                <Bar dataKey="score" fill="hsl(var(--primary))" />
+                <Bar dataKey="score" fill="hsl(var(--primary))">
+                  <ErrorBar dataKey="p50" xAxis={false} direction="y" width={2} stroke="hsl(var(--chart-3))" />
+                  <ErrorBar dataKey="score" xAxis={false} direction="y" data={[{lowKey: 'q25', highKey: 'q75'}]} stroke="hsl(var(--chart-2))" />
+                </Bar>
               </BarChart>
             </ChartContainer>
           </div>
@@ -744,9 +760,9 @@ function BatchDetailsPage() {
                   </td>
                   <td className="p-2">
                     <Badge variant={
-                      run.status === 'completed' ? 'default' : 
+                      run.status === 'completed' ? 'success' : 
                       run.status === 'failed' ? 'destructive' : 
-                      'secondary'
+                      run.status === 'running' ? 'info' : 'warning'
                     }>
                       {run.status}
                     </Badge>

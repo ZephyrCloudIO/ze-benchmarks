@@ -91,7 +91,7 @@ function formatStats(label: string, value: string | number, color: 'green' | 'bl
 }
 
 function createTitle() {
-  return figlet.textSync('Ze Benchmarks', {
+  return figlet.textSync('ze-benchmarks', {
     font: 'ANSI Shadow',
     horizontalLayout: 'fitted',
     verticalLayout: 'default'
@@ -158,11 +158,11 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
           const color = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
           const status = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'Excellent' : percent >= SCORE_THRESHOLDS.GOOD ? 'Good' : 'Needs Work';
           const statusColor = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          const categoryName = category.replace(/_/g, ' ').replace(/\\b\\w/g, (l: string) => l.toUpperCase());
           
           console.log(`│ ${chalk.cyan(categoryName.padEnd(20))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
         } else {
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          const categoryName = category.replace(/_/g, ' ').replace(/\\b\\w/g, (l: string) => l.toUpperCase());
           console.log(`│ ${chalk.red(categoryName.padEnd(20))} ${chalk.red('N/A'.padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
         }
       });
@@ -187,11 +187,13 @@ function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator
 
 // Common display functions
 function displayRunInfo(run: { status: string; suite: string; scenario: string; tier: string; agent: string; model?: string; weightedScore?: number | null; runId: string; startedAt: string | number }, index: number) {
-  const status = run.status === 'completed' 
-    ? chalk.green('✓') 
-    : run.status === 'failed' 
-    ? chalk.red('✗') 
-    : chalk.yellow('○');
+  const status = run.status === 'completed'
+    ? chalk.green('✓')
+    : run.status === 'failed'
+    ? chalk.red('✗')
+    : run.status === 'incomplete'
+    ? chalk.yellow('◐')
+    : chalk.blue('○');
   
   console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
   console.log(`   ${formatStats('Agent', run.agent + (run.model ? ` (${run.model})` : ''))}`);
@@ -253,6 +255,338 @@ function computeWeightedTotals(
 
 function findRepoRoot(): string {
 	return resolve(fileURLToPath(import.meta.url), '../../../..');
+}
+
+// ============================================================================
+// SECTION 2.5: VALIDATION HELPERS FOR SUITE/SCENARIO CREATION
+// ============================================================================
+
+function validateName(name: string, type: 'suite' | 'scenario'): { valid: boolean; error?: string } {
+	if (!name || name.trim().length === 0) {
+		return { valid: false, error: `${type} name cannot be empty` };
+	}
+	
+	// Check kebab-case: lowercase, alphanumeric + hyphens, no spaces or special chars
+	const kebabCasePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+	if (!kebabCasePattern.test(name)) {
+		return { 
+			valid: false, 
+			error: `${type} name must be in kebab-case (lowercase, alphanumeric and hyphens only, e.g., "my-benchmark")` 
+		};
+	}
+	
+	return { valid: true };
+}
+
+function checkSuiteExists(suiteName: string): boolean {
+	const root = findRepoRoot();
+	const suitePath = join(root, 'suites', suiteName);
+	return existsSync(suitePath);
+}
+
+function checkScenarioExists(suiteName: string, scenarioName: string): boolean {
+	const root = findRepoRoot();
+	const scenarioPath = join(root, 'suites', suiteName, 'scenarios', scenarioName);
+	return existsSync(scenarioPath);
+}
+
+async function createNewSuite(name?: string): Promise<void> {
+	const root = findRepoRoot();
+	const suitesDir = join(root, 'suites');
+	
+	// Get suite name from argument or prompt
+	let suiteName: string | undefined = name;
+	if (!suiteName) {
+		intro(chalk.bgGreen(' Create New Suite '));
+		const input = await text({
+			message: 'Enter suite name (kebab-case):',
+			placeholder: 'e.g., my-benchmark-suite',
+			validate: (value) => {
+				const validation = validateName(value, 'suite');
+				if (!validation.valid) {
+					return validation.error;
+				}
+				if (checkSuiteExists(value)) {
+					return `Suite "${value}" already exists`;
+				}
+				return;
+			}
+		});
+		
+		if (isCancel(input)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		suiteName = input as string;
+	}
+	
+	// Validate name - TypeScript guard
+	if (!suiteName) {
+		log.error('Suite name is required');
+		return;
+	}
+	
+	// TypeScript type narrowing - suiteName is guaranteed to be string here
+	const finalSuiteName = suiteName as string;
+	const validation = validateName(finalSuiteName, 'suite');
+	if (!validation.valid) {
+		log.error(validation.error || 'Invalid suite name');
+		return;
+	}
+	
+	// Check if suite exists
+	if (checkSuiteExists(finalSuiteName)) {
+		log.error(`Suite "${finalSuiteName}" already exists at suites/${finalSuiteName}/`);
+		return;
+	}
+	
+	// Create directory structure
+	const suitePath = join(suitesDir, finalSuiteName);
+	const promptsPath = join(suitePath, 'prompts');
+	const scenariosPath = join(suitePath, 'scenarios');
+	
+	const s = spinner();
+	s.start('Creating suite directory structure...');
+	
+	try {
+		mkdirSync(suitePath, { recursive: true });
+		mkdirSync(promptsPath, { recursive: true });
+		mkdirSync(scenariosPath, { recursive: true });
+		s.stop('Suite created');
+		
+		// Show relative path
+		const relativePath = join('suites', finalSuiteName);
+		console.log(`\n${chalk.green('✓')} Suite created at: ${chalk.cyan(relativePath)}`);
+		console.log(`   ${chalk.gray('Structure:')} ${relativePath}/{prompts,scenarios}`);
+		
+		outro(chalk.green(`Suite "${finalSuiteName}" created successfully`));
+	} catch (error) {
+		s.stop('Failed to create suite');
+		log.error(`Failed to create suite: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
+async function createNewScenario(suite?: string, scenarioName?: string): Promise<void> {
+	const root = findRepoRoot();
+	const suitesDir = join(root, 'suites');
+	
+	// Get suite name
+	let suiteName = suite;
+	if (!suiteName) {
+		intro(chalk.bgGreen(' Create New Scenario '));
+		
+		// Check if any suites exist
+		if (!existsSync(suitesDir)) {
+			log.error('No suites directory found. Create a suite first.');
+			return;
+		}
+		
+		const existingSuites = readdirSync(suitesDir).filter(dir => 
+			existsSync(join(suitesDir, dir, 'scenarios'))
+		);
+		
+		if (existingSuites.length === 0) {
+			const shouldCreate = await confirm({
+				message: 'No existing suites found. Create a new suite first?',
+				initialValue: true
+			});
+			
+			if (isCancel(shouldCreate) || !shouldCreate) {
+				cancel('Operation cancelled.');
+				return;
+			}
+			
+			await createNewSuite();
+			// Refresh suites list
+			const refreshedSuites = readdirSync(suitesDir).filter(dir => 
+				existsSync(join(suitesDir, dir, 'scenarios'))
+			);
+			if (refreshedSuites.length === 0) {
+				log.error('Failed to create suite or no suites available');
+				return;
+			}
+			existingSuites.push(...refreshedSuites);
+		}
+		
+		const selectedSuite = await select({
+			message: 'Select suite to add scenario to:',
+			options: existingSuites.map(s => ({ value: s, label: s }))
+		});
+		
+		if (isCancel(selectedSuite)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		suiteName = selectedSuite as string;
+	}
+	
+	// TypeScript guard - suiteName must be string at this point
+	if (!suiteName) {
+		log.error('Suite name is required');
+		return;
+	}
+	
+	// Validate suite exists
+	if (!checkSuiteExists(suiteName)) {
+		log.error(`Suite "${suiteName}" does not exist. Create it first with --new-suite.`);
+		return;
+	}
+	
+	// Get scenario name
+	let name: string | undefined = scenarioName;
+	if (!name) {
+		const input = await text({
+			message: 'Enter scenario name (kebab-case):',
+			placeholder: 'e.g., my-test-scenario',
+			validate: (value) => {
+				const validation = validateName(value, 'scenario');
+				if (!validation.valid) {
+					return validation.error;
+				}
+				if (checkScenarioExists(suiteName, value)) {
+					return `Scenario "${value}" already exists in suite "${suiteName}"`;
+				}
+				return;
+			}
+		});
+		
+		if (isCancel(input)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+		name = input as string;
+	}
+	
+	// Validate name - TypeScript guard
+	if (!name) {
+		log.error('Scenario name is required');
+		return;
+	}
+	
+	// TypeScript type narrowing - name is guaranteed to be string here
+	const finalName = name as string;
+	const validation = validateName(finalName, 'scenario');
+	if (!validation.valid) {
+		log.error(validation.error || 'Invalid scenario name');
+		return;
+	}
+	
+	// Check if scenario exists
+	if (checkScenarioExists(suiteName, finalName)) {
+		log.error(`Scenario "${finalName}" already exists in suite "${suiteName}" at suites/${suiteName}/scenarios/${finalName}/`);
+		return;
+	}
+	
+	const s = spinner();
+	s.start('Creating scenario structure...');
+	
+	try {
+		// Create scenario directory
+		const scenarioPath = join(suitesDir, suiteName, 'scenarios', finalName);
+		mkdirSync(scenarioPath, { recursive: true });
+		
+		// Create prompts directory for this scenario
+		const promptsPath = join(suitesDir, suiteName, 'prompts', finalName);
+		mkdirSync(promptsPath, { recursive: true });
+		
+		s.message('Copying scenario template...');
+		
+		// Copy and customize scenario.yaml template
+		const templatePath = join(root, 'docs', 'templates', 'scenario.yaml');
+		if (!existsSync(templatePath)) {
+			throw new Error(`Template file not found: ${templatePath}`);
+		}
+		
+		let templateContent = readFileSync(templatePath, 'utf8');
+		// Replace placeholders
+		templateContent = templateContent.replace(/^id: my-scenario$/m, `id: ${finalName}`);
+		templateContent = templateContent.replace(/^suite: my-suite$/m, `suite: ${suiteName}`);
+		
+		const scenarioYamlPath = join(scenarioPath, 'scenario.yaml');
+		writeFileSync(scenarioYamlPath, templateContent);
+		
+		s.message('Creating oracle-answers.json...');
+		
+		// Create oracle-answers.json
+		const oraclePath = join(scenarioPath, 'oracle-answers.json');
+		writeFileSync(oraclePath, '{}\n');
+		
+		s.message('Creating repo-fixture directory...');
+		
+		// Create repo-fixture directory
+		const repoFixturePath = join(scenarioPath, 'repo-fixture');
+		mkdirSync(repoFixturePath, { recursive: true });
+		
+		s.message('Copying repo-fixture guide to README.md...');
+		
+		// Copy repo-fixture.md template content into README.md inside repo-fixture
+		const repoFixtureTemplatePath = join(root, 'docs', 'templates', 'repo-fixture.md');
+		if (existsSync(repoFixtureTemplatePath)) {
+			const templateContent = readFileSync(repoFixtureTemplatePath, 'utf8');
+			const repoFixtureReadmePath = join(repoFixturePath, 'README.md');
+			writeFileSync(repoFixtureReadmePath, templateContent);
+		} else {
+			log.warning(`Template file not found: ${repoFixtureTemplatePath}`);
+			// Create a basic README if template is missing
+			const repoFixtureReadmePath = join(repoFixturePath, 'README.md');
+			const basicContent = `# Repository Fixture
+
+This directory contains the starting codebase state for this scenario.
+
+## Setup Instructions
+
+1. Add a \`package.json\` file with your project dependencies
+2. Include source files, tests, and configuration files
+3. Ensure the fixture represents the starting state before the agent performs the task
+4. Test that baseline commands (install, build, test) work correctly
+`;
+			writeFileSync(repoFixtureReadmePath, basicContent);
+		}
+		
+		s.message('Creating default prompt tiers...');
+		
+		// Create default prompt tier files
+		const promptTiers = [
+			{ file: 'L0-minimal.md', content: 'Complete the task with minimal guidance.\n' },
+			{ file: 'L1-basic.md', content: 'Complete the task with basic context and requirements.\n\nConstraints and goals:\n- Follow best practices\n- Ensure correctness\n' },
+			{ file: 'L2-directed.md', content: 'Complete the task with detailed guidance.\n\nConstraints and goals:\n- Follow all specified requirements\n- Maintain code quality\n- Ensure tests pass\n- Handle edge cases appropriately\n\nIf major changes are required, ask before proceeding.\n' }
+		];
+		
+		for (const tier of promptTiers) {
+			const tierPath = join(promptsPath, tier.file);
+			writeFileSync(tierPath, tier.content);
+		}
+		
+		s.stop('Scenario created');
+		
+		// Show relative paths
+		const scenarioRelativePath = join('suites', suiteName, 'scenarios', finalName);
+		const promptsRelativePath = join('suites', suiteName, 'prompts', finalName);
+		
+		console.log(`\n${chalk.green('✓')} Scenario created:`);
+		console.log(`   ${chalk.cyan('Scenario:')} ${scenarioRelativePath}/`);
+		console.log(`   ${chalk.cyan('Prompts:')} ${promptsRelativePath}/`);
+		const repoFixtureRelativePath = join('suites', suiteName, 'scenarios', finalName, 'repo-fixture');
+		
+		console.log(`\n${chalk.gray('Created files:')}`);
+		console.log(`   - ${scenarioRelativePath}/scenario.yaml`);
+		console.log(`   - ${scenarioRelativePath}/oracle-answers.json`);
+		console.log(`   - ${repoFixtureRelativePath}/README.md ${chalk.dim('(setup guide)')}`);
+		console.log(`   - ${repoFixtureRelativePath}/ ${chalk.dim('(empty - add your fixture files here)')}`);
+		console.log(`   - ${promptsRelativePath}/L0-minimal.md`);
+		console.log(`   - ${promptsRelativePath}/L1-basic.md`);
+		console.log(`   - ${promptsRelativePath}/L2-directed.md`);
+		console.log(`\n${chalk.yellow('Next steps:')}`);
+		console.log(`   ${chalk.cyan('1.')} Read ${chalk.bold('repo-fixture/README.md')} for setup instructions`);
+		console.log(`   ${chalk.cyan('2.')} Add your starting codebase to ${chalk.bold('repo-fixture/')} directory`);
+		console.log(`   ${chalk.cyan('3.')} Customize ${chalk.bold('scenario.yaml')} with your scenario configuration`);
+		console.log(`   ${chalk.cyan('4.')} Update prompt files in ${chalk.bold('prompts/')} directory`);
+		
+		outro(chalk.green(`Scenario "${finalName}" created successfully in suite "${suiteName}"`));
+	} catch (error) {
+		s.stop('Failed to create scenario');
+		log.error(`Failed to create scenario: ${error instanceof Error ? error.message : String(error)}`);
+	}
 }
 
 function loadScenario(suite: string, scenario: string) {
@@ -324,7 +658,15 @@ function prepareWorkspaceFromFixture(suite: string, scenario: string): { workspa
 	mkdirSync(workspacesDir, { recursive: true });
 	const workspaceDir = mkdtempSync(join(workspacesDir, `${suite}-${scenario}-`));
 	try {
-		cpSync(fixtureDir, workspaceDir, { recursive: true });
+		// Copy fixture directory while excluding README.md files
+		cpSync(fixtureDir, workspaceDir, { 
+			recursive: true,
+			filter: (src: string) => {
+				// Exclude README.md files from being copied (check filename and path)
+				const fileName = src.split(/[/\\]/).pop() || '';
+				return fileName !== 'README.md';
+			}
+		});
 		return { workspaceDir, fixtureDir };
 	} catch (err) {
 		console.error('Failed to copy fixture directory:', err);
@@ -437,6 +779,19 @@ function parseArgs(argv: string[]) {
 		return { cmd: 'compare-batches', batchIds } as const;
 	}
 	
+	// Check for new-suite command
+	if (args[0] === '--new-suite') {
+		const name = args[1];
+		return { cmd: 'new-suite', name } as const;
+	}
+	
+	// Check for new-scenario command
+	if (args[0] === '--new-scenario') {
+		const suite = args[1];
+		const name = args[2];
+		return { cmd: 'new-scenario', suite, name } as const;
+	}
+	
 	const cmd = 'bench';
 	const suite = args[0];
 	const scenario = args[1];
@@ -473,6 +828,8 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--batches')} [limit]             List recent batches`);
 	console.log(`  ${chalk.cyan('--batch-details')} <id>          Detailed batch analytics`);
 	console.log(`  ${chalk.cyan('--compare-batches')} <id1> <id2> Compare multiple batches`);
+	console.log(`  ${chalk.cyan('--new-suite')} [name]            Create a new benchmark suite`);
+	console.log(`  ${chalk.cyan('--new-scenario')} [suite] [name] Create a new scenario in a suite`);
 	console.log(`  ${chalk.cyan('--clear-db')}                    Clear database`);
 	
 	console.log('\n' + chalk.bold('Options:'));
@@ -484,7 +841,7 @@ function showHelp() {
 	console.log('\n' + chalk.bold('Model Selection:'));
 	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
 	console.log(`  ${chalk.gray('Search by:')} model name, provider, or description`);
-	console.log(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
+	console.log(`  ${chalk.gray('Example searches:')} \"gpt-4o\", \"llama-3\", \"gemma free\", \"claude sonnet\"`);
 	
 	console.log('\n' + chalk.bold('Web Dashboard:'));
 	console.log(`  ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
@@ -515,6 +872,8 @@ async function showInteractiveMenu() {
 				{ value: 'benchmark', label: 'Run Benchmarks' },
 				{ value: 'history', label: 'History' },
 				{ value: 'statistics', label: 'Statistics' },
+				{ value: 'new-suite', label: 'Create New Suite' },
+				{ value: 'new-scenario', label: 'Create New Scenario' },
 				{ value: 'clear', label: 'Clear Database' },
 				{ value: 'help', label: 'Show Help' },
 				{ value: 'exit', label: 'Exit' }
@@ -530,6 +889,12 @@ async function showInteractiveMenu() {
 				break;
 			case 'statistics':
 				await runInteractiveStatisticsMenu();
+				break;
+			case 'new-suite':
+				await createNewSuite();
+				break;
+			case 'new-scenario':
+				await createNewScenario();
 				break;
 			case 'clear':
 				await runInteractiveClear();
@@ -873,7 +1238,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const suitesToUse = selectedSuites.includes('__ALL__') ? suites : selectedSuites;
 	
 	// Get scenarios for all selected suites
@@ -914,7 +1279,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection and filter by suite
+	// Expand \"All\" selection and filter by suite
 	const scenariosToUse = selectedScenarios.includes('__ALL__') 
 		? allScenarios.map(s => s.value)
 		: selectedScenarios;
@@ -960,7 +1325,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const tiersToUse = selectedTiers.includes('__ALL__') 
 		? Array.from(availableTiersSet).sort()
 		: selectedTiers;
@@ -981,7 +1346,7 @@ async function runInteractiveBenchmark() {
 		return;
 	}
 
-	// Expand "All" selection
+	// Expand \"All\" selection
 	const agentsToUse = selectedAgents.includes('__ALL__') 
 		? ['echo', 'openrouter', 'anthropic', 'claude-code'] 
 		: selectedAgents;
@@ -1035,7 +1400,7 @@ async function runInteractiveBenchmark() {
 		const searchResults = openrouterAPI.searchModels(toolModels, modelSearch);
 		
 		if (searchResults.length === 0) {
-			log.warning(`No models found matching "${modelSearch}"`);
+			log.warning(`No models found matching \"${modelSearch}\"`);
 			log.info('Try searching for: gpt-4o, llama, gemma, claude, mistral');
 			return;
 		}
@@ -1512,10 +1877,16 @@ async function runInteractiveBatchStats() {
 					.filter(run => run.weightedScore !== null && run.weightedScore !== undefined)
 					.sort((a, b) => (b.weightedScore || 0) - (a.weightedScore || 0));
 				
-				sortedRuns.forEach((run, index) => {
+                sortedRuns.forEach((run, index) => {
 					const rank = index + 1;
 					const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
-					const status = run.status === 'completed' ? chalk.green('✓') : run.status === 'failed' ? chalk.red('✗') : chalk.yellow('○');
+                    const status = run.status === 'completed'
+                      ? chalk.green('✓')
+                      : run.status === 'failed'
+                      ? chalk.red('✗')
+                      : run.status === 'incomplete'
+                      ? chalk.yellow('◐')
+                      : chalk.blue('○');
 					console.log(`  ${rankDisplay} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)} ${chalk.cyan(run.agent)} ${chalk.yellow(run.weightedScore?.toFixed(4) || 'N/A')}`);
 				});
 		}
@@ -1760,6 +2131,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	const logger = BenchmarkLogger.getInstance();
 	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
 	const startTime = Date.now();
+
+	// Timeout watchdog based on scenario timeout_minutes (default 60)
+	let timeoutId: NodeJS.Timeout | null = null;
 	
 	// Initialize progress tracker (only if not in quiet mode)
 	const progress = quiet ? null : createProgress();
@@ -1768,6 +2142,16 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	// Stage 1: Setup
 		if (progress) updateProgress(progress, 1, 'Loading scenario configuration');
 	const scenarioCfg = loadScenario(suite, scenario);
+
+		// Start timeout watchdog after loading scenario config
+		const scenarioTimeoutMin = Number(scenarioCfg.timeout_minutes || 60);
+		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
+		timeoutId = setTimeout(() => {
+			try {
+				logger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
+				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
+			} catch {}
+		}, timeoutMs);
 	
 		if (progress) updateProgress(progress, 1, 'Loading prompt');
 	const promptContent = loadPrompt(suite, scenario, tier);
@@ -1872,19 +2256,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			
 			// Build system prompt with tool usage guidance
 			const systemPrompt = agent === 'anthropic' 
-				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}
-
-IMPORTANT: You are working in the directory: ${workspaceDir}
-This is a prepared workspace with the files you need to modify.
-
-Available Tools:
-- readFile: Read any file in the workspace
-- writeFile: Modify files (e.g., package.json files)
-- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)
-- listFiles: Explore directory structure
-- askUser: Ask questions when you need clarification or approval for major changes
-
-Work efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
+				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.\n\nAvailable Tools:\n- readFile: Read any file in the workspace\n- writeFile: Modify files (e.g., package.json files)\n- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)\n- listFiles: Explore directory structure\n- askUser: Ask questions when you need clarification or approval for major changes\n\nWork efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
 				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
 			
 			// Build the request
@@ -2153,6 +2525,11 @@ Work efficiently: read files to understand the current state, make necessary cha
 		if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 	} finally {
 		if (progress) completeProgress(progress);
+		// Clear timeout watchdog if set
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+			timeoutId = null;
+		}
 	}
 }
 
@@ -2189,12 +2566,17 @@ async function validateEnvironment() {
 // ============================================================================
 
 async function run() {
-	// Check for required environment variables first
-	await validateEnvironment();
+	const parsedArgs = parseArgs(process.argv);
+	
+	// Skip environment validation for creation commands (they don't need API keys)
+	const skipValidation = parsedArgs.cmd === 'new-suite' || parsedArgs.cmd === 'new-scenario';
+	
+	// Check for required environment variables first (unless skipping for creation commands)
+	if (!skipValidation) {
+		await validateEnvironment();
+	}
 	
 	// Dev server will be started only when viewing statistics
-	
-	const parsedArgs = parseArgs(process.argv);
 	
 	// If no arguments provided, show interactive menu
 	if (process.argv.length <= 2) {
@@ -2483,6 +2865,24 @@ async function run() {
 		return;
 	}
 	
+	// Handle new-suite command
+	if (parsedArgs.cmd === 'new-suite') {
+		await createNewSuite(parsedArgs.name);
+		return;
+	}
+	
+	// Handle new-scenario command
+	if (parsedArgs.cmd === 'new-scenario') {
+		const { suite, name } = parsedArgs;
+		if (!suite || !name) {
+			log.warning('Usage: pnpm bench --new-scenario <suite> <name>');
+			console.log('  Or run without arguments for interactive mode');
+			return;
+		}
+		await createNewScenario(suite, name);
+		return;
+	}
+	
 	const { cmd, suite, scenario, tier, agent, model, noJson } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
@@ -2513,15 +2913,26 @@ process.on('exit', () => {
 });
 
 process.on('SIGINT', () => {
-	console.log('\nShutting down...');
-	stopDevServer();
-	process.exit(0);
+    console.log('\nShutting down...');
+    try {
+        const logger = BenchmarkLogger.getInstance();
+        // Mark current run incomplete if any
+        (logger as any).markRunIncomplete?.('Interrupted by user (SIGINT)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+    } catch {}
+    stopDevServer();
+    process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-	console.log('\nShutting down...');
-	stopDevServer();
-	process.exit(0);
+    console.log('\nShutting down...');
+    try {
+        const logger = BenchmarkLogger.getInstance();
+        (logger as any).markRunIncomplete?.('Interrupted by system (SIGTERM)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+    } catch {}
+    stopDevServer();
+    process.exit(0);
 });
 
 process.on('uncaughtException', (err) => {

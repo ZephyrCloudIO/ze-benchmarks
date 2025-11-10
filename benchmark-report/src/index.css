@@ -4,74 +4,86 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
+    --background: 0 0 0;
+    --foreground: 255 255 255;
+    --card: 0 0 0;
+    --card-foreground: 255 255 255;
+    --popover: 0 0 0;
+    --popover-foreground: 255 255 255;
+    --primary: 163 215 224;
+    --primary-foreground: 10 10 15;
+    --secondary: 178 230 215;
+    --secondary-foreground: 10 10 15;
+    --muted: 30 30 45;
+    --muted-foreground: 163 215 224;
+    --accent: 251 175 60;
+    --accent-foreground: 10 10 15;
+    --destructive: 245 162 127;
+    --destructive-foreground: 10 10 15;
+    --success: 34 197 94;
+    --success-foreground: 10 10 15;
+    --warning: 251 191 36;
+    --warning-foreground: 10 10 15;
+    --info: 59 130 246;
+    --info-foreground: 10 10 15;
+    --border: 45 45 65;
+    --input: 45 45 65;
+    --ring: 163 215 224;
+    --chart-1: 163 215 224;
+    --chart-2: 178 230 215;
+    --chart-3: 244 195 180;
+    --chart-4: 245 162 127;
+    --chart-5: 251 175 60;
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: 0 0 0;
+    --sidebar-foreground: 255 255 255;
+    --sidebar-primary: 163 215 224;
+    --sidebar-primary-foreground: 10 10 15;
+    --sidebar-accent: 0 0 0;
+    --sidebar-accent-foreground: 163 215 224;
+    --sidebar-border: 45 45 65;
+    --sidebar-ring: 163 215 224;
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --background: 0 0 0;
+    --foreground: 255 255 255;
+    --card: 0 0 0;
+    --card-foreground: 255 255 255;
+    --popover: 0 0 0;
+    --popover-foreground: 255 255 255;
+    --primary: 163 215 224;
+    --primary-foreground: 5 5 10;
+    --secondary: 178 230 215;
+    --secondary-foreground: 5 5 10;
+    --muted: 25 25 40;
+    --muted-foreground: 163 215 224;
+    --accent: 251 175 60;
+    --accent-foreground: 5 5 10;
+    --destructive: 245 162 127;
+    --destructive-foreground: 5 5 10;
+    --success: 34 197 94;
+    --success-foreground: 5 5 10;
+    --warning: 251 191 36;
+    --warning-foreground: 5 5 10;
+    --info: 59 130 246;
+    --info-foreground: 5 5 10;
+    --border: 40 40 60;
+    --input: 40 40 60;
+    --ring: 163 215 224;
+    --chart-1: 163 215 224;
+    --chart-2: 178 230 215;
+    --chart-3: 244 195 180;
+    --chart-4: 245 162 127;
+    --chart-5: 251 175 60;
+    --sidebar: 0 0 0;
+    --sidebar-foreground: 255 255 255;
+    --sidebar-primary: 163 215 224;
+    --sidebar-primary-foreground: 5 5 10;
+    --sidebar-accent: 0 0 0;
+    --sidebar-accent-foreground: 163 215 224;
+    --sidebar-border: 40 40 60;
+    --sidebar-ring: 163 215 224;
 }
 
 @theme inline {
@@ -91,6 +103,12 @@
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -114,10 +132,52 @@
 }
 
 @layer base {
+    html {
+        @apply bg-background text-foreground;
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+    }
     * {
         @apply border-border outline-ring/50;
     }
     body {
         @apply bg-background text-foreground;
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+    }
+    #root {
+        background-color: rgb(var(--background));
+        color: rgb(var(--foreground));
+        min-height: 100vh;
+    }
+    
+    /* Chart text colors - ensure all chart text is white */
+    .recharts-cartesian-axis-tick,
+    .recharts-cartesian-axis-tick text,
+    .recharts-polar-angle-axis-tick text,
+    .recharts-radial-bar-axis-tick text,
+    .recharts-legend-item-text,
+    .recharts-tooltip,
+    .recharts-tooltip-item,
+    .recharts-tooltip-label,
+    .recharts-label {
+        fill: rgb(var(--foreground)) !important;
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    /* Chart tooltip background and text */
+    .recharts-default-tooltip {
+        background-color: rgb(var(--background)) !important;
+        border-color: rgb(var(--border)) !important;
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    .recharts-default-tooltip .recharts-tooltip-label {
+        color: rgb(var(--foreground)) !important;
+    }
+    
+    .recharts-default-tooltip .recharts-tooltip-item-name,
+    .recharts-default-tooltip .recharts-tooltip-item-value {
+        color: rgb(var(--foreground)) !important;
     }
 }

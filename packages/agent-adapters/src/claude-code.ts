@@ -9,6 +9,12 @@ type ParsedClaudeResponse = {
 	toolCalls?: number;
 };
 
+type ClaudeCodeAdapterOptions = {
+	model?: string;
+	defaultMaxTurns?: number;
+	permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+};
+
 export class ClaudeCodeAdapter implements AgentAdapter {
 	name = 'claude-code';
 	private model?: string;

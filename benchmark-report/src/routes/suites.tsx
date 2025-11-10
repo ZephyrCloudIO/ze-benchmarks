@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useDatabase } from '@/DatabaseProvider'
 import { useEffect, useState } from 'react'
+import { computeQuantiles } from '@/lib/chart-utils'
 
 export const Route = createFileRoute('/suites')({
   component: SuitesPage,
@@ -23,6 +24,7 @@ interface ScenarioStats {
   avgScore: number;
   minScore: number;
   maxScore: number;
+  medianScore: number;
 }
 
 function SuitesPage() {
@@ -87,8 +89,20 @@ function SuitesPage() {
           avgScore: row[5] as number,
           minScore: row[6] as number,
           maxScore: row[7] as number,
+          medianScore: 0,
         }));
-        setScenarioStats(scenarios);
+        // compute median per (suite,scenario,tier)
+        const withMedians = scenarios.map(s => {
+          const runs = db.exec(`
+            SELECT weighted_score FROM benchmark_runs
+            WHERE weighted_score IS NOT NULL
+              AND suite = '${s.suite}' AND scenario = '${s.scenario}' AND tier = '${s.tier}'
+          `);
+          const values = runs[0]?.values.map(v => v[0] as number) || [];
+          const [, q50] = computeQuantiles(values, [0.25, 0.5]);
+          return { ...s, medianScore: isNaN(q50) ? 0 : q50 };
+        });
+        setScenarioStats(withMedians);
       }
     } catch (err) {
       console.error('Failed to fetch suite stats:', err);
@@ -100,7 +114,7 @@ function SuitesPage() {
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64 text-destructive">Error: {error.message}</div>;
   }
 
   return (
@@ -139,40 +153,55 @@ function SuitesPage() {
         ))}
       </div>
 
-      {/* Scenario Comparison Table */}
+      {/* Scenario Comparison by Tier */}
       <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-2xl font-semibold mb-4">Scenario Performance</h2>
-        <div className="space-y-2">
-          {scenarioStats.map((scenario, idx) => (
-            <div key={idx} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
-              <div className="flex-1">
-                <div className="font-medium">{scenario.scenario}</div>
-                <div className="text-sm text-muted-foreground flex gap-2">
-                  <span>{scenario.suite}</span>
-                  <span>•</span>
-                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">
-                    {scenario.tier}
-                  </span>
+        <h2 className="text-2xl font-semibold mb-4">Scenario Performance by Tier</h2>
+        <div className="space-y-6">
+          {Array.from(new Set(scenarioStats.map(s => s.tier))).sort().map((tier) => {
+            const scenarios = scenarioStats
+              .filter(s => s.tier === tier)
+              .sort((a, b) => b.medianScore - a.medianScore);
+            return (
+              <div key={tier}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xl font-bold">Tier {tier}</h3>
+                  <span className="text-xs text-muted-foreground">sorted by median</span>
+                </div>
+                <div className="space-y-2">
+                  {scenarios.map((scenario, idx) => (
+                    <div key={`${tier}-${idx}`} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+                      <div className="flex-1">
+                        <div className="font-medium">{scenario.scenario}</div>
+                        <div className="text-sm text-muted-foreground flex gap-2">
+                          <span>{scenario.suite}</span>
+                          <span>•</span>
+                          <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">
+                            {scenario.tier}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{scenario.medianScore.toFixed(2)}</div>
+                        <div className="text-xs text-muted-foreground">median</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-sm">{scenario.minScore.toFixed(2)} - {scenario.maxScore.toFixed(2)}</div>
+                        <div className="text-xs text-muted-foreground">min - max</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{scenario.successRate.toFixed(1)}%</div>
+                        <div className="text-xs text-muted-foreground">success</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{scenario.totalRuns}</div>
+                        <div className="text-xs text-muted-foreground">runs</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold">{scenario.avgScore.toFixed(2)}</div>
-                <div className="text-xs text-muted-foreground">avg</div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold text-sm">{scenario.minScore.toFixed(2)} - {scenario.maxScore.toFixed(2)}</div>
-                <div className="text-xs text-muted-foreground">min - max</div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold">{scenario.successRate.toFixed(1)}%</div>
-                <div className="text-xs text-muted-foreground">success</div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold">{scenario.totalRuns}</div>
-                <div className="text-xs text-muted-foreground">runs</div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
