@@ -1,8 +1,7 @@
-// Export the Worker-based logger (POSTs to Worker API)
-export { BenchmarkLogger } from './worker-logger';
+// Export the local SQLite logger (writes directly to SQLite file)
+export { BenchmarkLogger } from './logger';
 
-// Legacy exports for backward compatibility
-// Note: Direct database queries are deprecated - use Worker API endpoints instead
+// Export schema and types
 export { SCHEMA } from './schema';
 export type {
   RunStatistics,

@@ -11,82 +11,76 @@
 8. [Local Development](#local-development)
 9. [Production Deployment](#production-deployment)
 10. [Technology Stack](#technology-stack)
+11. [Worker Development Guide](#worker-development-guide)
 
 ---
 
 ## Overview
 
-The ze-benchmarks system is a comprehensive benchmark harness and reporting platform for evaluating AI agent performance. The system recently underwent a major architectural transformation from a file-based architecture to a distributed, API-driven architecture using Cloudflare Workers and D1 database.
+The ze-benchmarks system is a comprehensive benchmark harness and reporting platform for evaluating AI agent performance. The system uses a file-based architecture with local SQLite database for simplicity and ease of use.
 
-### Key Goals of the Rewrite
+### Key Design Principles
 
-- **Unified Architecture**: Same code path for local development and production
-- **Real-time Updates**: Eliminate file sync issues with HTTP-based data flow
-- **Scalability**: Edge-deployed serverless architecture
-- **Type Safety**: End-to-end TypeScript with Drizzle ORM
-- **Developer Experience**: Single-command startup with mprocs
-- **Zero Cost**: Runs entirely on Cloudflare's free tier
+- **Simplicity**: Direct file-based storage with SQLite
+- **Local-First**: All data stored locally, no external dependencies required
+- **Type Safety**: End-to-end TypeScript
+- **Developer Experience**: Simple setup, no server required
+- **Optional Cloud Sync**: Worker API available for syncing to Cloudflare D1 when needed
 
 ---
 
-## Architecture Transformation
+## Current Architecture
 
-### Before: File-Based Architecture
-
-```mermaid
-graph LR
-    A[CLI Benchmark Harness] -->|writes| B[SQLite File]
-    B -->|served as static asset| C[Frontend]
-    C -->|loads with sql.js| D[Browser SQLite]
-
-    style B fill:#f9f,stroke:#333,stroke-width:2px
-    style D fill:#fcf,stroke:#333,stroke-width:2px
-```
-
-**Problems with Old Architecture:**
-- File locking issues with concurrent writes
-- Large SQLite file served to browser (poor performance)
-- No real-time updates without page refresh
-- sql.js overhead in browser
-- Difficult to query and analyze data
-- No API for external integrations
-
-### After: API-Driven Architecture
+### File-Based Architecture
 
 ```mermaid
 graph TB
     subgraph "Benchmark Execution"
         A[CLI Harness]
+        B[BenchmarkLogger]
     end
 
-    subgraph "Cloudflare Edge"
-        B[Worker API]
-        C[D1 Database]
+    subgraph "Local Storage"
+        C[(SQLite Database<br/>benchmarks.db)]
     end
 
     subgraph "Frontend"
         D[React App]
-        E[TanStack Query]
+        E[sql.js WASM]
     end
 
-    A -->|POST /api/results| B
-    B -->|SQL via Drizzle| C
-    D -->|HTTP GET| B
-    B -->|JSON| D
-    E -->|caching & state| D
+    subgraph "Optional: Cloud Sync"
+        F[Worker API]
+        G[(D1 Database)]
+        H[Sync Script]
+    end
 
-    style B fill:#f96,stroke:#333,stroke-width:2px
-    style C fill:#9cf,stroke:#333,stroke-width:2px
+    A -->|writes| B
+    B -->|writes| C
+    C -->|served as static file| D
+    D -->|loads with| E
+    E -->|queries| C
+    
+    H -.->|optional sync| F
+    F -.->|stores| G
+
+    style C fill:#9cf,stroke:#333,stroke-width:3px
     style E fill:#9f9,stroke:#333,stroke-width:2px
+    style F fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style G fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
-**Benefits of New Architecture:**
-- Real-time data flow via HTTP
-- Edge-deployed for global performance
-- Type-safe queries with Drizzle ORM
-- Efficient caching with TanStack Query
-- RESTful API for any client
-- Scalable serverless infrastructure
+**Current Architecture Benefits:**
+- **Simple Setup**: No server required, works entirely locally
+- **Fast Development**: Direct file access, no network latency
+- **Self-Contained**: All data in one SQLite file
+- **Easy Backup**: Just copy the database file
+- **Optional Cloud Sync**: Worker available for syncing to D1 when needed
+
+**Optional Cloudflare Worker:**
+- Available for syncing local SQLite data to Cloudflare D1
+- Manual sync via `pnpm sync` command
+- Useful for sharing data across environments or CI/CD
 
 ---
 
@@ -96,44 +90,41 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph "Development Environment"
+    subgraph "Benchmark Execution"
         CLI[Benchmark CLI]
-        MPROCS[mprocs orchestrator]
+        LOGGER[BenchmarkLogger]
     end
 
-    subgraph "Cloudflare Infrastructure"
-        WORKER[Cloudflare Worker]
-        D1[(D1 Database)]
-        ROUTER[itty-router]
+    subgraph "Local Storage"
+        SQLITE[(SQLite Database<br/>benchmark-report/public/benchmarks.db)]
     end
 
     subgraph "Frontend Application"
         REACT[React App]
-        TANSTACK[TanStack Query]
-        VITE[Vite Dev Server]
+        SQLJS[sql.js WASM]
+        RSBUILD[Rsbuild Dev Server]
     end
 
-    subgraph "Data Layer"
-        DRIZZLE[Drizzle ORM]
-        SCHEMA[Database Schema]
+    subgraph "Optional: Cloudflare Worker"
+        WORKER[Cloudflare Worker]
+        D1[(D1 Database)]
+        SYNC[Sync Script]
     end
 
-    CLI -->|POST benchmark results| WORKER
-    MPROCS -->|manages| WORKER
-    MPROCS -->|manages| VITE
+    CLI -->|writes| LOGGER
+    LOGGER -->|writes| SQLITE
+    SQLITE -->|served as static file| REACT
+    REACT -->|queries via| SQLJS
+    SQLJS -->|reads| SQLITE
+    RSBUILD -->|serves| REACT
+    
+    SYNC -.->|optional| WORKER
+    WORKER -.->|stores| D1
 
-    WORKER --> ROUTER
-    ROUTER --> DRIZZLE
-    DRIZZLE --> SCHEMA
-    SCHEMA --> D1
-
-    REACT --> TANSTACK
-    TANSTACK -->|HTTP GET| WORKER
-    VITE --> REACT
-
-    style WORKER fill:#f96,stroke:#333,stroke-width:3px
-    style D1 fill:#9cf,stroke:#333,stroke-width:3px
-    style TANSTACK fill:#9f9,stroke:#333,stroke-width:2px
+    style SQLITE fill:#9cf,stroke:#333,stroke-width:3px
+    style SQLJS fill:#9f9,stroke:#333,stroke-width:2px
+    style WORKER fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style D1 fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 ### Architecture Layers
@@ -146,56 +137,35 @@ graph TB
         A3[Data Tables]
     end
 
-    subgraph "Data Management Layer"
-        B1[TanStack Query]
-        B2[API Client]
-        B3[Cache Management]
-    end
-
-    subgraph "API Layer"
-        C1[Worker Router]
-        C2[Middleware Stack]
-        C3[Request Handlers]
-    end
-
-    subgraph "Business Logic Layer"
-        D1[Stats Aggregation]
-        D2[Batch Processing]
-        D3[Run Management]
-    end
-
     subgraph "Data Access Layer"
-        E1[Drizzle ORM]
-        E2[Query Builder]
-        E3[Type Inference]
+        B1[Database Context]
+        B2[sql.js WASM]
+        B3[SQL Queries]
     end
 
     subgraph "Persistence Layer"
-        F1[(D1 Database)]
-        F2[Schema Migrations]
+        C1[(SQLite Database)]
+        C2[File System]
+    end
+
+    subgraph "Benchmark Execution"
+        D1[CLI Harness]
+        D2[BenchmarkLogger]
     end
 
     A1 --> B1
     A2 --> B1
     A3 --> B1
     B1 --> B2
-    B2 --> C1
+    B2 --> B3
+    B3 --> C1
     C1 --> C2
-    C2 --> C3
-    C3 --> D1
-    C3 --> D2
-    C3 --> D3
-    D1 --> E1
-    D2 --> E1
-    D3 --> E1
-    E1 --> E2
-    E2 --> E3
-    E3 --> F1
-    F2 --> F1
+    
+    D1 --> D2
+    D2 --> C1
 
-    style C1 fill:#f96,stroke:#333,stroke-width:2px
-    style E1 fill:#fc9,stroke:#333,stroke-width:2px
-    style F1 fill:#9cf,stroke:#333,stroke-width:2px
+    style B2 fill:#9f9,stroke:#333,stroke-width:2px
+    style C1 fill:#9cf,stroke:#333,stroke-width:3px
 ```
 
 ---
@@ -208,13 +178,9 @@ graph TB
 sequenceDiagram
     participant CLI as Benchmark CLI
     participant Logger as BenchmarkLogger
-    participant Worker as Cloudflare Worker
-    participant Auth as Auth Middleware
-    participant API as Submit API
-    participant ORM as Drizzle ORM
-    participant D1 as D1 Database
+    participant SQLite as SQLite Database
     participant Frontend as React Frontend
-    participant Query as TanStack Query
+    participant SQLJS as sql.js WASM
 
     CLI->>Logger: startRun(suite, scenario, tier, agent)
     Logger->>Logger: Store in memory
@@ -223,201 +189,81 @@ sequenceDiagram
     CLI->>Logger: logTelemetry(...)
     CLI->>Logger: completeRun(scores, metadata)
 
-    Logger->>Worker: POST /api/results
-    Note over Logger,Worker: Authorization: Bearer API_KEY
-    Worker->>Auth: Validate API key
-    Auth-->>Worker: Authorized
-    Worker->>API: submitResults(payload)
-    API->>ORM: insertRun(data)
-    ORM->>D1: INSERT INTO benchmark_runs
-    API->>ORM: insertEvaluation(data)
-    ORM->>D1: INSERT INTO evaluation_results
-    API->>ORM: insertTelemetry(data)
-    ORM->>D1: INSERT INTO run_telemetry
-    D1-->>API: Success
-    API-->>Worker: {success: true, runId}
-    Worker-->>Logger: 201 Created
-    Logger-->>CLI: Submission complete
+    Logger->>SQLite: INSERT INTO benchmark_runs
+    Logger->>SQLite: INSERT INTO evaluation_results
+    Logger->>SQLite: INSERT INTO run_telemetry
+    SQLite-->>Logger: Success
+    Logger-->>CLI: Run logged
 
-    Note over Frontend: User refreshes dashboard
-    Frontend->>Query: useDashboardStats()
-    Query->>Worker: GET /api/stats
-    Worker->>ORM: getGlobalStatistics()
-    ORM->>D1: SELECT aggregated stats
-    D1-->>ORM: Results
-    ORM-->>Worker: Stats data
-    Worker-->>Query: JSON Response
-    Query-->>Frontend: Cached & rendered
+    Note over Frontend: User opens dashboard
+    Frontend->>SQLJS: initSqlJs()
+    SQLJS->>SQLite: Load database file
+    SQLite-->>SQLJS: Database loaded
+    Frontend->>SQLJS: SELECT * FROM benchmark_runs
+    SQLJS->>SQLite: Execute query
+    SQLite-->>SQLJS: Results
+    SQLJS-->>Frontend: Rendered in UI
 ```
 
 ### Local Development Data Flow
 
 ```mermaid
-graph LR
-    subgraph "Terminal 1: mprocs"
-        M[mprocs]
-    end
-
-    subgraph "Process: Worker"
-        W[wrangler dev<br/>localhost:8787]
-        D1L[(Local D1 SQLite)]
-    end
-
-    subgraph "Process: Frontend"
-        V[vite dev<br/>localhost:3000]
-    end
-
-    subgraph "Terminal 2: CLI"
+graph TB
+    subgraph "Terminal: CLI"
         C[pnpm bench]
         L[BenchmarkLogger]
     end
 
-    M -->|starts| W
-    M -->|starts| V
-    W --> D1L
+    subgraph "File System"
+        DB[(benchmark-report/public/benchmarks.db)]
+    end
 
-    C --> L
-    L -->|POST| W
-    V -->|GET| W
+    subgraph "Frontend Dev Server"
+        RS[Rsbuild Dev Server<br/>localhost:3000]
+        REACT[React App]
+        SQLJS[sql.js WASM]
+    end
 
-    style M fill:#f9f,stroke:#333,stroke-width:2px
-    style W fill:#f96,stroke:#333,stroke-width:2px
-    style D1L fill:#9cf,stroke:#333,stroke-width:2px
+    C -->|executes| L
+    L -->|writes| DB
+    RS -->|serves| REACT
+    REACT -->|loads| SQLJS
+    SQLJS -->|reads| DB
+
+    style DB fill:#9cf,stroke:#333,stroke-width:3px
+    style SQLJS fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
-### Production Data Flow
+### Optional Cloud Sync Flow
 
 ```mermaid
-graph TB
-    subgraph "GitHub Actions"
-        GH[CI/CD Pipeline]
+graph LR
+    subgraph "Local"
+        DB[(Local SQLite)]
+        SYNC[Sync Script<br/>pnpm sync]
     end
 
-    subgraph "Cloudflare Edge Network"
-        CF[Cloudflare Workers<br/>Distributed Globally]
-        D1P[(D1 Database<br/>Primary Region)]
+    subgraph "Cloudflare"
+        WORKER[Worker API]
+        D1[(D1 Database)]
     end
 
-    subgraph "Static Hosting"
-        CDN[Frontend on CDN<br/>Vercel/Netlify/CF Pages]
-    end
+    SYNC -->|reads| DB
+    SYNC -->|POST /api/results| WORKER
+    WORKER -->|stores| D1
 
-    subgraph "Users"
-        U1[Developer 1]
-        U2[Developer 2]
-        U3[Browser Users]
-    end
-
-    GH -->|POST results| CF
-    CF --> D1P
-
-    U1 -->|HTTPS| CDN
-    U2 -->|HTTPS| CDN
-    U3 -->|HTTPS| CDN
-    CDN -->|API calls| CF
-
-    style CF fill:#f96,stroke:#333,stroke-width:3px
-    style D1P fill:#9cf,stroke:#333,stroke-width:3px
-    style CDN fill:#9f9,stroke:#333,stroke-width:2px
+    style SYNC fill:#fc9,stroke:#333,stroke-width:2px
+    style WORKER fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style D1 fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 ---
 
 ## Component Details
 
-### 1. Cloudflare Worker API
+### 1. CLI Benchmark Logger
 
-**Location**: `worker/src/`
-
-```mermaid
-graph TB
-    subgraph "Worker Entry Point"
-        A[index.ts]
-    end
-
-    subgraph "Routing Layer"
-        B[itty-router]
-    end
-
-    subgraph "Middleware"
-        C1[CORS Handler]
-        C2[Auth Middleware]
-        C3[Error Handler]
-    end
-
-    subgraph "API Endpoints"
-        D1[Runs API]
-        D2[Batches API]
-        D3[Stats API]
-        D4[Submit API]
-    end
-
-    subgraph "Database Layer"
-        E1[Drizzle ORM]
-        E2[Schema Definitions]
-        E3[Type Inference]
-    end
-
-    subgraph "Utilities"
-        F1[Response Helpers]
-        F2[Type Definitions]
-    end
-
-    A --> B
-    B --> C1
-    B --> C2
-    C1 --> D1
-    C2 --> D4
-    D1 --> E1
-    D2 --> E1
-    D3 --> E1
-    D4 --> E1
-    E1 --> E2
-    E2 --> E3
-    D1 --> F1
-
-    style A fill:#f96,stroke:#333,stroke-width:2px
-    style E1 fill:#fc9,stroke:#333,stroke-width:2px
-```
-
-**Key Files**:
-- `index.ts`: Main entry point, router configuration
-- `api/runs.ts`: Run queries (list, details, evaluations, telemetry)
-- `api/batches.ts`: Batch operations and analytics
-- `api/stats.ts`: Statistics and aggregations
-- `api/submit.ts`: Result submission endpoints (authenticated)
-- `db/schema.ts`: Drizzle ORM schema definitions
-- `middleware/`: CORS, authentication, error handling
-
-**Responsibilities**:
-- Route HTTP requests to appropriate handlers
-- Validate API authentication for write operations
-- Execute type-safe database queries via Drizzle ORM
-- Return JSON responses with proper CORS headers
-- Handle errors gracefully with detailed messages
-
-### 2. Database Layer (D1 + Drizzle)
-
-**Schema**: `worker/src/db/schema.ts`
-
-The database uses Drizzle ORM for type-safe queries against Cloudflare D1 (SQLite-compatible).
-
-**Tables**:
-1. `batch_runs`: Batch-level aggregations
-2. `benchmark_runs`: Individual benchmark run records
-3. `evaluation_results`: Evaluator scores for each run
-4. `run_telemetry`: Token usage, cost, duration metrics
-
-**Indexes** (for query performance):
-- Suite + Scenario combination
-- Agent lookup
-- Status filtering
-- Batch ID relationships
-- Success flag filtering
-
-### 3. CLI Benchmark Logger
-
-**Location**: `packages/database/src/worker-logger.ts`
+**Location**: `packages/database/src/logger.ts`
 
 ```mermaid
 stateDiagram-v2
@@ -426,24 +272,50 @@ stateDiagram-v2
     RunActive --> CollectingData: logEvaluation()
     RunActive --> CollectingData: logTelemetry()
     CollectingData --> CollectingData: More evaluations
-    CollectingData --> Submitting: completeRun() or failRun()
-    Submitting --> Submitted: POST to Worker
-    Submitted --> [*]: clearPendingData()
+    CollectingData --> Writing: completeRun() or failRun()
+    Writing --> Written: Write to SQLite
+    Written --> [*]: clearPendingData()
 
-    note right of Submitting
-        POST /api/results
-        with Authorization header
+    note right of Writing
+        Direct SQLite writes
+        using better-sqlite3
     end note
 ```
 
 **Key Features**:
 - Singleton pattern for global access
 - In-memory accumulation of run data
-- Automatic submission on completion/failure
-- Environment-based configuration
-- Graceful fallback if Worker URL not configured
+- Direct SQLite writes using `better-sqlite3`
+- Automatic database initialization
+- Type-safe database operations
 
-### 4. Frontend Architecture
+**Key Files**:
+- `logger.ts`: Main BenchmarkLogger class
+- `schema.ts`: Database schema definitions
+
+### 2. Database Layer (SQLite)
+
+**Schema**: `packages/database/src/schema.ts`
+
+The database uses SQLite with `better-sqlite3` for CLI operations and `sql.js` WASM for browser access.
+
+**Tables**:
+1. `batch_runs`: Batch-level aggregations
+2. `benchmark_runs`: Individual benchmark run records
+3. `evaluation_results`: Evaluator scores for each run
+4. `run_telemetry`: Token usage, cost, duration metrics
+
+**Database Location**:
+- `benchmark-report/public/benchmarks.db` - Served as static file to frontend
+
+**Indexes** (for query performance):
+- Suite + Scenario combination
+- Agent lookup
+- Status filtering
+- Batch ID relationships
+- Success flag filtering
+
+### 3. Frontend Architecture
 
 **Location**: `benchmark-report/src/`
 
@@ -454,15 +326,15 @@ graph TB
         B[Router]
     end
 
-    subgraph "State Management"
-        C[QueryClientProvider]
-        D[TanStack Query Cache]
+    subgraph "Database Context"
+        C[DatabaseProvider]
+        D[useDatabase Hook]
     end
 
-    subgraph "Data Layer"
-        E[API Client]
-        F[Custom Hooks]
-        G[Query Keys]
+    subgraph "Data Access Layer"
+        E[sql.js WASM]
+        F[SQL Queries]
+        G[Database Utils]
     end
 
     subgraph "UI Components"
@@ -472,41 +344,58 @@ graph TB
         H4[Stats Cards]
     end
 
-    subgraph "Backend Communication"
-        I[Worker API]
+    subgraph "Static Assets"
+        I[(SQLite Database File)]
     end
 
     A --> B
     A --> C
     C --> D
     B --> H1
-    H1 --> F
-    H2 --> F
-    H3 --> F
-    H4 --> F
-    F --> E
+    H1 --> D
+    H2 --> D
+    H3 --> D
+    H4 --> D
+    D --> E
+    E --> F
     F --> G
-    E --> I
-    D --> F
+    G --> I
 
     style C fill:#9f9,stroke:#333,stroke-width:2px
-    style E fill:#fc9,stroke:#333,stroke-width:2px
-    style I fill:#f96,stroke:#333,stroke-width:2px
+    style E fill:#9f9,stroke:#333,stroke-width:2px
+    style I fill:#9cf,stroke:#333,stroke-width:3px
 ```
 
 **Key Files**:
-- `lib/api-client.ts`: Type-safe API client with all endpoints
-- `hooks/use-api-queries.ts`: TanStack Query hooks with cache keys
-- `DatabaseProvider.tsx`: QueryClient provider (replaces old sql.js provider)
-- `routes/index.tsx`: Dashboard with real-time data fetching
+- `DatabaseProvider.tsx`: Context provider for database access
+- `lib/database.ts`: Database initialization and query utilities
+- `routes/index.tsx`: Dashboard with direct SQL queries
+- `scripts/copy-wasm.js`: Script to copy sql.js WASM to public directory
 
-**Data Fetching Strategy**:
-- TanStack Query for server state management
-- 30-second stale time for frequently updated data
-- 60-second stale time for stable data (run details)
-- Automatic background refetching
-- Manual refresh capability
+**Data Access Strategy**:
+- Direct SQL queries via sql.js WASM
+- Database loaded once on app initialization
+- Manual refresh capability via `refreshDatabase()`
 - Client-side aggregations for complex stats
+- No network requests required
+
+### 4. Optional: Cloudflare Worker API
+
+**Location**: `worker/src/`
+
+The Worker API is optional and used only for syncing local SQLite data to Cloudflare D1.
+
+**Key Features**:
+- Manual sync via `pnpm sync` command
+- Reads from local SQLite database
+- Posts to Worker API endpoints
+- Useful for sharing data across environments or CI/CD
+
+**Sync Script**: `worker/scripts/sync.ts`
+- Reads from `benchmark-report/public/benchmarks.db`
+- Transforms data to match Worker API format
+- Posts to `/api/results` and `/api/results/batch`
+- Supports `--dry-run`, `--limit`, and `--force` options
 
 ---
 
@@ -1176,3 +1065,441 @@ This architecture transformation represents a significant modernization of the z
 - ✅ Excellent developer experience
 
 The new architecture provides a solid foundation for future enhancements while maintaining simplicity and ease of use.
+
+---
+
+## Worker Development Guide
+
+This section provides comprehensive guides for working with the Cloudflare Worker and D1 database.
+
+### Starting the Worker Server
+
+#### Quick Start
+
+**Local D1 (default):**
+```bash
+cd worker
+pnpm dev
+```
+
+This starts the Worker on **http://localhost:8787** using **local D1 database**.
+
+**Remote D1 (Cloudflare):**
+```bash
+cd worker
+pnpm dev:remote
+```
+
+This starts the Worker on **http://localhost:8787** but connects to **remote D1 database** on Cloudflare.
+
+**Start Everything (Worker + Frontend):**
+```bash
+# From root directory
+pnpm dev
+```
+
+This starts:
+- **Worker** on `http://localhost:8787`
+- **Frontend** on `http://localhost:3000`
+
+#### Production Deployment
+
+To deploy the Worker to Cloudflare:
+
+```bash
+cd worker
+pnpm run deploy
+```
+
+**Note:** Use `pnpm run deploy` (not `pnpm deploy`) because `deploy` is a script, not a workspace command.
+
+This will give you a URL like:
+- `https://ze-benchmarks-api.your-subdomain.workers.dev`
+
+#### Verify Server is Running
+
+**Check Local Worker:**
+```bash
+curl http://localhost:8787/health
+```
+
+Should return:
+```json
+{"status":"ok","timestamp":"2025-11-11T00:00:00.000Z"}
+```
+
+**Check Remote Worker:**
+```bash
+curl https://your-worker.workers.dev/health
+```
+
+### Local vs Remote D1 in Development
+
+When running `wrangler dev`, you can choose to use either **local D1** or **remote D1** (Cloudflare).
+
+| Command | D1 Database | Use Case |
+|---------|-------------|----------|
+| `pnpm dev` | **Local D1** | Fast development, no Cloudflare needed |
+| `pnpm dev:remote` | **Remote D1** | Test against production database |
+
+#### Local D1 (Default)
+
+**What happens:**
+- Worker runs on `http://localhost:8787`
+- Uses **local D1 database** (stored in `.wrangler/state/v3/d1/`)
+- Fast startup, no network calls
+- Data is stored locally on your machine
+- Good for: Development, testing, prototyping
+
+**Output shows:**
+```
+env.DB (ze-benchmarks)               D1 Database               local
+```
+
+#### Remote D1 (Cloudflare)
+
+**What happens:**
+- Worker runs on `http://localhost:8787` (still localhost)
+- Connects to **remote D1 database** on Cloudflare
+- Slower startup (needs to connect to Cloudflare)
+- Data is stored in Cloudflare
+- Good for: Testing against production data, debugging production issues
+
+**Output shows:**
+```
+env.DB (ze-benchmarks)               D1 Database               remote
+```
+
+#### When to Use Each
+
+**Use Local D1 (`pnpm dev`) when:**
+- ✅ Developing new features
+- ✅ Testing locally
+- ✅ Don't need production data
+- ✅ Want fast iteration
+- ✅ Working offline
+
+**Use Remote D1 (`pnpm dev:remote`) when:**
+- ✅ Testing against production database
+- ✅ Debugging production issues
+- ✅ Need to see real data
+- ✅ Testing migrations on remote database
+- ✅ Verifying remote database connectivity
+
+#### Configuration
+
+Make sure your `wrangler.toml` has:
+```toml
+[[ d1_databases ]]
+binding = "DB"
+database_name = "ze-benchmarks"
+database_id = "your-database-id"  # Required for remote
+preview_database_id = "your-preview-database-id"  # For dev:remote
+```
+
+**Note:** For remote D1, you need a valid `database_id` in `wrangler.toml`. For `dev:remote`, use `preview_database_id` to avoid affecting production.
+
+### Database Setup
+
+#### Issue: "Couldn't find a D1 DB" Error
+
+If you see this error when running `pnpm db:push:local`:
+
+```
+✘ [ERROR] Couldn't find a D1 DB with the name or binding 'ze-benchmarks' in your wrangler.toml file.
+```
+
+This means the local D1 database hasn't been initialized yet.
+
+#### Solution
+
+**Option 1: Initialize with wrangler dev (Recommended)**
+
+Local D1 databases are automatically created when you run `wrangler dev`.
+
+1. **Start the worker** (this initializes the local D1 database):
+   ```bash
+   cd worker
+   pnpm dev
+   ```
+   Let it run for a few seconds, then stop it (Ctrl+C).
+
+2. **Now run the migration:**
+   ```bash
+   pnpm db:push:local
+   ```
+
+**Option 2: Use Wrangler Auto-Migrations**
+
+Wrangler can auto-apply migrations when you run `wrangler dev` if `migrations_dir` is set in `wrangler.toml` (which it is).
+
+1. **Just run the worker:**
+   ```bash
+   cd worker
+   pnpm dev
+   ```
+
+2. Wrangler will automatically apply migrations from the `drizzle/` folder.
+
+**Option 3: Create Remote Database**
+
+If you need a remote database:
+
+1. **Create the D1 database** (requires Cloudflare account):
+   ```bash
+   cd worker
+   wrangler d1 create ze-benchmarks
+   ```
+
+2. **Copy the database_id** from the output and update `wrangler.toml`:
+   ```toml
+   database_id = "your-database-id-here"
+   ```
+
+3. **Apply migrations to remote:**
+   ```bash
+   pnpm db:push:remote
+   ```
+
+#### Check Database State
+
+Before applying migrations, check if tables already exist:
+
+```bash
+cd worker
+# Check local database
+pnpm db:check
+
+# Check remote database
+pnpm db:check:remote
+```
+
+#### Error: "table already exists"
+
+If you see this error:
+```
+✘ [ERROR] table `batch_runs` already exists
+```
+
+This means the migration was already applied. You can:
+1. **Skip the migration** - Tables already exist, no action needed
+2. **Check database state** - Run `pnpm db:check` or `pnpm db:check:remote` to verify
+3. **Use Wrangler auto-migrations** - If `migrations_dir` is set, Wrangler tracks applied migrations
+
+### Drizzle Commands Explained
+
+#### `db:generate` → `drizzle-kit generate`
+
+**What it does:**
+- Reads your TypeScript schema from `src/db/schema.ts`
+- Compares it with existing migrations
+- Generates new migration SQL files in `drizzle/` folder
+- Creates files like `0000_quiet_turbo.sql`, `0001_something.sql`, etc.
+
+**When to use:**
+- After modifying `src/db/schema.ts`
+- Before applying schema changes to database
+- Creates migration history for version control
+
+**Example:**
+```bash
+# 1. Edit src/db/schema.ts (add a new column, table, etc.)
+# 2. Generate migration file
+pnpm db:generate
+# 3. Review the generated SQL in drizzle/0001_*.sql
+# 4. Apply it with db:push:local or db:push:remote
+```
+
+#### `db:push:local` → `wrangler d1 execute ze-benchmarks --local --file=./drizzle/0000_quiet_turbo.sql`
+
+**What it does:**
+- Manually executes a SQL migration file
+- Applies it to your **local D1 database** (used by `wrangler dev`)
+- Uses Wrangler CLI to execute SQL directly
+
+**When to use:**
+- After generating migrations with `db:generate`
+- To set up local database schema
+- When you need to manually apply a specific migration file
+
+**Note:** This executes a specific file. If you have multiple migrations, you need to run them in order.
+
+#### `db:push:remote` → `wrangler d1 execute ze-benchmarks --remote --file=./drizzle/0000_quiet_turbo.sql`
+
+**What it does:**
+- Same as `db:push:local`, but for **remote/production D1 database**
+- Applies migrations to your Cloudflare D1 database in the cloud
+
+**When to use:**
+- After testing migrations locally
+- To update production database schema
+- **⚠️ Be careful** - this modifies production data!
+
+#### Wrangler Auto-Migrations
+
+When `migrations_dir = "drizzle"` is set in `wrangler.toml`:
+- Wrangler **automatically applies migrations** when you run `wrangler dev`
+- Migrations are applied in order based on timestamp
+- You may still need to run `db:push:local` manually for a fresh database
+
+#### Summary
+
+| Command | Purpose | Creates Files? | Applies to DB? |
+|---------|---------|----------------|----------------|
+| `db:generate` | Generate migration files | ✅ Yes | ❌ No |
+| `db:push:local` | Apply migrations (local) | ❌ No | ✅ Yes |
+| `db:push:remote` | Apply migrations (remote) | ❌ No | ✅ Yes |
+
+**For this project:** Use `db:generate` + `db:push:local/remote` for migration-based workflow.
+
+### Syncing Data to Remote D1
+
+The sync script sends data from local SQLite to Cloudflare D1 via the Worker API.
+
+#### Key Concept
+
+The sync script sends data to a **Worker API**, and the Worker writes to its configured D1 database:
+- **Local Worker** (`http://localhost:8787`) → writes to **Local D1**
+- **Remote Worker** (`https://your-worker.workers.dev`) → writes to **Remote D1**
+
+#### Prerequisites
+
+1. **Install dependencies:**
+   ```bash
+   cd worker
+   pnpm install
+   ```
+
+2. **Ensure database migrations are applied:**
+   - For local D1: `cd worker && pnpm db:push:local`
+   - For remote D1: `cd worker && pnpm db:push:remote`
+
+3. **Ensure Worker is running:**
+   - For local: `cd worker && pnpm dev` (runs on http://localhost:8787)
+   - For production: Ensure Worker is deployed and accessible
+
+4. **Set environment variables:**
+   
+   **For LOCAL D1 (localhost):**
+   ```bash
+   export ZE_BENCHMARKS_WORKER_URL=http://localhost:8787
+   export ZE_BENCHMARKS_API_KEY=dev-local-key
+   ```
+   
+   **For REMOTE D1 (Cloudflare production):**
+   ```bash
+   export ZE_BENCHMARKS_WORKER_URL=https://your-worker.your-subdomain.workers.dev
+   export ZE_BENCHMARKS_API_KEY=your-production-api-key
+   ```
+
+#### Usage
+
+**Sync to LOCAL D1:**
+```bash
+cd worker
+export ZE_BENCHMARKS_WORKER_URL=http://localhost:8787
+export ZE_BENCHMARKS_API_KEY=dev-local-key
+# Make sure local Worker is running: pnpm dev
+pnpm sync
+```
+
+**Sync to REMOTE D1:**
+
+1. **Deploy your Worker:**
+   ```bash
+   cd worker
+   pnpm run deploy
+   ```
+
+2. **Set environment variables:**
+   ```bash
+   export ZE_BENCHMARKS_WORKER_URL=https://your-worker.your-subdomain.workers.dev
+   export ZE_BENCHMARKS_API_KEY=your-production-api-key
+   ```
+
+3. **Run the sync:**
+   ```bash
+   cd worker
+   pnpm sync
+   ```
+
+**Sync Options:**
+- `--dry-run`: Preview what would be synced without actually syncing
+- `--limit N`: Only sync first N records per table
+- `--force`: Skip duplicate checks and force insert
+
+#### How It Works
+
+1. **Reads from local SQLite**: Opens `benchmark-report/public/benchmarks.db`
+2. **Transforms data**: Converts local SQLite format to Worker API format
+3. **Posts to Worker API**: Uses existing `/api/results` and `/api/results/batch` endpoints
+4. **Tracks progress**: Shows what's being synced and any errors
+
+**Data Flow:**
+```
+Local SQLite → Transform → Worker API → D1 Database
+```
+
+**Sync Order:**
+1. **Batches first** (`batch_runs` table)
+2. **Runs second** (`benchmark_runs` table with evaluations and telemetry)
+
+This order ensures foreign key relationships are maintained.
+
+#### Troubleshooting
+
+**Error: Cannot connect to Worker API**
+- Make sure the Worker is running (`pnpm dev` in worker directory)
+- Check `ZE_BENCHMARKS_WORKER_URL` environment variable
+
+**Error: Database schema not initialized**
+- Run migrations: `cd worker && pnpm db:push:local` (for local) or `pnpm db:push:remote` (for remote)
+- If using `wrangler dev`, migrations should auto-apply, but you may need to run them manually for a fresh database
+
+**Error: Local database not found**
+- Ensure you have run benchmarks locally first
+- Check that `benchmark-report/public/benchmarks.db` exists
+
+**Error: Authentication failed**
+- Check `ZE_BENCHMARKS_API_KEY` environment variable
+- For local dev, use `dev-local-key`
+- For production, use the API key set in Worker secrets
+
+**Still syncing to local?**
+- Check: `echo $ZE_BENCHMARKS_WORKER_URL`
+- Should be your production URL, not `http://localhost:8787`
+- The sync script will warn you if it detects localhost
+
+### Common Issues
+
+#### "Port 8787 already in use"
+```bash
+# Find and kill the process
+lsof -ti:8787 | xargs kill -9
+# Then start again
+cd worker && pnpm dev
+```
+
+#### "Database not found"
+```bash
+# Initialize local D1 first
+cd worker
+pnpm dev  # This auto-initializes local D1
+# Or manually apply migrations
+pnpm db:push:local
+```
+
+#### "Cannot connect to Worker"
+- Make sure Worker is running: `pnpm dev` in worker directory
+- Check the URL: Should be `http://localhost:8787` for local
+- Verify with: `curl http://localhost:8787/health`
+
+#### "Database not found" with remote
+- Make sure `database_id` is set in `wrangler.toml`
+- Verify the database exists: `wrangler d1 list`
+- Check you're authenticated: `wrangler whoami`
+
+#### "Cannot connect to remote D1"
+- Check your internet connection
+- Verify Cloudflare authentication: `wrangler login`
+- Make sure the database exists in your Cloudflare account

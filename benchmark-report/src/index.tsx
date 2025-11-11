@@ -4,7 +4,6 @@ import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { DatabaseProvider } from './DatabaseProvider';
 import './index.css';
-import 'sql.js/dist/sql-wasm.js';
 
 const rootEl = document.getElementById('root');
 if (rootEl) {

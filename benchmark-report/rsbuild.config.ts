@@ -17,9 +17,8 @@ export default defineConfig({
     },
   },
   output: {
-    copy: [
-      { from: '../node_modules/.pnpm/sql.js@1.13.0/node_modules/sql.js/dist/sql-wasm.wasm' }
-    ]
+    // WASM file is copied via postinstall script to public directory
+    // This ensures it's always available at /sql-wasm.wasm
   },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 3000,

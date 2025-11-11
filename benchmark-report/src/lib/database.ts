@@ -22,8 +22,15 @@ export async function initDatabase(): Promise<Database> {
   initPromise = (async () => {
     try {
       // Initialize sql.js with the WASM binary
+      // Try multiple paths to find the WASM file (handles different build setups)
       const SQL = await initSqlJs({
-        locateFile: (file) => `/sql-wasm.wasm`,
+        locateFile: (file) => {
+          // Try absolute path first (from public directory)
+          if (file.endsWith('.wasm')) {
+            return '/sql-wasm.wasm';
+          }
+          return file;
+        },
       });
 
       // Fetch the database file
@@ -39,6 +46,7 @@ export async function initDatabase(): Promise<Database> {
       return db;
     } catch (error) {
       initPromise = null; // Reset on error so it can be retried
+      console.error('Failed to initialize sql.js:', error);
       throw error;
     }
   })();
