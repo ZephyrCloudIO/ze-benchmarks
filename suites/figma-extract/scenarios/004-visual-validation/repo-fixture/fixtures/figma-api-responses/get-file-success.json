@@ -1,0 +1,14 @@
+{
+  "document": {
+    "id": "0:0",
+    "name": "Design System",
+    "type": "DOCUMENT",
+    "children": []
+  },
+  "components": {},
+  "styles": {},
+  "name": "Design System",
+  "lastModified": "2025-11-11T00:00:00Z",
+  "thumbnailUrl": "https://example.com/thumbnail.png",
+  "version": "1.0.0"
+}

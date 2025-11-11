@@ -1,0 +1,63 @@
+id: ZE_figma_extract_semantic_mapping
+suite: figma-extract
+title: "Semantic Component Mapping"
+description: |
+  Map Figma design components to semantic code component libraries (ShadCN, Radix, MUI)
+  with accurate prop translation and variant mapping.
+
+  Category: semantic-mapping
+  Type: accuracy
+timeout_minutes: 40
+workspace:
+  node: "18.20.x"
+  manager: auto
+  managers_allowed: [pnpm]
+  workspaces: single
+baseline:
+  run:
+    - cmd: "pnpm install"
+    - cmd: "pnpm test"
+    - cmd: "pnpm run lint"
+    - cmd: "pnpm run typecheck"
+constraints:
+  blocklist: []
+  namespace_migrations: []
+  companion_versions: []
+targets:
+  required: []
+  optional: []
+validation:
+  commands:
+    install: "pnpm install"
+    test: "pnpm test"
+    lint: "pnpm run lint"
+    typecheck: "pnpm run typecheck"
+fixtures:
+  figma_file: "./repo-fixture/fixtures/figma-files/full-component-set.json"
+  api_responses:
+    success: "./repo-fixture/fixtures/figma-api-responses/get-file-response.json"
+    node: "./repo-fixture/fixtures/figma-api-responses/get-node-response.json"
+    rate_limit: "./repo-fixture/fixtures/figma-api-responses/rate-limit-error.json"
+    auth_error: "./repo-fixture/fixtures/figma-api-responses/invalid-token-error.json"
+oracle:
+  answers_file: "./oracle-answers.json"
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-sonnet-4-5"
+  temperature: 0.1
+  max_tokens: 2000
+rubric_overrides:
+  weights:
+    install_success: 1.0
+    tests_nonregression: 1.5
+    mapping_accuracy: 1.3
+    prop_translation: 1.0
+    variant_mapping: 0.9
+    code_quality: 0.6
+    library_compatibility: 0.8
+    semantic_correctness: 0.9
+    api_consistency: 0.7
+    type_safety: 0.7
+    user_questions_quality: 0.4
+    efficiency: 0.5
+    llm_judge: 1.0

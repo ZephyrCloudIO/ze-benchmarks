@@ -1,0 +1,134 @@
+{
+  "document": {
+    "id": "0:0",
+    "name": "Color System",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:1",
+        "name": "Primary Colors",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "1:2",
+            "name": "Blue/100",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.88, "g": 0.94, "b": 1.0, "a": 1.0}}]
+          },
+          {
+            "id": "1:3",
+            "name": "Blue/200",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.67, "g": 0.84, "b": 1.0, "a": 1.0}}]
+          },
+          {
+            "id": "1:4",
+            "name": "Blue/300",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.4, "g": 0.7, "b": 1.0, "a": 1.0}}]
+          },
+          {
+            "id": "1:5",
+            "name": "Blue/400",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.2, "g": 0.55, "b": 1.0, "a": 1.0}}]
+          },
+          {
+            "id": "1:6",
+            "name": "Blue/500",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.4, "b": 1.0, "a": 1.0}}]
+          },
+          {
+            "id": "1:7",
+            "name": "Blue/600",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.3, "b": 0.8, "a": 1.0}}]
+          },
+          {
+            "id": "1:8",
+            "name": "Blue/700",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.2, "b": 0.6, "a": 1.0}}]
+          }
+        ]
+      },
+      {
+        "id": "2:1",
+        "name": "Semantic Colors",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "2:2",
+            "name": "Success",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.13, "g": 0.8, "b": 0.38, "a": 1.0}}]
+          },
+          {
+            "id": "2:3",
+            "name": "Warning",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 1.0, "g": 0.73, "b": 0.0, "a": 1.0}}]
+          },
+          {
+            "id": "2:4",
+            "name": "Error",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.96, "g": 0.26, "b": 0.21, "a": 1.0}}]
+          },
+          {
+            "id": "2:5",
+            "name": "Info",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.74, "b": 0.96, "a": 1.0}}]
+          }
+        ]
+      },
+      {
+        "id": "3:1",
+        "name": "Neutral Colors",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "3:2",
+            "name": "Gray/50",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.98, "g": 0.98, "b": 0.98, "a": 1.0}}]
+          },
+          {
+            "id": "3:3",
+            "name": "Gray/100",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.95, "g": 0.95, "b": 0.95, "a": 1.0}}]
+          },
+          {
+            "id": "3:4",
+            "name": "Gray/500",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.5, "g": 0.5, "b": 0.5, "a": 1.0}}]
+          },
+          {
+            "id": "3:5",
+            "name": "Gray/900",
+            "type": "RECTANGLE",
+            "fills": [{"type": "SOLID", "color": {"r": 0.1, "g": 0.1, "b": 0.1, "a": 1.0}}]
+          }
+        ]
+      }
+    ]
+  },
+  "styles": {
+    "color-blue-500": {
+      "key": "color-blue-500",
+      "name": "Blue/500",
+      "styleType": "FILL",
+      "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.4, "b": 1.0, "a": 1.0}}]
+    },
+    "color-success": {
+      "key": "color-success",
+      "name": "Success",
+      "styleType": "FILL",
+      "fills": [{"type": "SOLID", "color": {"r": 0.13, "g": 0.8, "b": 0.38, "a": 1.0}}]
+    }
+  }
+}

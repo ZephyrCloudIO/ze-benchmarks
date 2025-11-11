@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "err": null,
+  "name": "Design System",
+  "lastModified": "2025-11-11T00:00:00Z",
+  "thumbnailUrl": "https://example.com/thumbnail.png",
+  "version": "1234567890",
+  "role": "owner",
+  "editorType": "figma",
+  "linkAccess": "view",
+  "document": {
+    "id": "0:0",
+    "name": "Design System",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:1",
+        "name": "Components",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 0.95,
+          "g": 0.95,
+          "b": 0.95,
+          "a": 1
+        },
+        "prototypeStartNodeID": null,
+        "children": []
+      }
+    ]
+  },
+  "components": {},
+  "componentSets": {},
+  "schemaVersion": 0,
+  "styles": {},
+  "mainFileKey": "ABC123XYZ"
+}

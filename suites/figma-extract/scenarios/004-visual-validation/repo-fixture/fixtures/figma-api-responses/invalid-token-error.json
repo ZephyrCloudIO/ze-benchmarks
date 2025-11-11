@@ -1,0 +1,6 @@
+{
+  "status": 403,
+  "err": "Forbidden",
+  "error": true,
+  "message": "Invalid token. The access token provided is not valid."
+}

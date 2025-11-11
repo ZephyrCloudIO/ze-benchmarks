@@ -1,0 +1,1 @@
+Extract design tokens from the Figma file and generate a structured tokens.json file. Include colors (hex values), typography (font family, size, weight, line height), spacing values, and effects (shadows, blur). Parse Figma style names into semantic token names using dot notation. Write tests to verify extraction accuracy and JSON validity.

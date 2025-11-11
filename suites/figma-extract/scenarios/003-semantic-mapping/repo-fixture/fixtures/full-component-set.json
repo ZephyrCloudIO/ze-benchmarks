@@ -1,0 +1,99 @@
+{
+  "document": {
+    "id": "0:0",
+    "name": "Full Component Library",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:1",
+        "name": "Buttons",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "1:2",
+            "name": "Button/Primary",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 0.0, "g": 0.4, "b": 1.0, "a": 1.0}}],
+            "cornerRadius": 8
+          },
+          {
+            "id": "1:3",
+            "name": "Button/Secondary",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 0.5, "g": 0.5, "b": 0.5, "a": 1.0}}],
+            "cornerRadius": 8
+          }
+        ]
+      },
+      {
+        "id": "2:1",
+        "name": "Inputs",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "2:2",
+            "name": "Input/Text",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1, "a": 1.0}}],
+            "strokes": [{"type": "SOLID", "color": {"r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0}}],
+            "strokeWeight": 1,
+            "cornerRadius": 4
+          }
+        ]
+      },
+      {
+        "id": "3:1",
+        "name": "Cards",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "3:2",
+            "name": "Card/Default",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1, "a": 1.0}}],
+            "effects": [
+              {
+                "type": "DROP_SHADOW",
+                "color": {"r": 0, "g": 0, "b": 0, "a": 0.1},
+                "offset": {"x": 0, "y": 2},
+                "radius": 4
+              }
+            ],
+            "cornerRadius": 12
+          }
+        ]
+      },
+      {
+        "id": "4:1",
+        "name": "Avatars",
+        "type": "CANVAS",
+        "children": [
+          {
+            "id": "4:2",
+            "name": "Avatar/Small",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0}}],
+            "cornerRadius": 999,
+            "absoluteBoundingBox": {"x": 0, "y": 0, "width": 32, "height": 32}
+          },
+          {
+            "id": "4:3",
+            "name": "Avatar/Medium",
+            "type": "COMPONENT",
+            "fills": [{"type": "SOLID", "color": {"r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0}}],
+            "cornerRadius": 999,
+            "absoluteBoundingBox": {"x": 0, "y": 0, "width": 48, "height": 48}
+          }
+        ]
+      }
+    ]
+  },
+  "components": {
+    "1:2": {"key": "btn-primary", "name": "Button/Primary"},
+    "1:3": {"key": "btn-secondary", "name": "Button/Secondary"},
+    "2:2": {"key": "input-text", "name": "Input/Text"},
+    "3:2": {"key": "card-default", "name": "Card/Default"},
+    "4:2": {"key": "avatar-sm", "name": "Avatar/Small"},
+    "4:3": {"key": "avatar-md", "name": "Avatar/Medium"}
+  }
+}

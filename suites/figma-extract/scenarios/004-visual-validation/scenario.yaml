@@ -1,0 +1,63 @@
+id: ZE_figma_extract_visual_validation
+suite: figma-extract
+title: "Visual Validation"
+description: |
+  Compare generated code output against Figma designs using pixel comparison,
+  semantic analysis, and visual regression testing.
+
+  Category: visual-validation
+  Type: accuracy
+timeout_minutes: 40
+workspace:
+  node: "18.20.x"
+  manager: auto
+  managers_allowed: [pnpm]
+  workspaces: single
+baseline:
+  run:
+    - cmd: "pnpm install"
+    - cmd: "pnpm test"
+    - cmd: "pnpm run lint"
+    - cmd: "pnpm run typecheck"
+constraints:
+  blocklist: []
+  namespace_migrations: []
+  companion_versions: []
+targets:
+  required: []
+  optional: []
+validation:
+  commands:
+    install: "pnpm install"
+    test: "pnpm test"
+    lint: "pnpm run lint"
+    typecheck: "pnpm run typecheck"
+fixtures:
+  figma_file: "./repo-fixture/fixtures/figma-files/minimal-button.json"
+  api_responses:
+    success: "./repo-fixture/fixtures/figma-api-responses/get-file-response.json"
+    node: "./repo-fixture/fixtures/figma-api-responses/get-node-response.json"
+    rate_limit: "./repo-fixture/fixtures/figma-api-responses/rate-limit-error.json"
+    auth_error: "./repo-fixture/fixtures/figma-api-responses/invalid-token-error.json"
+oracle:
+  answers_file: "./oracle-answers.json"
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-sonnet-4-5"
+  temperature: 0.1
+  max_tokens: 2000
+rubric_overrides:
+  weights:
+    install_success: 1.0
+    tests_nonregression: 1.5
+    pixel_comparison: 1.1
+    semantic_analysis: 1.0
+    diff_detection: 0.9
+    code_quality: 0.7
+    visual_regression: 0.8
+    screenshot_accuracy: 0.9
+    rendering_correctness: 0.8
+    comparison_algorithm: 0.7
+    user_questions_quality: 0.4
+    efficiency: 0.5
+    llm_judge: 1.0

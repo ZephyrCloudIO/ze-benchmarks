@@ -1,0 +1,20 @@
+
+> ze-benchmarks@0.1.0 bench /Users/zackarychapple/code/figma-research-clean/reference-repos/ze-benchmarks
+> tsx packages/harness/src/cli.ts figma-research classification-detection --tier L0-minimal --agent anthropic --model claude-sonnet-4.5
+
+Demo: Benchmarking AI Agents:
+
+► pnpm bench 'figma-research/classification-detection' 'L0-minimal' 'anthropic'
+│
+●  Running: figma-research/classification-detection
+│
+●  Tier: L0-minimal Agent: anthropic
+Database path: /Users/zackarychapple/code/figma-research-clean/reference-repos/ze-benchmarks/benchmark-report/public/benchmarks.db
+Checking database at: /Users/zackarychapple/code/figma-research-clean/reference-repos/ze-benchmarks/benchmark-report/public/benchmarks.db
+File exists: true
+Testing database connection...
+✓ Database connection successful
+[?25l│
+✗ Agent execution failed
+◇  Benchmark complete
+[?25h

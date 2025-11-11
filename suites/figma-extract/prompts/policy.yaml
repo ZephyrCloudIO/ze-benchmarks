@@ -1,0 +1,68 @@
+# Figma Extract Suite Policy
+# Suite-level configuration for Figma design token extraction and component understanding scenarios
+
+tiers:
+  L0: { description: "Minimal instruction", askUser_bonus: 0.2, efficiency_weight: 0.8 }
+  L1: { description: "Basic context", askUser_bonus: 0.1, efficiency_weight: 1.0 }
+  L2: { description: "Directed extraction targets", askUser_bonus: 0.05, efficiency_weight: 1.1 }
+  L3: { description: "Complex component analysis", askUser_bonus: 0.0, efficiency_weight: 1.2 }
+  Lx: { description: "Adversarial / conflicting design data", askUser_bonus: 0.25, efficiency_weight: 0.9 }
+
+dimensions:
+  verbosity: [terse, normal, verbose]
+  figma_access: [fixtures-only, api-allowed]
+  extraction_depth: [tokens-only, components, full-design-system]
+  validation_level: [none, basic, comprehensive]
+
+# Common rubric weights across all figma-extract scenarios
+rubric_weights:
+  install_success: 1.0
+  tests_nonregression: 1.5
+  figma_api_usage: 1.2
+  token_extraction: 1.3
+  component_understanding: 1.2
+  data_validation: 1.0
+  type_safety: 0.9
+  code_quality: 0.8
+  error_handling: 0.7
+  output_format: 0.7
+  documentation: 0.6
+  user_questions_quality: 0.4
+  efficiency: 0.5
+  llm_judge: 1.0
+
+# Common constraints for all scenarios
+constraints:
+  # Figma API requirements
+  - type: api_usage
+    description: "Must use Figma REST API correctly"
+    validation: "Check for proper authentication and endpoint usage"
+
+  # Data structure requirements
+  - type: data_structure
+    description: "Extract design tokens in structured format"
+    validation: "Verify token hierarchy and naming conventions"
+
+  # Type safety requirements
+  - type: type_safety
+    description: "Use TypeScript with proper types for Figma API responses"
+    validation: "Check for type definitions and proper typing"
+
+  # Testing requirements
+  - type: testing
+    description: "Include tests for extraction logic using fixtures"
+    validation: "Tests must use committed fixtures, not live API"
+
+# Fixture usage guidelines
+fixtures:
+  location: "./fixtures/"
+  usage: "All scenarios should use committed fixtures for deterministic testing"
+  types:
+    - figma_files: "JSON exports of Figma file structures"
+    - api_responses: "Mocked Figma API responses"
+
+quality_checks:
+  require_acceptance_criteria: true
+  require_fixtures: true
+  require_type_safety: true
+  require_error_handling: true
