@@ -140,30 +140,29 @@ export class AnthropicAdapter implements AgentAdapter {
     toolUses: ToolUseBlock[],
     toolHandlers?: Map<string, (input: unknown) => Promise<string> | string>
   ): Promise<ToolResult[]> {
+    // Execute all tool calls in parallel for better performance
+    const results = await Promise.all(
+      toolUses.map(async (toolUse) => {
+        const handler = toolHandlers?.get(toolUse.name);
+        let resultContent: string;
 
-    const results: ToolResult[] = [];
-
-    for (const toolUse of toolUses) {
-      
-      const handler = toolHandlers?.get(toolUse.name);
-      let resultContent: string;
-
-      if (handler) {
-        try {
-          resultContent = await handler(toolUse.input);
-        } catch (error) {
-          resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+        if (handler) {
+          try {
+            resultContent = await handler(toolUse.input);
+          } catch (error) {
+            resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        } else {
+          resultContent = `Tool '${toolUse.name}' is not available`;
         }
-      } else {
-        resultContent = `Tool '${toolUse.name}' is not available`;
-      }
 
-      results.push({
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
-        content: resultContent
-      });
-    }
+        return {
+          type: 'tool_result' as const,
+          tool_use_id: toolUse.id,
+          content: resultContent
+        };
+      })
+    );
 
     return results;
   }

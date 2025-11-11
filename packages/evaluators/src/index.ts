@@ -23,14 +23,17 @@ export async function runEvaluators(
 		evaluators.push(new LLMJudgeEvaluator());
 	}
 
-	const results: EvaluatorResult[] = [];
-	for (const evaluator of evaluators) {
-		try {
-			results.push(await evaluator.evaluate(ctx));
-		} catch (error) {
-			results.push({ name: evaluator.meta.name, score: 0, details: `error: ${String(error)}` });
-		}
-	}
+	// Run all evaluators in parallel for better performance
+	// LLM Judge can take 2-4 minutes, so parallelizing saves significant time
+	const results: EvaluatorResult[] = await Promise.all(
+		evaluators.map(async (evaluator) => {
+			try {
+				return await evaluator.evaluate(ctx);
+			} catch (error) {
+				return { name: evaluator.meta.name, score: 0, details: `error: ${String(error)}` };
+			}
+		})
+	);
 
 	const scoreCard: ScoreCard = {
 		install_success: results.find((result) => result.name === 'InstallEvaluator')?.score ?? 0,

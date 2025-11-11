@@ -2361,7 +2361,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 	// Stage 4: Validation
 	if (progress) updateProgress(progress, 4, 'Running validation commands');
-	const commandLog = workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
+	const commandLog = workspaceDir ? await runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
 	const diffArtifacts = workspaceDir && fixtureDir ? buildDiffArtifacts(fixtureDir, workspaceDir) : { diffSummary: [], depsDelta: [] };
 
 	const passedCommands = commandLog.filter(cmd => cmd.exitCode === 0).length;

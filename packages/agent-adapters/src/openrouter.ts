@@ -299,30 +299,31 @@ export class OpenRouterAdapter implements AgentAdapter {
     toolCalls: any[],
     toolHandlers?: Map<string, (input: unknown) => Promise<string> | string>
   ): Promise<ToolResult[]> {
-    const results: ToolResult[] = [];
+    // Execute all tool calls in parallel for better performance
+    const results = await Promise.all(
+      toolCalls.map(async (toolCall) => {
+        const handler = toolHandlers?.get(toolCall.function.name);
+        let resultContent: string;
 
-    for (const toolCall of toolCalls) {
-      const handler = toolHandlers?.get(toolCall.function.name);
-      let resultContent: string;
-
-      if (handler) {
-        try {
-          const input = JSON.parse(toolCall.function.arguments || '{}');
-          resultContent = await handler(input);
-        } catch (error) {
-          console.error(`    ❌ Error in ${toolCall.function.name}:`, error);
-          resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+        if (handler) {
+          try {
+            const input = JSON.parse(toolCall.function.arguments || '{}');
+            resultContent = await handler(input);
+          } catch (error) {
+            console.error(`    Error in ${toolCall.function.name}:`, error);
+            resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        } else {
+          console.warn(`    No handler found for tool: ${toolCall.function.name}`);
+          resultContent = `Tool '${toolCall.function.name}' is not available`;
         }
-      } else {
-        console.warn(`    ⚠️ No handler found for tool: ${toolCall.function.name}`);
-        resultContent = `Tool '${toolCall.function.name}' is not available`;
-      }
 
-      results.push({
-        tool_call_id: toolCall.id,
-        content: resultContent
-      });
-    }
+        return {
+          tool_call_id: toolCall.id,
+          content: resultContent
+        };
+      })
+    );
 
     return results;
   }
