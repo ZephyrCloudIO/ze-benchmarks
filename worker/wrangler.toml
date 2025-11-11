@@ -5,7 +5,9 @@ compatibility_date = "2024-01-01"
 [[ d1_databases ]]
 binding = "DB"
 database_name = "ze-benchmarks"
-database_id = "" # Run: wrangler d1 create ze-benchmarks
+database_id = "72797d24-19de-432d-9b1a-3d1510108a1c" # Production database
+preview_database_id = "77242e50-9829-4456-8e1a-8cd4f3549e55" # Preview database for dev:remote
+migrations_dir = "drizzle"
 
 [vars]
 ENVIRONMENT = "development"
