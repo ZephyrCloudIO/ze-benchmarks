@@ -41,3 +41,4 @@ export class EchoAgent implements AgentAdapter {
 export { ClaudeCodeAdapter } from './claude-code.ts';
 export { AnthropicAdapter } from './anthropic.ts';
 export { OpenRouterAdapter } from './openrouter.ts';
+export { SpecialistAdapter } from './specialist.ts';
