@@ -440,7 +440,10 @@ async function main() {
     console.log(`  Failed: ${chalk.red(results.filter(r => !r.success).length)}`);
 
     console.log(chalk.bold('\n💡 Next steps:'));
-    console.log(`  ${chalk.cyan('pnpm mint:snapshot')} <template-path> ${batchId}`);
+    console.log(`  ${chalk.cyan('pnpm --filter agency-specialist-mint mint:snapshot')} \\`);
+    console.log(`    <template-path> ze-benchmarks \\`);
+    console.log(`    --output ./agency-specialist-mint/snapshots \\`);
+    console.log(`    --batch-id ${batchId}`);
     console.log(`  ${chalk.cyan('pnpm batch:details')} ${batchId}`);
 
     console.log(chalk.bold('\n🌐 View results:'));
