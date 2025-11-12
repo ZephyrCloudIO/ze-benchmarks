@@ -14,7 +14,7 @@ Purpose: Help agents operate the benchmark harness quickly. Stay repo-specific; 
 3. Prompts load from `suites/<suite>/prompts/<scenario>/<tier>-*.md`; absence logs a warning and skips the agent.
 4. Scenario `validation.commands` run in install→test→lint→typecheck order via `runValidationCommands`, capturing exit codes and logs.
 5. `buildDiffArtifacts` compares workspace vs fixture to populate `diff_summary` and package deltas.
-6. `runEvaluators` applies current metrics, then `computeWeightedTotals` rescales weighted averages to a 0–10 score before writing `results/summary.json`.
+6. `runEvaluators` applies current metrics, then `computeWeightedTotals` rescales weighted averages to a 0–10 score before saving to `benchmarks.db`.
 
 ### Evaluators & scoring (all in `packages/evaluators/src/evaluators/`)
 - `InstallEvaluator`: expects an install command result with exit code 0.
@@ -43,7 +43,7 @@ npm -w packages/harness run build
 node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L1 --agent claude-code --model sonnet --max-turns 15
 ```
 - `npm -w packages/harness run dev` launches `tsc --watch` while editing the CLI.
-- Each `run` overwrites `results/summary.json`; archive outputs manually if you need history.
+- All benchmark results are stored in `benchmarks.db` with full history.
 
 ### Guardrails & troubleshooting
 - Work inside the generated workspace (`results/workspaces/...`), not the repository root; evaluators read only that directory.

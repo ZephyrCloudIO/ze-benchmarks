@@ -1,23 +1,41 @@
 #!/usr/bin/env tsx
 import { config } from 'dotenv';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync, statSync, unlinkSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
 // Load environment variables from .env file in project root
-config({ path: resolve(process.cwd(), '.env') });
-import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
+// Find workspace root by looking for pnpm-workspace.yaml
+// In case of nested workspaces, find the topmost one
+function findWorkspaceRoot(startDir: string): string {
+  let currentDir = startDir;
+  let lastWorkspaceRoot = startDir;
+
+  while (currentDir !== resolve(currentDir, '..')) {
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
+      lastWorkspaceRoot = currentDir;
+    }
+    currentDir = resolve(currentDir, '..');
+  }
+
+  return lastWorkspaceRoot;
+}
+
+const workspaceRoot = findWorkspaceRoot(process.cwd());
+const envPath = resolve(workspaceRoot, '.env');
+config({ path: envPath });
+import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, SpecialistAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
 import { OpenAI } from 'openai';
 import { runEvaluators } from '../../evaluators/src/index.ts';
 import { runValidationCommands } from './runtime/validation.ts';
 import { buildDiffArtifacts } from './runtime/diff.ts';
+import { detectPackageManager, extractPackageManagerFromCommand, extractTestResults } from './runtime/extractors.ts';
 import { Oracle } from './runtime/oracle.ts';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
-import { BenchmarkLogger } from '@ze/worker-client';
+import { BenchmarkLogger } from '@ze/database';
 import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel, text } from '@clack/prompts';
-import { spawn } from 'node:child_process';
 import chalk from 'chalk';
 import figlet from 'figlet';
 import { startDevServer, getServerUrl, stopDevServer } from './dev-server.ts';
@@ -26,30 +44,6 @@ import { OpenRouterAPI } from './lib/openrouter-api.ts';
 // ============================================================================
 // DYNAMIC MODEL LOADING
 // ============================================================================
-// Check if environment variables loaded and print them for debugging
-if (process.env && Object.keys(process.env).length > 0) {
-  console.log(chalk.gray('[env] Loaded environment variables:'));
-  // Print only custom/project-specific env variables for safety
-  const allowedPrefixes = [
-    'ZE_BENCHMARKS_',
-    'OPENAI_',
-    'ANTHROPIC_',
-    'OPENROUTER_',
-    'NODE_ENV'
-  ];
-  const shownEnv = Object.entries(process.env)
-    .filter(([key, _]) =>
-      allowedPrefixes.some(prefix => key.startsWith(prefix)) ||
-      key === 'NODE_ENV'
-    )
-    .sort(([a], [b]) => a.localeCompare(b));
-  for (const [key, value] of shownEnv) {
-    const displayValue = value ? '***set***' : '(empty)';
-    console.log(chalk.gray(`  ${key}=${displayValue}`));
-  }
-} else {
-  console.log(chalk.yellow('[env] Warning: No environment variables found.'));
-}
 
 async function getAvailableAgents(): Promise<Array<{value: string, label: string}>> {
   const agents = [
@@ -216,7 +210,7 @@ function displayRunInfo(run: { status: string; suite: string; scenario: string; 
     ? chalk.green('✓')
     : run.status === 'failed'
     ? chalk.red('✗')
-    : run.status === 'running'
+    : run.status === 'incomplete'
     ? chalk.yellow('◐')
     : chalk.blue('○');
   
@@ -666,6 +660,138 @@ function getAvailableTiers(suite: string, scenario: string): Array<{value: strin
   }));
 }
 
+async function executeWarmup(
+	suite: string,
+	scenario: string,
+	scenarioCfg: any,
+	quiet: boolean = false
+): Promise<{ success: boolean; error?: string }> {
+	// Check if warmup is enabled
+	if (!scenarioCfg.warmup || !scenarioCfg.warmup.enabled) {
+		return { success: true }; // No warmup configured, continue normally
+	}
+
+	const warmupCfg = scenarioCfg.warmup;
+	const scenarioDir = getScenarioDir(suite, scenario);
+	const workingDir = join(scenarioDir, warmupCfg.working_dir || './repo-fixture');
+
+	if (!quiet) {
+		console.log(chalk.blue('🔥 Executing warmup phase...'));
+		console.log(chalk.gray(`   Working directory: ${workingDir}`));
+	}
+
+	// Create working directory if it doesn't exist, or clean it if it does
+	if (existsSync(workingDir)) {
+		// Clean existing directory
+		try {
+			const files = readdirSync(workingDir);
+			for (const file of files) {
+				const filePath = join(workingDir, file);
+				const stat = statSync(filePath);
+				if (stat.isDirectory()) {
+					rmSync(filePath, { recursive: true, force: true });
+				} else {
+					unlinkSync(filePath);
+				}
+			}
+		} catch (err) {
+			return { success: false, error: `Failed to clean warmup directory: ${err}` };
+		}
+	} else {
+		mkdirSync(workingDir, { recursive: true });
+	}
+
+	// Execute based on warmup type
+	if (warmupCfg.type === 'agent') {
+		// Agent-driven warmup
+		const agentCfg = warmupCfg.agent;
+		const provider = agentCfg.provider || 'openrouter';
+		const model = agentCfg.model;
+		const prompt = agentCfg.prompt;
+
+		if (!prompt) {
+			return { success: false, error: 'Warmup agent prompt is required' };
+		}
+
+		if (!quiet) {
+			console.log(chalk.gray(`   Provider: ${provider}`));
+			console.log(chalk.gray(`   Model: ${model || 'default'}`));
+		}
+
+		try {
+			// Create agent adapter
+			const agentAdapter = createAgentAdapter(provider, model);
+
+			// Build the request
+			const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+				{
+					role: 'user' as const,
+					content: prompt
+				}
+			];
+
+			const request: AgentRequest = {
+				messages,
+				workspaceDir: workingDir,
+			};
+
+			// Add tools if agent supports them
+			if (provider === 'anthropic' || provider === 'openrouter') {
+				const { createWorkspaceToolHandlers, getAllWorkspaceTools } = await import('./runtime/workspace-tools.ts');
+				const workspaceHandlers = createWorkspaceToolHandlers(workingDir);
+				const tools = getAllWorkspaceTools();
+
+				request.tools = tools;
+				request.toolHandlers = workspaceHandlers;
+			}
+
+			// Execute the agent
+			if (!quiet) console.log(chalk.blue('   🤖 Running warmup agent...'));
+
+			const response = await agentAdapter.execute(request);
+
+			if (!quiet) {
+				console.log(chalk.green('   ✓ Warmup completed successfully'));
+				if (response.content) {
+					console.log(chalk.gray(`   Agent response: ${response.content.substring(0, 100)}...`));
+				}
+			}
+
+			return { success: true };
+		} catch (err: any) {
+			return { success: false, error: `Warmup agent execution failed: ${err.message || err}` };
+		}
+	} else if (warmupCfg.type === 'scripted') {
+		// Scripted warmup
+		const commands = warmupCfg.commands || [];
+
+		if (!quiet) console.log(chalk.blue(`   Running ${commands.length} warmup commands...`));
+
+		for (const cmdCfg of commands) {
+			const cmd = cmdCfg.cmd;
+			const description = cmdCfg.description || cmd;
+
+			if (!quiet) console.log(chalk.gray(`   → ${description}`));
+
+			try {
+				const { execSync } = await import('child_process');
+				execSync(cmd, {
+					cwd: workingDir,
+					stdio: quiet ? 'ignore' : 'inherit',
+					encoding: 'utf8'
+				});
+			} catch (err: any) {
+				return { success: false, error: `Warmup command failed: ${cmd}\n${err.message || err}` };
+			}
+		}
+
+		if (!quiet) console.log(chalk.green('   ✓ Warmup commands completed'));
+		return { success: true };
+	} else {
+		return { success: false, error: `Unknown warmup type: ${warmupCfg.type}` };
+	}
+}
+
 function prepareWorkspaceFromFixture(suite: string, scenario: string): { workspaceDir: string; fixtureDir: string } | undefined {
 	const scenarioDir = getScenarioDir(suite, scenario);
 	const candidates = ['repo', 'repo-fixture'];
@@ -727,32 +853,74 @@ function loadPrompt(suite: string, scenario: string, tier: string): string | nul
 	}
 }
 
-function createAgentAdapter(agentName: string, model?: string): AgentAdapter {
+/**
+ * Resolve specialist name to template file path
+ *
+ * Converts a specialist name (e.g., @zephyr-cloud/shadcn-specialist) to the
+ * corresponding template file path in starting_from_outcome/
+ *
+ * @param specialistName - Specialist name (with or without namespace)
+ * @returns Absolute path to template file
+ * @throws Error if template file doesn't exist
+ */
+function resolveSpecialistTemplatePath(specialistName: string): string {
+	// Strip namespace prefix if present (e.g., @zephyr-cloud/)
+	const templateName = specialistName.replace(/^@[^/]+\//, '');
+
+	// Construct template path relative to workspace root
+	const templatePath = `starting_from_outcome/${templateName}.json5`;
+	const absolutePath = resolve(workspaceRoot, templatePath);
+
+	// Verify template exists
+	if (!existsSync(absolutePath)) {
+		throw new Error(
+			`Specialist template not found: ${templatePath}\n` +
+			`  Specialist: ${specialistName}\n` +
+			`  Expected path: ${absolutePath}\n` +
+			`  Tip: Ensure the template file exists in starting_from_outcome/`
+		);
+	}
+
+	// Return absolute path to avoid cwd-related issues when harness is spawned
+	// from different directories (similar to mint:snapshot fix)
+	return absolutePath;
+}
+
+function createAgentAdapter(agentName: string, model?: string, specialistName?: string): AgentAdapter {
+	// Create base adapter
+	let baseAdapter: AgentAdapter;
+
 	switch (agentName) {
 		case 'openrouter':
 			// Pass model directly to constructor instead of using environment variable
-			return new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+			baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+			break;
 		case 'anthropic':
 			if (model) {
 				process.env.CLAUDE_MODEL = model;
 			}
-			return new AnthropicAdapter();
+			baseAdapter = new AnthropicAdapter();
+			break;
 		case 'claude-code':
-			return new ClaudeCodeAdapter(model);
+			baseAdapter = new ClaudeCodeAdapter(model);
+			break;
 		case 'echo':
 		default:
-			return new EchoAgent();
+			baseAdapter = new EchoAgent();
+			break;
 	}
+
+	// Wrap with SpecialistAdapter if specialist name provided
+	if (specialistName) {
+		const templatePath = resolveSpecialistTemplatePath(specialistName);
+		console.log(chalk.blue(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`));
+		console.log(chalk.gray(`     Template: ${templatePath}`));
+		return new SpecialistAdapter(baseAdapter, templatePath);
+	}
+
+	return baseAdapter;
 }
 
-function writeResult(out: unknown, suite: string, scenario: string) {
-	const root = findRepoRoot();
-	const resultsDir = join(root, 'results');
-	mkdirSync(resultsDir, { recursive: true });
-	const outPath = join(resultsDir, `summary.json`);
-	writeFileSync(outPath, JSON.stringify(out, null, 2));
-	console.log(`Wrote results to ${outPath}`);
-}
 
 
 // ============================================================================
@@ -821,20 +989,23 @@ function parseArgs(argv: string[]) {
 	const suite = args[0];
 	const scenario = args[1];
 	const rest = args.slice(2);
-	
+
 	const tierIndex = rest.indexOf('--tier');
 	const tier = tierIndex !== -1 ? rest[tierIndex + 1] : 'L0';
-	
+
 	const agentIndex = rest.indexOf('--agent');
 	const agent = agentIndex !== -1 ? rest[agentIndex + 1] : 'echo';
-	
+
 	const modelIndex = rest.indexOf('--model');
 	const model = modelIndex !== -1 ? rest[modelIndex + 1] : undefined;
 
+	const batchIdIndex = rest.indexOf('--batch-id');
+	const batchId = batchIdIndex !== -1 ? rest[batchIdIndex + 1] : undefined;
 
-	const noJson = rest.includes('--no-json');
+	const specialistIndex = rest.indexOf('--specialist');
+	const specialist = specialistIndex !== -1 ? rest[specialistIndex + 1] : undefined;
 
-	return { cmd, suite, scenario, tier, agent, model, noJson } as const;
+	return { cmd, suite, scenario, tier, agent, model, batchId, specialist } as const;
 }
 
 function showHelp() {
@@ -861,7 +1032,7 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--tier')} <tier>                   Difficulty tier (varies by scenario)`);
 	console.log(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
-	console.log(`  ${chalk.cyan('--no-json')}                     Skip JSON output`);
+	console.log(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
 	
 	console.log('\n' + chalk.bold('Model Selection:'));
 	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
@@ -947,12 +1118,11 @@ async function executeMultipleBenchmarks(
 	scenarios: string[],
 	tiers: string[],
 	agents: string[],
-	models: (string | undefined)[],
-	noJson: boolean
+	models: (string | undefined)[]
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
-	const batchId = await logger.startBatch();
+	const batchId = logger.startBatch();
 	
 	// Calculate total combinations
 	const combinations: Array<{
@@ -1032,7 +1202,7 @@ async function executeMultipleBenchmarks(
 			async (combo, i) => {
 				const { suite, scenario, tier, agent, model } = combo;
 				console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-				await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId, true); // quiet mode
+				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true); // quiet mode
 			}
 		);
 	} else {
@@ -1041,8 +1211,8 @@ async function executeMultipleBenchmarks(
 			const { suite, scenario, tier, agent, model } = combinations[i];
 			
 			console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-			
-			await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId, true); // quiet mode
+
+			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true); // quiet mode
 		}
 	}
 	
@@ -1051,19 +1221,19 @@ async function executeMultipleBenchmarks(
 	const duration = endTime - startTime;
 	
 	// Calculate batch statistics
-	const batchStats = await logger.getBatchDetails(batchId);
+	const batchStats = logger.getBatchDetails(batchId);
 	if (batchStats) {
 		// Calculate successful runs directly from individual runs in the batch
 		// This ensures we use the new is_successful field
-		successfulRuns = await logger.getBatchSuccessfulRunsCount(batchId);
-
+		successfulRuns = logger.getBatchSuccessfulRunsCount(batchId);
+		
 		// Calculate average scores directly from individual runs in the batch
-		const scoreStats = await logger.getBatchScoreStats(batchId);
-		totalScore = scoreStats.avgScore ?? 0;
-		totalWeightedScore = scoreStats.avgWeightedScore ?? 0;
+		const scoreStats = logger.getBatchScoreStats(batchId);
+		totalScore = scoreStats.avgScore;
+		totalWeightedScore = scoreStats.avgWeightedScore;
 	}
-
-	await logger.completeBatch(batchId, {
+	
+	logger.completeBatch(batchId, {
 		totalRuns: combinations.length,
 		successfulRuns,
 		avgScore: totalScore,
@@ -1077,57 +1247,35 @@ async function executeMultipleBenchmarks(
 			duration
 		}
 	});
-
-	// Auto-sync to D1 if enabled
-	if (process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
-		console.log(chalk.blue('Syncing to D1...'));
-		try {
-			const workerDir = join(process.cwd(), 'worker');
-
-			// Run sync script silently in background (detached)
-			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
-				cwd: workerDir,
-				stdio: 'ignore',
-				shell: true,
-				detached: true,
-				env: { ...process.env }
-			});
-
-			// Unreference so parent can exit without waiting
-			syncProcess.unref();
-		} catch (error: any) {
-			// Silent failure - don't interrupt CLI flow
-		}
-	}
 	
 	// Note: Database is now created directly in public/ directory
 	
 	// Get comprehensive batch analytics
-	const analytics = await logger.getBatchAnalytics(batchId);
-
+	const analytics = logger.getBatchAnalytics(batchId);
+	
 	// Show batch summary header
 	console.log('\n' + chalk.bold.underline('Batch Summary'));
 	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 	console.log(`│ ${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 8))}...`);
-
+	
 	// Show model if all runs used the same model
 	const uniqueModels = [...new Set(combinations.map(c => c.model).filter(m => m))];
 	if (uniqueModels.length === 1) {
 		console.log(`│ ${chalk.bold('Model:')} ${chalk.cyan(uniqueModels[0])}`);
 	}
-
+	
 	console.log(`│ ${chalk.bold('Total Runs:')} ${combinations.length}`);
 	console.log(`│ ${chalk.bold('Completed:')} ${successfulRuns} (${combinations.length > 0 ? ((successfulRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
-
+	
 	// Show failed runs breakdown
-	const failedRunsCount = combinations.length - successfulRuns;
-	if (failedRunsCount > 0) {
-		console.log(`│ ${chalk.bold('Failed:')} ${chalk.red(failedRunsCount)} (${combinations.length > 0 ? ((failedRunsCount / combinations.length) * 100).toFixed(1) : 0}%)`);
-
+	const failedRuns = combinations.length - successfulRuns;
+	if (failedRuns > 0) {
+		console.log(`│ ${chalk.bold('Failed:')} ${chalk.red(failedRuns)} (${combinations.length > 0 ? ((failedRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
+		
 		// Get failure breakdown
-		const failureBreakdown = logger.getFailureBreakdown(analytics);
+		const failureBreakdown = logger.getFailureBreakdown(batchId);
 		if (failureBreakdown.length > 0) {
-			const failureReasons = failureBreakdown.map((f: any) => `${f.errorType}: ${f.count}`).join(', ');
+			const failureReasons = failureBreakdown.map(f => `${f.errorType}: ${f.count}`).join(', ');
 			console.log(`│ ${chalk.bold('Failure Reasons:')} ${chalk.red(failureReasons)}`);
 		}
 	}
@@ -1137,18 +1285,18 @@ async function executeMultipleBenchmarks(
 	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 	
 	// Show suite breakdown if analytics available
-	if (analytics && analytics.suiteBreakdown && analytics.suiteBreakdown.length > 0) {
+	if (analytics && analytics.suiteBreakdown.length > 0) {
 		console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
-		analytics.suiteBreakdown.forEach((suite: any) => {
+		analytics.suiteBreakdown.forEach(suite => {
 			const successRate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
 			console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${successRate}% success, ${suite.runs} runs)`)}`);
 		});
 	}
-
+	
 	// Show agent performance
-	if (analytics && analytics.agentBreakdown && analytics.agentBreakdown.length > 0) {
+	if (analytics && analytics.agentPerformance.length > 0) {
 		console.log(`\n${chalk.bold.underline('Agent Performance')}`);
-		analytics.agentBreakdown.forEach((agent: any, index: number) => {
+		analytics.agentPerformance.forEach((agent, index) => {
 			const rank = index + 1;
 			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
 			const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : '';
@@ -1156,12 +1304,11 @@ async function executeMultipleBenchmarks(
 			console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor](agent.avgWeightedScore.toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns}/${agent.runs} runs)`)}`);
 		});
 	}
-
+	
 	// Show failed runs if any
-	const failedRuns = logger.getFailureBreakdown(analytics);
-	if (failedRuns && failedRuns.length > 0) {
+	if (analytics && analytics.failedRuns.length > 0) {
 		console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
-		failedRuns.forEach((run: any) => {
+		analytics.failedRuns.forEach(run => {
 			console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent} - ${run.error || 'Unknown error'}`);
 		});
 	}
@@ -1549,14 +1696,8 @@ async function runInteractiveBenchmark() {
 		modelsToUse = selectedModels;
 		console.log(`🎯 Selected Claude Code models: ${modelsToUse.join(', ')}`);
 	}
-	
-	
-	// Ask for JSON output
-	const includeJson = await confirm({
-		message: 'Include JSON output?',
-		initialValue: true
-	});
-	
+
+
 	// Calculate total combinations for automatic parallel decision
 	const totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
 	
@@ -1586,7 +1727,6 @@ async function runInteractiveBenchmark() {
 	if (needsOpenRouterModels || needsAnthropicModels || needsClaudeCodeModels) {
 		console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
 	}
-	console.log(`   ${chalk.cyan('JSON output:')} ${includeJson ? 'Yes' : 'No'}`);
 	console.log(`   ${chalk.cyan('Parallel execution:')} ${useParallel ? `Yes (concurrency: ${concurrency})` : 'No'}`);
 	
 	// Show title before execution
@@ -1598,8 +1738,7 @@ async function runInteractiveBenchmark() {
 		scenariosToUse,
 		tiersToUse,
 		agentsToUse,
-		modelsToUse,
-		!includeJson
+		modelsToUse
 	);
 }
 
@@ -1631,18 +1770,18 @@ async function runInteractiveHistory() {
 		}) as number;
 		
 		// Execute history command
-		const runHistory = await logger.getRunHistory({ limit });
-
+		const runHistory = logger.getRunHistory(limit);
+		
 		if (runHistory.length === 0) {
 			log.warning('No benchmark runs found');
 			outro(chalk.yellow('Run a benchmark first'));
 			return;
 		}
-
+		
 		intro(chalk.bgCyan(' Benchmark History '));
-
+		
 		// Use common display function
-		runHistory.forEach((run: any, index: number) => displayRunInfo(run, index));
+		runHistory.forEach((run, index) => displayRunInfo(run, index));
 		
 		outro(chalk.green(`Showing ${runHistory.length} recent runs`));
 		
@@ -1688,7 +1827,7 @@ async function runInteractiveSuiteStats() {
 			}) as string;
 			
 			// Execute suite stats
-			const stats = await logger.getSuiteStats(selectedSuite) as any;
+			const stats = logger.getSuiteStats(selectedSuite);
 		console.log(chalk.bold.bgBlue(` Suite: ${selectedSuite} `));
 			console.log('\n' + chalk.underline('Overview'));
 			console.log(formatStats('Total Runs', stats.totalRuns));
@@ -1696,10 +1835,10 @@ async function runInteractiveSuiteStats() {
 			console.log(formatStats('Avg Score', stats.avgScore.toFixed(4), 'yellow'));
 			console.log(formatStats('Avg Weighted', stats.avgWeightedScore.toFixed(4), 'yellow'));
 			console.log(formatStats('Avg Duration', `${(stats.avgDuration / 1000).toFixed(2)}s`, 'blue'));
-
+			
 			if (stats.scenarioBreakdown.length > 0) {
 				console.log('\n' + chalk.underline('Scenario Breakdown'));
-				stats.scenarioBreakdown.forEach((scenario: any) => {
+				stats.scenarioBreakdown.forEach(scenario => {
 					console.log(`  ${chalk.cyan('•')} ${chalk.bold(scenario.scenario)}: ${chalk.yellow(scenario.avgScore.toFixed(4))} ${chalk.gray(`(${scenario.runs} runs)`)}`);
 				});
 			}
@@ -1751,26 +1890,26 @@ async function runInteractiveScenarioStats() {
 			}) as string;
 			
 			// Execute scenario stats
-			const stats = await logger.getScenarioStats(selectedSuite, selectedScenario) as any;
+			const stats = logger.getScenarioStats(selectedSuite, selectedScenario);
 		console.log(chalk.bold.bgMagenta(` ${selectedSuite}/${selectedScenario} `));
-
+			
 			// Score range with visual bar
 			const scorePercent = (stats.avgWeightedScore / 10) * 100;
 			const barLength = 20;
 			const filled = Math.round((scorePercent / 100) * barLength);
 			const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(barLength - filled));
 			console.log(`\n${bar} ${chalk.bold(stats.avgWeightedScore.toFixed(2))}/10`);
-
+			
 			console.log('\n' + chalk.underline('Overview'));
 			console.log(formatStats('Total Runs', stats.totalRuns));
 			console.log(formatStats('Success Rate', `${stats.totalRuns > 0 ? ((stats.successfulRuns / stats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
 			console.log(formatStats('Avg Score', stats.avgScore.toFixed(4), 'yellow'));
 			console.log(formatStats('Score Range', `${stats.minScore.toFixed(4)} - ${stats.maxScore.toFixed(4)}`, 'blue'));
-
+			
 			// Agent comparison table
 			if (stats.agentComparison.length > 0) {
 				console.log('\n' + chalk.underline('Agent Performance'));
-				stats.agentComparison.forEach((agent: any, i: number) => {
+				stats.agentComparison.forEach((agent, i) => {
 					const rank = i + 1;
 					const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
 					console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent.padEnd(15))} ${chalk.yellow(agent.avgScore.toFixed(4))} ${chalk.gray(`(${agent.runs} runs)`)}`);
@@ -1802,7 +1941,7 @@ async function runInteractiveRunStats() {
 	
 	try {
 			// Get recent runs to choose from
-			const runHistory = await logger.getRunHistory({ limit: 10 });
+			const runHistory = logger.getRunHistory(10);
 			
 			if (runHistory.length === 0) {
 				log.warning('No benchmark runs found');
@@ -1819,29 +1958,29 @@ async function runInteractiveRunStats() {
 			}) as string;
 			
 			// Execute run stats
-			const stats = await logger.getDetailedRunStats(selectedRun);
+			const stats = logger.getDetailedRunStats(selectedRun);
 		console.log(chalk.bold.bgGreen(` Run Details `));
 			console.log(`\n${chalk.gray('ID:')} ${chalk.dim(selectedRun.substring(0, 8))}...`);
-			console.log(formatStats('Suite', stats.suite));
-			console.log(formatStats('Scenario', stats.scenario));
-			console.log(formatStats('Tier', stats.tier));
-			console.log(formatStats('Agent', stats.agent + (stats.model ? ` (${stats.model})` : '')));
-			console.log(formatStats('Status', stats.status, stats.status === 'completed' ? 'green' : stats.status === 'failed' ? 'red' : 'yellow'));
-			console.log(formatStats('Started', new Date(stats.startedAt).toLocaleString()));
-			if (stats.completedAt) {
-				console.log(formatStats('Completed', new Date(stats.completedAt).toLocaleString()));
+			console.log(formatStats('Suite', stats.run.suite));
+			console.log(formatStats('Scenario', stats.run.scenario));
+			console.log(formatStats('Tier', stats.run.tier));
+			console.log(formatStats('Agent', stats.run.agent + (stats.run.model ? ` (${stats.run.model})` : '')));
+			console.log(formatStats('Status', stats.run.status, stats.run.status === 'completed' ? 'green' : stats.run.status === 'failed' ? 'red' : 'yellow'));
+			console.log(formatStats('Started', new Date(stats.run.startedAt).toLocaleString()));
+			if (stats.run.completedAt) {
+				console.log(formatStats('Completed', new Date(stats.run.completedAt).toLocaleString()));
 			}
-			if (stats.totalScore !== null && stats.totalScore !== undefined) {
-				console.log(formatStats('Total Score', stats.totalScore.toFixed(4), 'green'));
+			if (stats.run.totalScore !== null && stats.run.totalScore !== undefined) {
+				console.log(formatStats('Total Score', stats.run.totalScore.toFixed(4), 'green'));
 			}
-			if (stats.weightedScore !== null && stats.weightedScore !== undefined) {
-				console.log(formatStats('Weighted Score', stats.weightedScore.toFixed(4), 'green'));
+			if (stats.run.weightedScore !== null && stats.run.weightedScore !== undefined) {
+				console.log(formatStats('Weighted Score', stats.run.weightedScore.toFixed(4), 'green'));
 			}
-
+			
 			// Evaluation breakdown with progress bars
-			if (stats.evaluations && stats.evaluations.length > 0) {
+			if (stats.evaluationBreakdown.length > 0) {
 				console.log('\n' + chalk.underline('Evaluations'));
-				stats.evaluations.forEach((evaluation: any) => {
+				stats.evaluationBreakdown.forEach(evaluation => {
 					const percent = evaluation.percentage;
 					const color = percent === 100 ? 'green' : percent >= 80 ? 'yellow' : 'red';
 					const barLength = 15;
@@ -1852,12 +1991,12 @@ async function runInteractiveRunStats() {
 				});
 			}
 			
-			if (stats.telemetry) {
+			if (stats.telemetrySummary) {
 				console.log('\n' + chalk.underline('Telemetry'));
-				console.log(formatStats('Tool Calls', (stats.telemetry.toolCalls || 0) as any, 'blue'));
-				console.log(formatStats('Tokens', `${stats.telemetry.tokensIn || 0}/${stats.telemetry.tokensOut || 0}`, 'blue'));
-				console.log(formatStats('Cost', `$${(stats.telemetry.costUsd || 0).toFixed(6)}`, 'blue'));
-				console.log(formatStats('Duration', `${((stats.telemetry.durationMs || 0) / 1000).toFixed(2)}s`, 'blue'));
+				console.log(formatStats('Tool Calls', stats.telemetrySummary.toolCalls, 'blue'));
+				console.log(formatStats('Tokens', stats.telemetrySummary.tokens, 'blue'));
+				console.log(formatStats('Cost', `$${stats.telemetrySummary.cost.toFixed(6)}`, 'blue'));
+				console.log(formatStats('Duration', `${(stats.telemetrySummary.duration / 1000).toFixed(2)}s`, 'blue'));
 			}
 			
 	} catch (error) {
@@ -1882,24 +2021,24 @@ async function runInteractiveBatchStats() {
 	
 	try {
 			// Get recent batches to choose from
-			const batchHistory = await logger.getBatchHistory(10);
-
+			const batchHistory = logger.getBatchHistory(10);
+			
 			if (batchHistory.length === 0) {
 				log.warning('No batch runs found');
 				outro(chalk.yellow('Run some benchmarks first'));
 				return;
 			}
-
+			
 			const selectedBatch = await select({
 				message: 'Choose a batch to view details:',
-				options: batchHistory.map((batch: any, index: number) => ({
+				options: batchHistory.map((batch, index) => ({
 					value: batch.batchId,
 					label: `${index + 1}. Batch ${batch.batchId.substring(0, 8)}... - ${batch.successfulRuns}/${batch.totalRuns} runs - ${batch.avgWeightedScore?.toFixed(4) || 'N/A'}`
 				}))
 			}) as string;
-
+			
 			// Execute batch stats
-			const batchStats = await logger.getBatchDetails(selectedBatch);
+			const batchStats = logger.getBatchDetails(selectedBatch);
 			if (!batchStats) {
 				log.error('Batch not found');
 				return;
@@ -1907,12 +2046,12 @@ async function runInteractiveBatchStats() {
 			
 		console.log(chalk.bold.bgGreen(` Batch Details `));
 			console.log(`\n${chalk.gray('ID:')} ${chalk.dim(selectedBatch.substring(0, 8))}...`);
-			console.log(formatStats('Total Runs', (batchStats.totalRuns || 0) as any));
-			console.log(formatStats('Successful', (batchStats.successfulRuns || 0) as any, 'green'));
-			console.log(formatStats('Success Rate', `${(batchStats.totalRuns || 0) > 0 ? (((batchStats.successfulRuns || 0) / (batchStats.totalRuns || 0)) * 100).toFixed(1) : 0}%`, 'green'));
-			console.log(formatStats('Avg Score', (batchStats.avgScore || 0).toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Weighted', (batchStats.avgWeightedScore || 0).toFixed(4), 'yellow'));
-			console.log(formatStats('Duration', `${((batchStats.duration || 0) / 1000).toFixed(2)}s`, 'blue'));
+			console.log(formatStats('Total Runs', batchStats.totalRuns));
+			console.log(formatStats('Successful', batchStats.successfulRuns, 'green'));
+			console.log(formatStats('Success Rate', `${batchStats.totalRuns > 0 ? ((batchStats.successfulRuns / batchStats.totalRuns) * 100).toFixed(1) : 0}%`, 'green'));
+			console.log(formatStats('Avg Score', batchStats.avgScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Weighted', batchStats.avgWeightedScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Duration', `${(batchStats.duration / 1000).toFixed(2)}s`, 'blue'));
 			console.log(formatStats('Started', new Date(batchStats.createdAt).toLocaleString()));
 			if (batchStats.completedAt) {
 				console.log(formatStats('Completed', new Date(batchStats.completedAt).toLocaleString()));
@@ -1922,17 +2061,17 @@ async function runInteractiveBatchStats() {
 			if (batchStats.runs.length > 0) {
 				console.log('\n' + chalk.underline('Runs in Batch'));
 				const sortedRuns = batchStats.runs
-					.filter((run: any) => run.weightedScore !== null && run.weightedScore !== undefined)
-					.sort((a: any, b: any) => (b.weightedScore || 0) - (a.weightedScore || 0));
-
-                sortedRuns.forEach((run: any, index: number) => {
+					.filter(run => run.weightedScore !== null && run.weightedScore !== undefined)
+					.sort((a, b) => (b.weightedScore || 0) - (a.weightedScore || 0));
+				
+                sortedRuns.forEach((run, index) => {
 					const rank = index + 1;
 					const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
                     const status = run.status === 'completed'
                       ? chalk.green('✓')
                       : run.status === 'failed'
                       ? chalk.red('✗')
-                      : run.status === 'running'
+                      : run.status === 'incomplete'
                       ? chalk.yellow('◐')
                       : chalk.blue('○');
 					console.log(`  ${rankDisplay} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)} ${chalk.cyan(run.agent)} ${chalk.yellow(run.weightedScore?.toFixed(4) || 'N/A')}`);
@@ -1962,38 +2101,38 @@ async function runInteractiveEvaluators() {
 	
 	try {
 		intro(chalk.bgYellow(' Evaluator Performance '));
-
-		const stats = await logger.getStats();
-
-		if (Object.keys(stats.evaluatorStats || {}).length === 0) {
+		
+		const stats = logger.getStats();
+		
+		if (Object.keys(stats.evaluatorStats).length === 0) {
 			log.warning('No evaluator data available');
 			outro(chalk.yellow('Run some benchmarks first'));
 			return;
 		}
-
+		
 		// Sort by performance
-		const sorted = Object.entries(stats.evaluatorStats || {}).sort((a: any, b: any) => b[1].averageScore - a[1].averageScore);
-
+		const sorted = Object.entries(stats.evaluatorStats).sort((a, b) => b[1].averageScore - a[1].averageScore);
+		
 		console.log('\n' + chalk.underline('Performance Ranking'));
-		sorted.forEach(([name, stat]: [string, any], index: number) => {
+		sorted.forEach(([name, stat], index) => {
 			const rank = index + 1;
 			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
 			const percent = (stat.averageScore * 100).toFixed(1);
 			const color = stat.averageScore >= 0.9 ? 'green' : stat.averageScore >= 0.7 ? 'yellow' : 'red';
-
+			
 			console.log(`  ${rankDisplay} ${chalk.bold(name.padEnd(30))} ${chalk[color](percent + '%')} ${chalk.gray(`(${stat.count} runs)`)}`);
 		});
-
+		
 		// Show best and worst performers
 		const best = sorted[0];
 		const worst = sorted[sorted.length - 1];
-
+		
 		console.log('\n' + chalk.underline('Performance Summary'));
 		console.log(`  ${chalk.green('Best:')} ${chalk.bold(best[0])} ${chalk.green((best[1].averageScore * 100).toFixed(1) + '%')}`);
 		console.log(`  ${chalk.red('Needs Work:')} ${chalk.bold(worst[0])} ${chalk.red((worst[1].averageScore * 100).toFixed(1) + '%')}`);
-
+		
 		// Show model performance using common function
-		const modelStats = await logger.getModelPerformanceStats('');
+		const modelStats = logger.getModelPerformanceStats();
 		displayModelPerformance(modelStats);
 		
 		outro(chalk.green('Analysis complete'));
@@ -2033,17 +2172,17 @@ async function runInteractiveBatchHistory() {
 		}) as number;
 		
 		// Execute batch history command
-		const batchHistory = await logger.getBatchHistory(limit);
-
+		const batchHistory = logger.getBatchHistory(limit);
+		
 		if (batchHistory.length === 0) {
 			log.warning('No batch runs found');
 			outro(chalk.yellow('Run some benchmarks first'));
 			return;
 		}
-
+		
 		intro(chalk.bgCyan(' Batch History '));
-
-		batchHistory.forEach((batch: any, index: number) => {
+		
+		batchHistory.forEach((batch, index) => {
 			const status = batch.completedAt 
 				? chalk.green('✓') 
 				: chalk.yellow('○');
@@ -2077,20 +2216,20 @@ async function runInteractiveClear() {
 	
 	try {
 		intro(chalk.bgRed(' Clear Database '));
-
+		
 		// Get count before clearing
-		const stats = await logger.getStats();
+		const stats = logger.getStats();
 		log.warning(`Found ${chalk.bold(stats.totalRuns)} benchmark runs`);
-
+		
 		const shouldClear = await confirm({
 			message: 'Are you sure you want to clear all data?',
 			initialValue: false
 		});
-
+		
 		if (shouldClear) {
 			const s = spinner();
 			s.start('Clearing database...');
-			await logger.clearDatabase();
+			logger.clearDatabase();
 			s.stop('Database cleared');
 			outro(chalk.green('✓ All data removed'));
 		} else {
@@ -2174,14 +2313,14 @@ function calculateSuccess(
 // SECTION 9: MAIN BENCHMARK RUNNER
 // ============================================================================
 
-async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, noJson?: boolean, batchId?: string, quiet?: boolean) {
+async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string, quiet?: boolean, specialist?: string) {
 	// Initialize logger
 	const logger = BenchmarkLogger.getInstance();
-	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
+
+	// Determine the agent name to log (will be updated if specialist is used)
+	let agentName = agent;
+	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId, !!specialist);
 	const startTime = Date.now();
-	
-	// Store runId for potential sync later
-	const currentRunId = runId;
 
 	// Timeout watchdog based on scenario timeout_minutes (default 60)
 	let timeoutId: NodeJS.Timeout | null = null;
@@ -2197,9 +2336,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		// Start timeout watchdog after loading scenario config
 		const scenarioTimeoutMin = Number(scenarioCfg.timeout_minutes || 60);
 		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
-		timeoutId = setTimeout(async () => {
+		timeoutId = setTimeout(() => {
 			try {
-				await logger.failRun(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'unknown');
+				logger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
 				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
 			} catch {}
 		}, timeoutMs);
@@ -2209,19 +2348,29 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 		// Early failure check: prompt missing for non-echo agents
 		if (!promptContent && agent !== 'echo') {
-			await logger.failRun('Prompt file not found', 'prompt');
+			logger.failRun('Prompt file not found', 'prompt');
 			if (!quiet) console.log(chalk.red('✗ Prompt file not found'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
 			return;
 		}
-	
+
+	// Stage 1.5: Warmup (if configured)
+		if (progress) updateProgress(progress, 1, 'Running warmup phase');
+	const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, quiet);
+		if (!warmupResult.success) {
+			logger.failRun(`Warmup failed: ${warmupResult.error}`, 'warmup');
+			if (!quiet) console.log(chalk.red(`✗ Warmup failed: ${warmupResult.error}`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
+			return;
+		}
+
 	// Stage 2: Workspace
 		if (progress) updateProgress(progress, 2, 'Preparing workspace');
 	const workspacePrep = prepareWorkspaceFromFixture(suite, scenario);
 		
 		// Early failure check: workspace preparation failed
 		if (!workspacePrep) {
-			await logger.failRun('Workspace preparation failed', 'workspace');
+			logger.failRun('Workspace preparation failed', 'workspace');
 			if (!quiet) console.log(chalk.red('✗ Workspace preparation failed'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`));
 			return;
@@ -2229,7 +2378,11 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 		const workspaceDir = workspacePrep.workspaceDir;
 		const fixtureDir = workspacePrep.fixtureDir;
-	
+
+		console.log(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
+		console.log(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
+		console.log(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+
 	// Initialize result structure
 	const result = {
 		suite,
@@ -2256,12 +2409,19 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 
 	// Stage 3: Agent Execution
+	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agent));
 	if (promptContent && agent !== 'echo') {
+		console.log(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
+			console.log(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
 			// Create agent adapter
-		const agentAdapter = createAgentAdapter(agent, model);
-			
+		const agentAdapter = createAgentAdapter(agent, model, specialist);
+
+			// Update the logged agent name with the actual adapter name
+			// (for specialists, this will be "specialist:template-name:base-adapter")
+			logger.updateAgent(agentAdapter.name, runId);
+
 			// Show selected model info - ALWAYS for OpenRouter
 			if (agent === 'openrouter' && 'getModel' in agentAdapter) {
 				const adapterModel = (agentAdapter as any).getModel();
@@ -2305,23 +2465,19 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 				}
 			}
 			
-			// Build system prompt with tool usage guidance
-			const systemPrompt = agent === 'anthropic' 
-				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.\n\nAvailable Tools:\n- readFile: Read any file in the workspace\n- writeFile: Modify files (e.g., package.json files)\n- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)\n- listFiles: Explore directory structure\n- askUser: Ask questions when you need clarification or approval for major changes\n\nWork efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
-				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
-			
+			// Build the request messages
+			// For vanilla runs: send ONLY user message (no system prompt for true baseline testing)
+			// For specialist runs: SpecialistAdapter will add the specialist system prompt from template
+			const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+				{
+					role: 'user' as const,
+					content: promptContent
+				}
+			];
+
 			// Build the request
 			const request: AgentRequest = {
-				messages: [
-					{
-						role: 'system' as const,
-						content: systemPrompt
-					},
-					{
-						role: 'user' as const,
-						content: promptContent
-					}
-				],
+				messages,
 				...(workspaceDir && { workspaceDir }),
 			};
 
@@ -2362,29 +2518,33 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 				request.toolHandlers = toolHandlers;
 			}
 
+			// Extract the prompt being sent for logging
+			const promptSent = JSON.stringify(request.messages);
+
 			// Execute agent request
 			const response = await agentAdapter.send(request);
-			
+
 			// Show summary after agent completes
 			console.log(chalk.gray(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`));
-			
+
 			// Update result with agent response
 			result.agent_response = response.content;
 			result.telemetry.tokens.in = response.tokensIn || 0;
 			result.telemetry.tokens.out = response.tokensOut || 0;
 			result.telemetry.cost_usd = response.costUsd || 0;
 			result.telemetry.toolCalls = response.toolCalls ?? 0;
-			
+
 			// Log telemetry to database
 			const duration = Date.now() - startTime;
-			await logger.logTelemetry(runId, {
-				toolCalls: response.toolCalls ?? 0,
-				tokensIn: response.tokensIn || 0,
-				tokensOut: response.tokensOut || 0,
-				costUsd: response.costUsd || 0,
-				durationMs: duration,
-				workspaceDir
-			});
+			logger.logTelemetry(
+				response.toolCalls ?? 0,
+				response.tokensIn || 0,
+				response.tokensOut || 0,
+				response.costUsd || 0,
+				duration,
+				workspaceDir,
+				promptSent
+			);
 			
 			// Log oracle usage if available
 			if (oracle) {
@@ -2398,18 +2558,20 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			// Telemetry is shown in final results
 			
 		} catch (error) {
-			await logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
+			console.log(chalk.magenta('🔍 DEBUG: Agent execution threw error:', error));
+			logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) console.log(chalk.red('✗ Agent execution failed'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 			return; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
-		// No prompt loaded, skipping agent execution
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
 	} else {
-		// Using echo agent (no actual execution)
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent'));
 	}
 
 	// Stage 4: Validation
+	console.log(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
 	if (progress) updateProgress(progress, 4, 'Running validation commands');
 	const commandLog = workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
 	const diffArtifacts = workspaceDir && fixtureDir ? buildDiffArtifacts(fixtureDir, workspaceDir) : { diffSummary: [], depsDelta: [] };
@@ -2418,8 +2580,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	if (!quiet) console.log(chalk.gray(`  ✓ ${passedCommands}/${commandLog.length} commands passed`));
 
 	// Stage 5: Evaluation
+	console.log(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
 	if (progress) updateProgress(progress, 5, 'Computing scores');
-	
+
 	try {
 		if (workspaceDir) {
 			// Actually run evaluators
@@ -2440,12 +2603,12 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			
 			// Log evaluation results to database
 			for (const evalResult of evaluatorResults) {
-				await logger.logEvaluation(runId, {
-					evaluatorName: evalResult.name,
-					score: evalResult.score,
-					maxScore: 1.0,
-					details: evalResult.details
-				});
+				logger.logEvaluation(
+					evalResult.name,
+					evalResult.score,
+					1.0, // max score
+					evalResult.details
+				);
 			}
 			
 			// Show evaluator summary
@@ -2462,7 +2625,19 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	// Calculate success based on validation commands and evaluator scores
 	const { isSuccessful, successMetric } = calculateSuccess(commandLog, result.scores || {}, scenarioCfg);
 	
-	await logger.completeRun(
+	// Extract package manager and test results
+	let packageManager: string | undefined;
+	if (workspaceDir) {
+		packageManager = detectPackageManager(workspaceDir);
+		if (packageManager === 'unknown') {
+			packageManager = extractPackageManagerFromCommand(commandLog);
+		}
+	}
+	
+	const testResults = extractTestResults(commandLog);
+	const testResultsJson = testResults ? JSON.stringify(testResults) : undefined;
+	
+	logger.completeRun(
 		totalScore,
 		result.totals?.weighted,
 		{
@@ -2471,30 +2646,10 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			oracleQuestions: (result as any).oracle_questions
 		},
 		isSuccessful,
-		successMetric
+		successMetric,
+		packageManager,
+		testResultsJson
 	);
-
-	// Auto-sync to D1 if enabled and not in batch mode (batches sync after completion)
-	if (!batchId && process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
-		console.log(chalk.blue('Syncing to D1...'));
-		try {
-			const workerDir = join(process.cwd(), 'worker');
-
-			// Run sync script silently in background (detached)
-			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
-				cwd: workerDir,
-				stdio: 'ignore',
-				shell: true,
-				detached: true,
-				env: { ...process.env }
-			});
-
-			// Unreference so parent can exit without waiting
-			syncProcess.unref();
-		} catch (error: any) {
-			// Silent failure - don't interrupt CLI flow
-		}
-	}
 
 	// Stage 6: Results
 	if (progress) updateProgress(progress, 6, 'Preparing results');
@@ -2562,14 +2717,14 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 	// Show database summary in table format
 	try {
-		const stats = await logger.getStats();
+		const stats = logger.getStats();
 		console.log(`\n${chalk.bold.underline('Database Summary')}`);
 		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 		console.log(`│ ${chalk.bold('Metric'.padEnd(25))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Status'.padEnd(10))} │`);
 		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-		console.log(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue((stats.totalRuns || 0).toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${((stats.successRate || 0) * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green((stats.averageWeightedScore || 0).toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue(stats.totalRuns.toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${(stats.successRate * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green(stats.averageWeightedScore.toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
 		console.log(`│ ${chalk.cyan('Database'.padEnd(25))} ${chalk.blue('benchmark-report/public/benchmarks.db'.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
 		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
@@ -2578,13 +2733,8 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		console.error(chalk.dim(dbError instanceof Error ? dbError.message : String(dbError)));
 	}
 
-	// Optionally write JSON
-	if (!noJson) {
-	writeResult(result, suite, scenario);
-		console.log(`\n${chalk.green('✓')} Results saved to database and JSON`);
-	} else {
-		console.log(`\n${chalk.yellow('⚠')} JSON output disabled, results saved to database only`);
-	}
+	// Results are saved to database only (benchmarks.db is the single source of truth)
+	console.log(`\n${chalk.green('✓')} Results saved to database`);
 	
 	// Note: Database is now created directly in public/ directory
 	
@@ -2593,9 +2743,23 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 	} catch (error) {
 		// Catch-all for unexpected errors
-		await logger.failRun(error instanceof Error ? error.message : String(error), 'unknown');
-		if (!quiet) console.log(chalk.red('✗ Unexpected error'));
-		if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+
+		logger.failRun(errorMessage, 'unknown');
+
+		if (!quiet) {
+			console.log(chalk.red('✗ Unexpected error'));
+			console.error(chalk.red('\nError details:'));
+			console.error(chalk.red(errorMessage));
+			if (errorStack) {
+				console.error(chalk.dim('\nStack trace:'));
+				console.error(chalk.dim(errorStack));
+			}
+		}
+		if (quiet) {
+			console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`));
+		}
 	} finally {
 		if (progress) completeProgress(progress);
 		// Clear timeout watchdog if set
@@ -2719,26 +2883,26 @@ async function run() {
 		
 		intro(chalk.bgCyan(' Benchmark History '));
 		
-		try{
-			const runHistory = await logger.getRunHistory({ limit });
-
+		try {
+			const runHistory = logger.getRunHistory(limit);
+			
 			if (runHistory.length === 0) {
 				log.warning('No benchmark runs found');
 				outro(chalk.yellow('Run a benchmark first: pnpm bench <suite> <scenario>'));
 				return;
 			}
-
+			
 			// Use common display function
-			runHistory.forEach((run: any, index: number) => displayRunInfo(run, index));
-
+			runHistory.forEach((run, index) => displayRunInfo(run, index));
+			
 			// Show overall stats
-			const stats = await logger.getStats();
+			const stats = logger.getStats();
 			console.log('\n' + chalk.underline('Overall Statistics'));
-			console.log(formatStats('Total Runs', stats.totalRuns || 0));
-			console.log(formatStats('Success Rate', `${((stats.successRate || 0) * 100).toFixed(1)}%`, 'green'));
-			console.log(formatStats('Avg Score', (stats.averageScore || 0).toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Weighted', (stats.averageWeightedScore || 0).toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Duration', `${((stats.averageDuration || 0) / 1000).toFixed(2)}s`, 'blue'));
+			console.log(formatStats('Total Runs', stats.totalRuns));
+			console.log(formatStats('Success Rate', `${(stats.successRate * 100).toFixed(1)}%`, 'green'));
+			console.log(formatStats('Avg Score', stats.averageScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Weighted', stats.averageWeightedScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Duration', `${(stats.averageDuration / 1000).toFixed(2)}s`, 'blue'));
 			
 			outro(chalk.green(`Showing ${runHistory.length} recent runs`));
 			
@@ -2758,17 +2922,17 @@ async function run() {
 		const limit = parsedArgs.limit;
 		
 		try {
-			const batches = await logger.getAllBatches(limit);
-
+			const batches = logger.getAllBatches({ limit });
+			
 			if (batches.length === 0) {
 				log.warning('No batches found');
 				outro(chalk.yellow('Run some benchmarks first'));
 				return;
 			}
-
+			
 			intro(chalk.bgCyan(' Batch History '));
-
-			batches.forEach((batch: any, index: number) => {
+			
+			batches.forEach((batch, index) => {
 				const status = batch.completedAt 
 					? chalk.green('✓') 
 					: chalk.yellow('○');
@@ -2805,19 +2969,19 @@ async function run() {
 		}
 		
 		try {
-			const analytics = await logger.getBatchAnalytics(batchId);
-
+			const analytics = logger.getBatchAnalytics(batchId);
+			
 			if (!analytics) {
 				log.error(chalk.red(`Batch ${batchId} not found`));
 				return;
 			}
-
+			
 			intro(chalk.bgCyan(' Batch Details '));
-
-			const batch = (analytics as any).batch;
+			
+			const batch = analytics.batch;
 			const duration = batch.duration / 1000;
 			const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(1) : 0;
-
+			
 			console.log(`\n${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 16))}...`);
 			console.log(formatStats('Status', batch.completedAt ? 'Completed' : 'Running', batch.completedAt ? 'green' : 'yellow'));
 			console.log(formatStats('Total Runs', `${batch.totalRuns}`, 'blue'));
@@ -2825,40 +2989,39 @@ async function run() {
 			console.log(formatStats('Avg Score', batch.avgWeightedScore.toFixed(4), 'yellow'));
 			console.log(formatStats('Duration', `${duration.toFixed(2)}s`, 'blue'));
 			console.log(formatStats('Started', new Date(batch.createdAt).toLocaleString()));
-
+			
 			// Suite breakdown
-			if (analytics.suiteBreakdown && analytics.suiteBreakdown.length > 0) {
+			if (analytics.suiteBreakdown.length > 0) {
 				console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
-				analytics.suiteBreakdown.forEach((suite: any) => {
+				analytics.suiteBreakdown.forEach(suite => {
 					const rate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
 					console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${rate}% success, ${suite.runs} runs)`)}`);
 				});
 			}
-
+			
 			// Agent performance
-			if (analytics.agentBreakdown && analytics.agentBreakdown.length > 0) {
+			if (analytics.agentPerformance.length > 0) {
 				console.log(`\n${chalk.bold.underline('Agent Performance')}`);
-				analytics.agentBreakdown.forEach((agent: any, i: number) => {
+				analytics.agentPerformance.forEach((agent, i) => {
 					const rankDisplay = i < 3 ? `#${i + 1}` : `${i + 1}.`;
 					const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : '';
 					const scoreColor = agent.avgWeightedScore >= 9 ? 'green' : agent.avgWeightedScore >= 7 ? 'yellow' : 'red';
 					console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor](agent.avgWeightedScore.toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns}/${agent.runs})`)}`);
 				});
 			}
-
+			
 			// Tier distribution
-			if (analytics.tierBreakdown && analytics.tierBreakdown.length > 0) {
+			if (analytics.tierDistribution.length > 0) {
 				console.log(`\n${chalk.bold.underline('Tier Distribution')}`);
-				analytics.tierBreakdown.forEach((tier: any) => {
+				analytics.tierDistribution.forEach(tier => {
 					console.log(`  ${chalk.cyan(tier.tier)}: ${tier.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${tier.successfulRuns}/${tier.runs} runs)`)}`);
 				});
 			}
-
+			
 			// Failed runs
-			const failedRuns = logger.getFailureBreakdown(analytics);
-			if (failedRuns && failedRuns.length > 0) {
+			if (analytics.failedRuns.length > 0) {
 				console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
-				failedRuns.forEach((run: any) => {
+				analytics.failedRuns.forEach(run => {
 					console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent}`);
 				});
 			}
@@ -2886,26 +3049,26 @@ async function run() {
 		}
 		
 		try {
-			const batches = await logger.getBatchComparison();
-
+			const batches = logger.getBatchComparison(batchIds);
+			
 			if (batches.length === 0) {
 				log.error(chalk.red('No batches found with the provided IDs'));
 				return;
 			}
-
+			
 			intro(chalk.bgMagenta(' Batch Comparison '));
-
+			
 			console.log(`\n${chalk.bold('Comparing')} ${batches.length} batches:\n`);
-
+			
 			// Create comparison table
-			console.log(chalk.bold('Batch'.padEnd(12)) + ' | ' +
-			           chalk.bold('Runs'.padEnd(8)) + ' | ' +
-			           chalk.bold('Success'.padEnd(10)) + ' | ' +
-			           chalk.bold('Avg Score'.padEnd(10)) + ' | ' +
+			console.log(chalk.bold('Batch'.padEnd(12)) + ' | ' + 
+			           chalk.bold('Runs'.padEnd(8)) + ' | ' + 
+			           chalk.bold('Success'.padEnd(10)) + ' | ' + 
+			           chalk.bold('Avg Score'.padEnd(10)) + ' | ' + 
 			           chalk.bold('Duration'));
 			console.log('─'.repeat(70));
-
-			batches.forEach((batch: any) => {
+			
+			batches.forEach(batch => {
 				const batchIdShort = batch.batchId.substring(0, 8) + '...';
 				const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(0) + '%' : 'N/A';
 				const duration = batch.duration ? `${(batch.duration / 1000).toFixed(0)}s` : 'N/A';
@@ -2956,29 +3119,29 @@ async function run() {
 		await createNewScenario(suite, name);
 		return;
 	}
-	
-	const { cmd, suite, scenario, tier, agent, model, noJson } = parsedArgs;
+
+	const { cmd, suite, scenario, tier, agent, model, batchId, specialist } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
 	}
-	
+
 	// Show modern CLI intro with hyperfine-style header
 	console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
 	console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agent}'`)}`);
-	
+
 	log.info(chalk.bold(`Running: ${suite}/${scenario}`));
 	log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agent)}`);
-	
+
 	// Warn if OpenRouter agent but no model specified
 	if (agent === 'openrouter' && !model && !process.env.OPENROUTER_MODEL) {
 		console.log(chalk.yellow(`\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
 		console.log(chalk.gray(`   Tip: Use --model flag or set OPENROUTER_MODEL environment variable`));
 		console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\n`));
 	}
-	
+
 	// Execute the benchmark
-	await executeBenchmark(suite, scenario, tier, agent, model, noJson);
+	await executeBenchmark(suite, scenario, tier, agent, model, batchId, false, specialist);
 }
 
 // Cleanup handlers
@@ -2986,29 +3149,24 @@ process.on('exit', () => {
 	stopDevServer();
 });
 
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
-        // Mark current run as failed if any
-        if ((logger as any).currentRunId) {
-            await logger.failRun('Interrupted by user (SIGINT)', 'unknown');
-            console.log(chalk.yellow('⚠ Current run marked as failed'));
-        }
+        // Mark current run incomplete if any
+        (logger as any).markRunIncomplete?.('Interrupted by user (SIGINT)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
     } catch {}
     stopDevServer();
     process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
-        // Mark current run as failed if any
-        if ((logger as any).currentRunId) {
-            await logger.failRun('Interrupted by system (SIGTERM)', 'unknown');
-            console.log(chalk.yellow('⚠ Current run marked as failed'));
-        }
+        (logger as any).markRunIncomplete?.('Interrupted by system (SIGTERM)', 'signal');
+        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
     } catch {}
     stopDevServer();
     process.exit(0);
@@ -3026,17 +3184,17 @@ process.on('unhandledRejection', (reason, promise) => {
 	process.exit(1);
 });
 
-run().catch(async (err) => {
+run().catch((err) => {
 	console.log(`\n${chalk.red('✗')} Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
-
+	
 	// Try to log the error to database if logger is available
 	try {
 		const logger = BenchmarkLogger.getInstance();
-		await logger.failRun(String(err));
+		logger.failRun(String(err));
 	} catch (logErr) {
 		console.log(`${chalk.yellow('⚠')} Failed to log error to database: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
 	}
-
+	
 	stopDevServer();
 	process.exit(1);
 });

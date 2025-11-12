@@ -104,7 +104,8 @@ export class SpecialistAdapter implements AgentAdapter {
       }
 
       // Transform prompt using agency-prompt-creator
-      const result = createPrompt(this.template, userMessage, {
+      const result = createPrompt(this.template, {
+        userPrompt: userMessage,
         // Extract model from environment or use default
         model: this.getModelName(),
         // Pass any additional context from the request
@@ -114,7 +115,7 @@ export class SpecialistAdapter implements AgentAdapter {
       // Create modified request with transformed system prompt
       const modifiedRequest: AgentRequest = {
         ...request,
-        messages: this.injectSystemPrompt(request.messages, result.finalPrompt)
+        messages: this.injectSystemPrompt(request.messages, result.prompt)
       };
 
       // Delegate to underlying adapter

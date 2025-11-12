@@ -3,6 +3,7 @@ export type ScoreCard = Record<string, number>;
 export interface ScenarioConfig {
 	id: string;
 	suite: string;
+	reference_path?: string;
 	title?: string;
 	description?: string;
 	constraints?: {
