@@ -8,9 +8,8 @@ export class DependencyProximityEvaluator implements Evaluator {
 
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
-			// Get reference directory path
-			const referencePath = this.getReferencePath(ctx);
-			if (!referencePath || !fs.existsSync(referencePath)) {
+			// Use reference path from context (no filesystem traversal needed)
+			if (!ctx.referencePath || !fs.existsSync(ctx.referencePath)) {
 				return {
 					name: this.meta.name,
 					score: 0,
@@ -19,7 +18,7 @@ export class DependencyProximityEvaluator implements Evaluator {
 			}
 
 			const workspacePkgPath = path.join(ctx.workspaceDir, 'package.json');
-			const referencePkgPath = path.join(referencePath, 'package.json');
+			const referencePkgPath = path.join(ctx.referencePath, 'package.json');
 
 			if (!fs.existsSync(workspacePkgPath)) {
 				return {
@@ -76,38 +75,6 @@ export class DependencyProximityEvaluator implements Evaluator {
 				details: `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
 			};
 		}
-	}
-
-	private getReferencePath(ctx: EvaluationContext): string | null {
-		if (!ctx.scenario.reference_path) {
-			return null;
-		}
-
-		// Find the ze-benchmarks root by looking for suites directory
-		let currentDir = __dirname;
-		let suitesDir = null;
-
-		// Go up max 10 levels to find suites directory
-		for (let i = 0; i < 10; i++) {
-			const possibleSuitesDir = path.join(currentDir, 'suites');
-			if (fs.existsSync(possibleSuitesDir)) {
-				suitesDir = possibleSuitesDir;
-				break;
-			}
-			const parent = path.dirname(currentDir);
-			if (parent === currentDir) break; // Reached root
-			currentDir = parent;
-		}
-
-		if (!suitesDir) {
-			return null;
-		}
-
-		// Construct path: suites/{suite}/scenarios/{scenario-name}/../reference_path
-		const scenarioDir = path.join(suitesDir, ctx.scenario.suite, 'scenarios', ctx.scenario.id.replace('ZE_', ''));
-		const referencePath = path.resolve(scenarioDir, ctx.scenario.reference_path);
-
-		return fs.existsSync(referencePath) ? referencePath : null;
 	}
 
 	private compareDependency(

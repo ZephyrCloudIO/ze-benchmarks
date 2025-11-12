@@ -54,6 +54,8 @@ export interface ExecutedCommand {
 export interface EvaluationContext {
 	scenario: ScenarioConfig;
 	workspaceDir: string;
+	suitesDir: string; // Absolute path to suites directory
+	referencePath?: string; // Absolute path to reference implementation (if scenario has reference_path)
 	agentResponse?: string;
 	diffSummary?: FileDiff[];
 	depsDelta?: DepChange[];

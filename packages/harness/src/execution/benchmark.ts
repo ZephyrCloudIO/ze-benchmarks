@@ -344,10 +344,23 @@ export async function executeBenchmark(
 
 	try {
 		if (workspaceDir) {
+			// Load benchmark config to get suitesDir
+			const { loadBenchmarkConfig } = await import('../lib/config.ts');
+			const config = loadBenchmarkConfig();
+
+			// Calculate reference path if scenario has reference_path
+			let referencePath: string | undefined;
+			if (scenarioCfg.reference_path) {
+				const scenarioDir = getScenarioDir(suite, scenario);
+				referencePath = join(scenarioDir, scenarioCfg.reference_path);
+			}
+
 			// Actually run evaluators
 			const ctx = {
 				scenario: scenarioCfg,
 				workspaceDir,
+				suitesDir: config.suitesDir,
+				referencePath,
 				agentResponse: result.agent_response,
 				commandLog,
 				diffSummary: diffArtifacts.diffSummary,
