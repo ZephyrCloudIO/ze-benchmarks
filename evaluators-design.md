@@ -31,7 +31,7 @@ packages/
 │   │   └── types/
 │   │       └── ze-evaluator.d.ts  # harness-side evaluator definitions
 └── results/
-    └── summary.json               # last run output (single artifact)
+    └── workspaces/                # generated workspace directories for each run
 ```
 
 ### Roadmap Structure (Planned)
@@ -183,7 +183,7 @@ node packages/harness/dist/cli.js run update-deps nx-pnpm-monorepo --tier L1 --a
   "deps_delta": []
 }
 ```
-The harness writes a single `results/summary.json` file per run; additional evaluator entries follow the same structure, and diff/dependency arrays may be large (often truncated when reporting).
+The harness saves benchmark results to `benchmarks.db` (SQLite database); additional evaluator entries follow the same structure, and diff/dependency arrays may be large (often truncated when reporting).
 
 ### 3. Harness Integration
 ```typescript

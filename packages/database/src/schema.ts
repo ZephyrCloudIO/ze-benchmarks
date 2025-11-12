@@ -28,6 +28,7 @@ export const SCHEMA = `
     success_metric REAL,
     package_manager TEXT,
     test_results TEXT,
+    specialist_enabled BOOLEAN DEFAULT 0,
     metadata TEXT,
     FOREIGN KEY (batchId) REFERENCES batch_runs(batchId)
   );
@@ -52,6 +53,7 @@ export const SCHEMA = `
     cost_usd REAL,
     duration_ms INTEGER,
     workspace_dir TEXT,
+    prompt_sent TEXT,
     FOREIGN KEY (run_id) REFERENCES benchmark_runs(run_id)
   );
 

@@ -280,6 +280,13 @@ export class OpenRouterAdapter implements AgentAdapter {
       temperature: 0.1
     };
 
+    // Add provider restriction for Anthropic models
+    if (this.model.startsWith('anthropic/')) {
+      params.provider = {
+        only: ['anthropic']
+      };
+    }
+
     if (system) {
       params.messages = [
         { role: "system", content: system },

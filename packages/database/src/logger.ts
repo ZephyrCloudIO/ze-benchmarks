@@ -82,6 +82,7 @@ export interface BenchmarkRun {
   weightedScore?: number | null;
   packageManager?: string | null;
   testResults?: string | null;
+  specialistEnabled?: boolean;
   metadata?: string;
 }
 
@@ -104,6 +105,7 @@ export interface RunTelemetry {
   costUsd?: number;
   durationMs?: number;
   workspaceDir?: string;
+  promptSent?: string;
 }
 
 export interface BatchRun {
@@ -158,10 +160,18 @@ export class BenchmarkLogger {
   }
 
   private initializeSchema() {
+    // Enable WAL mode for better concurrent write performance
+    // WAL (Write-Ahead Logging) allows concurrent reads while writes are happening
+    // and reduces lock contention between parallel benchmarks
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = NORMAL');
+
     this.db.exec(SCHEMA);
     this.addBatchIdColumnIfNeeded();
     this.addSuccessTrackingColumnsIfNeeded();
     this.addPackageManagerAndTestResultsColumnsIfNeeded();
+    this.addSpecialistEnabledColumnIfNeeded();
+    this.addPromptSentColumnIfNeeded();
   }
 
   private addBatchIdColumnIfNeeded() {
@@ -216,13 +226,13 @@ export class BenchmarkLogger {
       const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
       const hasPackageManager = columns.some(col => col.name === 'package_manager');
       const hasTestResults = columns.some(col => col.name === 'test_results');
-      
+
       if (!hasPackageManager) {
         console.log('Adding package_manager column to existing database...');
         this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN package_manager TEXT');
         console.log('✓ package_manager column added successfully');
       }
-      
+
       if (!hasTestResults) {
         console.log('Adding test_results column to existing database...');
         this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN test_results TEXT');
@@ -230,6 +240,36 @@ export class BenchmarkLogger {
       }
     } catch (error) {
       console.warn('Failed to add package manager and test results columns:', error);
+    }
+  }
+
+  private addSpecialistEnabledColumnIfNeeded() {
+    try {
+      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const hasSpecialistEnabled = columns.some(col => col.name === 'specialist_enabled');
+
+      if (!hasSpecialistEnabled) {
+        console.log('Adding specialist_enabled column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN specialist_enabled BOOLEAN DEFAULT 0');
+        console.log('✓ specialist_enabled column added successfully');
+      }
+    } catch (error) {
+      console.warn('Failed to add specialist_enabled column:', error);
+    }
+  }
+
+  private addPromptSentColumnIfNeeded() {
+    try {
+      const columns = this.db.prepare("PRAGMA table_info(run_telemetry)").all() as Array<{name: string}>;
+      const hasPromptSent = columns.some(col => col.name === 'prompt_sent');
+
+      if (!hasPromptSent) {
+        console.log('Adding prompt_sent column to existing database...');
+        this.db.exec('ALTER TABLE run_telemetry ADD COLUMN prompt_sent TEXT');
+        console.log('✓ prompt_sent column added successfully');
+      }
+    } catch (error) {
+      console.warn('Failed to add prompt_sent column:', error);
     }
   }
 
@@ -297,16 +337,27 @@ export class BenchmarkLogger {
     }
   }
 
-  startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string): string {
+  startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string, specialistEnabled?: boolean): string {
     const runId = uuidv4();
     this.currentRunId = runId;
 
     this.db.prepare(`
-      INSERT INTO benchmark_runs (run_id, batchId, suite, scenario, tier, agent, model, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'running')
-    `).run(runId, batchId, suite, scenario, tier, agent, model);
+      INSERT INTO benchmark_runs (run_id, batchId, suite, scenario, tier, agent, model, status, specialist_enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'running', ?)
+    `).run(runId, batchId, suite, scenario, tier, agent, model, specialistEnabled ? 1 : 0);
 
     return runId;
+  }
+
+  updateAgent(agentName: string, runId?: string) {
+    const targetRunId = runId || this.currentRunId;
+    if (!targetRunId) throw new Error('No active run');
+
+    this.db.prepare(`
+      UPDATE benchmark_runs
+      SET agent = ?
+      WHERE run_id = ?
+    `).run(agentName, targetRunId);
   }
 
   completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number, packageManager?: string, testResults?: string) {
@@ -354,18 +405,18 @@ export class BenchmarkLogger {
     this.updateTimestamp();
   }
 
-  logTelemetry(toolCalls?: number, tokensIn?: number, tokensOut?: number, costUsd?: number, durationMs?: number, workspaceDir?: string) {
+  logTelemetry(toolCalls?: number, tokensIn?: number, tokensOut?: number, costUsd?: number, durationMs?: number, workspaceDir?: string, promptSent?: string) {
     if (!this.currentRunId) throw new Error('No active run');
-    
+
     this.db.prepare(`
-      INSERT INTO run_telemetry (run_id, tool_calls, tokens_in, tokens_out, cost_usd, duration_ms, workspace_dir)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(this.currentRunId, toolCalls, tokensIn, tokensOut, costUsd, durationMs, workspaceDir);
+      INSERT INTO run_telemetry (run_id, tool_calls, tokens_in, tokens_out, cost_usd, duration_ms, workspace_dir, prompt_sent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(this.currentRunId, toolCalls, tokensIn, tokensOut, costUsd, durationMs, workspaceDir, promptSent);
   }
 
   getRunHistory(limit: number = 50): BenchmarkRun[] {
     const rows = this.db.prepare(`
-      SELECT 
+      SELECT
         id,
         run_id as runId,
         suite,
@@ -380,12 +431,13 @@ export class BenchmarkLogger {
         weighted_score as weightedScore,
         package_manager as packageManager,
         test_results as testResults,
+        specialist_enabled as specialistEnabled,
         metadata
-      FROM benchmark_runs 
-      ORDER BY started_at DESC 
+      FROM benchmark_runs
+      ORDER BY started_at DESC
       LIMIT ?
     `).all(limit) as any[];
-    
+
     return rows.map(row => ({
       id: row.id,
       runId: row.runId,
@@ -401,13 +453,14 @@ export class BenchmarkLogger {
       weightedScore: row.weightedScore,
       packageManager: row.packageManager,
       testResults: row.testResults,
+      specialistEnabled: row.specialistEnabled === 1,
       metadata: row.metadata
     }));
   }
 
   getRunDetails(runId: string) {
     const runRow = this.db.prepare(`
-      SELECT 
+      SELECT
         id,
         run_id as runId,
         suite,
@@ -422,10 +475,11 @@ export class BenchmarkLogger {
         weighted_score as weightedScore,
         package_manager as packageManager,
         test_results as testResults,
+        specialist_enabled as specialistEnabled,
         metadata
       FROM benchmark_runs WHERE run_id = ?
     `).get(runId) as any;
-    
+
     const run: BenchmarkRun | undefined = runRow ? {
       id: runRow.id,
       runId: runRow.runId,
@@ -441,6 +495,7 @@ export class BenchmarkLogger {
       weightedScore: runRow.weightedScore,
       packageManager: runRow.packageManager,
       testResults: runRow.testResults,
+      specialistEnabled: runRow.specialistEnabled === 1,
       metadata: runRow.metadata
     } : undefined;
     
@@ -467,7 +522,7 @@ export class BenchmarkLogger {
     }));
     
     const telemetryRows = this.db.prepare(`
-      SELECT 
+      SELECT
         id,
         run_id as runId,
         tool_calls as toolCalls,
@@ -475,10 +530,11 @@ export class BenchmarkLogger {
         tokens_out as tokensOut,
         cost_usd as costUsd,
         duration_ms as durationMs,
-        workspace_dir as workspaceDir
+        workspace_dir as workspaceDir,
+        prompt_sent as promptSent
       FROM run_telemetry WHERE run_id = ?
     `).all(runId) as any[];
-    
+
     const telemetry: RunTelemetry[] = telemetryRows.map(row => ({
       id: row.id,
       runId: row.runId,
@@ -487,7 +543,8 @@ export class BenchmarkLogger {
       tokensOut: row.tokensOut,
       costUsd: row.costUsd,
       durationMs: row.durationMs,
-      workspaceDir: row.workspaceDir
+      workspaceDir: row.workspaceDir,
+      promptSent: row.promptSent
     }));
     
     return { run, evaluations, telemetry };
@@ -722,13 +779,22 @@ export class BenchmarkLogger {
   startBatch(): string {
     const batchId = uuidv4();
     const now = Date.now();
-    
+
     this.db.prepare(`
       INSERT INTO batch_runs (batchId, createdAt, totalRuns, successfulRuns)
       VALUES (?, ?, 0, 0)
     `).run(batchId, now);
-    
+
     return batchId;
+  }
+
+  createBatch(batchId: string): void {
+    const now = Date.now();
+
+    this.db.prepare(`
+      INSERT OR IGNORE INTO batch_runs (batchId, createdAt, totalRuns, successfulRuns)
+      VALUES (?, ?, 0, 0)
+    `).run(batchId, now);
   }
 
   getBatchSuccessfulRunsCount(batchId: string): number {
@@ -819,7 +885,7 @@ export class BenchmarkLogger {
     if (!batchRow) return null;
     
     const runs = this.db.prepare(`
-      SELECT 
+      SELECT
         id,
         run_id as runId,
         batchId,
@@ -833,14 +899,15 @@ export class BenchmarkLogger {
         completed_at as completedAt,
         total_score as totalScore,
         weighted_score as weightedScore,
+        specialist_enabled as specialistEnabled,
         metadata
-      FROM benchmark_runs 
+      FROM benchmark_runs
       WHERE batchId = ?
       ORDER BY started_at
     `).all(batchId) as any[];
-    
+
     const duration = batchRow.completedAt ? batchRow.completedAt - batchRow.createdAt : 0;
-    
+
     return {
       batchId: batchRow.batchId,
       createdAt: batchRow.createdAt,
@@ -864,6 +931,7 @@ export class BenchmarkLogger {
         completedAt: run.completedAt,
         totalScore: run.totalScore,
         weightedScore: run.weightedScore,
+        specialistEnabled: run.specialistEnabled === 1,
         metadata: run.metadata
       }))
     };

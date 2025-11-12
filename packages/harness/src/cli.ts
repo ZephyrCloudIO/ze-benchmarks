@@ -1,13 +1,31 @@
 #!/usr/bin/env tsx
 import { config } from 'dotenv';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, readdirSync, statSync, unlinkSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
 // Load environment variables from .env file in project root
-config({ path: resolve(process.cwd(), '.env') });
-import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
+// Find workspace root by looking for pnpm-workspace.yaml
+// In case of nested workspaces, find the topmost one
+function findWorkspaceRoot(startDir: string): string {
+  let currentDir = startDir;
+  let lastWorkspaceRoot = startDir;
+
+  while (currentDir !== resolve(currentDir, '..')) {
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
+      lastWorkspaceRoot = currentDir;
+    }
+    currentDir = resolve(currentDir, '..');
+  }
+
+  return lastWorkspaceRoot;
+}
+
+const workspaceRoot = findWorkspaceRoot(process.cwd());
+const envPath = resolve(workspaceRoot, '.env');
+config({ path: envPath });
+import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, SpecialistAdapter, type AgentAdapter, type AgentRequest } from '../../agent-adapters/src/index.ts';
 import { OpenAI } from 'openai';
 import { runEvaluators } from '../../evaluators/src/index.ts';
 import { runValidationCommands } from './runtime/validation.ts';
@@ -642,6 +660,138 @@ function getAvailableTiers(suite: string, scenario: string): Array<{value: strin
   }));
 }
 
+async function executeWarmup(
+	suite: string,
+	scenario: string,
+	scenarioCfg: any,
+	quiet: boolean = false
+): Promise<{ success: boolean; error?: string }> {
+	// Check if warmup is enabled
+	if (!scenarioCfg.warmup || !scenarioCfg.warmup.enabled) {
+		return { success: true }; // No warmup configured, continue normally
+	}
+
+	const warmupCfg = scenarioCfg.warmup;
+	const scenarioDir = getScenarioDir(suite, scenario);
+	const workingDir = join(scenarioDir, warmupCfg.working_dir || './repo-fixture');
+
+	if (!quiet) {
+		console.log(chalk.blue('🔥 Executing warmup phase...'));
+		console.log(chalk.gray(`   Working directory: ${workingDir}`));
+	}
+
+	// Create working directory if it doesn't exist, or clean it if it does
+	if (existsSync(workingDir)) {
+		// Clean existing directory
+		try {
+			const files = readdirSync(workingDir);
+			for (const file of files) {
+				const filePath = join(workingDir, file);
+				const stat = statSync(filePath);
+				if (stat.isDirectory()) {
+					rmSync(filePath, { recursive: true, force: true });
+				} else {
+					unlinkSync(filePath);
+				}
+			}
+		} catch (err) {
+			return { success: false, error: `Failed to clean warmup directory: ${err}` };
+		}
+	} else {
+		mkdirSync(workingDir, { recursive: true });
+	}
+
+	// Execute based on warmup type
+	if (warmupCfg.type === 'agent') {
+		// Agent-driven warmup
+		const agentCfg = warmupCfg.agent;
+		const provider = agentCfg.provider || 'openrouter';
+		const model = agentCfg.model;
+		const prompt = agentCfg.prompt;
+
+		if (!prompt) {
+			return { success: false, error: 'Warmup agent prompt is required' };
+		}
+
+		if (!quiet) {
+			console.log(chalk.gray(`   Provider: ${provider}`));
+			console.log(chalk.gray(`   Model: ${model || 'default'}`));
+		}
+
+		try {
+			// Create agent adapter
+			const agentAdapter = createAgentAdapter(provider, model);
+
+			// Build the request
+			const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+				{
+					role: 'user' as const,
+					content: prompt
+				}
+			];
+
+			const request: AgentRequest = {
+				messages,
+				workspaceDir: workingDir,
+			};
+
+			// Add tools if agent supports them
+			if (provider === 'anthropic' || provider === 'openrouter') {
+				const { createWorkspaceToolHandlers, getAllWorkspaceTools } = await import('./runtime/workspace-tools.ts');
+				const workspaceHandlers = createWorkspaceToolHandlers(workingDir);
+				const tools = getAllWorkspaceTools();
+
+				request.tools = tools;
+				request.toolHandlers = workspaceHandlers;
+			}
+
+			// Execute the agent
+			if (!quiet) console.log(chalk.blue('   🤖 Running warmup agent...'));
+
+			const response = await agentAdapter.execute(request);
+
+			if (!quiet) {
+				console.log(chalk.green('   ✓ Warmup completed successfully'));
+				if (response.content) {
+					console.log(chalk.gray(`   Agent response: ${response.content.substring(0, 100)}...`));
+				}
+			}
+
+			return { success: true };
+		} catch (err: any) {
+			return { success: false, error: `Warmup agent execution failed: ${err.message || err}` };
+		}
+	} else if (warmupCfg.type === 'scripted') {
+		// Scripted warmup
+		const commands = warmupCfg.commands || [];
+
+		if (!quiet) console.log(chalk.blue(`   Running ${commands.length} warmup commands...`));
+
+		for (const cmdCfg of commands) {
+			const cmd = cmdCfg.cmd;
+			const description = cmdCfg.description || cmd;
+
+			if (!quiet) console.log(chalk.gray(`   → ${description}`));
+
+			try {
+				const { execSync } = await import('child_process');
+				execSync(cmd, {
+					cwd: workingDir,
+					stdio: quiet ? 'ignore' : 'inherit',
+					encoding: 'utf8'
+				});
+			} catch (err: any) {
+				return { success: false, error: `Warmup command failed: ${cmd}\n${err.message || err}` };
+			}
+		}
+
+		if (!quiet) console.log(chalk.green('   ✓ Warmup commands completed'));
+		return { success: true };
+	} else {
+		return { success: false, error: `Unknown warmup type: ${warmupCfg.type}` };
+	}
+}
+
 function prepareWorkspaceFromFixture(suite: string, scenario: string): { workspaceDir: string; fixtureDir: string } | undefined {
 	const scenarioDir = getScenarioDir(suite, scenario);
 	const candidates = ['repo', 'repo-fixture'];
@@ -703,32 +853,74 @@ function loadPrompt(suite: string, scenario: string, tier: string): string | nul
 	}
 }
 
-function createAgentAdapter(agentName: string, model?: string): AgentAdapter {
+/**
+ * Resolve specialist name to template file path
+ *
+ * Converts a specialist name (e.g., @zephyr-cloud/shadcn-specialist) to the
+ * corresponding template file path in starting_from_outcome/
+ *
+ * @param specialistName - Specialist name (with or without namespace)
+ * @returns Absolute path to template file
+ * @throws Error if template file doesn't exist
+ */
+function resolveSpecialistTemplatePath(specialistName: string): string {
+	// Strip namespace prefix if present (e.g., @zephyr-cloud/)
+	const templateName = specialistName.replace(/^@[^/]+\//, '');
+
+	// Construct template path relative to workspace root
+	const templatePath = `starting_from_outcome/${templateName}.json5`;
+	const absolutePath = resolve(workspaceRoot, templatePath);
+
+	// Verify template exists
+	if (!existsSync(absolutePath)) {
+		throw new Error(
+			`Specialist template not found: ${templatePath}\n` +
+			`  Specialist: ${specialistName}\n` +
+			`  Expected path: ${absolutePath}\n` +
+			`  Tip: Ensure the template file exists in starting_from_outcome/`
+		);
+	}
+
+	// Return absolute path to avoid cwd-related issues when harness is spawned
+	// from different directories (similar to mint:snapshot fix)
+	return absolutePath;
+}
+
+function createAgentAdapter(agentName: string, model?: string, specialistName?: string): AgentAdapter {
+	// Create base adapter
+	let baseAdapter: AgentAdapter;
+
 	switch (agentName) {
 		case 'openrouter':
 			// Pass model directly to constructor instead of using environment variable
-			return new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+			baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+			break;
 		case 'anthropic':
 			if (model) {
 				process.env.CLAUDE_MODEL = model;
 			}
-			return new AnthropicAdapter();
+			baseAdapter = new AnthropicAdapter();
+			break;
 		case 'claude-code':
-			return new ClaudeCodeAdapter(model);
+			baseAdapter = new ClaudeCodeAdapter(model);
+			break;
 		case 'echo':
 		default:
-			return new EchoAgent();
+			baseAdapter = new EchoAgent();
+			break;
 	}
+
+	// Wrap with SpecialistAdapter if specialist name provided
+	if (specialistName) {
+		const templatePath = resolveSpecialistTemplatePath(specialistName);
+		console.log(chalk.blue(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`));
+		console.log(chalk.gray(`     Template: ${templatePath}`));
+		return new SpecialistAdapter(baseAdapter, templatePath);
+	}
+
+	return baseAdapter;
 }
 
-function writeResult(out: unknown, suite: string, scenario: string) {
-	const root = findRepoRoot();
-	const resultsDir = join(root, 'results');
-	mkdirSync(resultsDir, { recursive: true });
-	const outPath = join(resultsDir, `summary.json`);
-	writeFileSync(outPath, JSON.stringify(out, null, 2));
-	console.log(`Wrote results to ${outPath}`);
-}
 
 
 // ============================================================================
@@ -797,20 +989,23 @@ function parseArgs(argv: string[]) {
 	const suite = args[0];
 	const scenario = args[1];
 	const rest = args.slice(2);
-	
+
 	const tierIndex = rest.indexOf('--tier');
 	const tier = tierIndex !== -1 ? rest[tierIndex + 1] : 'L0';
-	
+
 	const agentIndex = rest.indexOf('--agent');
 	const agent = agentIndex !== -1 ? rest[agentIndex + 1] : 'echo';
-	
+
 	const modelIndex = rest.indexOf('--model');
 	const model = modelIndex !== -1 ? rest[modelIndex + 1] : undefined;
 
+	const batchIdIndex = rest.indexOf('--batch-id');
+	const batchId = batchIdIndex !== -1 ? rest[batchIdIndex + 1] : undefined;
 
-	const noJson = rest.includes('--no-json');
+	const specialistIndex = rest.indexOf('--specialist');
+	const specialist = specialistIndex !== -1 ? rest[specialistIndex + 1] : undefined;
 
-	return { cmd, suite, scenario, tier, agent, model, noJson } as const;
+	return { cmd, suite, scenario, tier, agent, model, batchId, specialist } as const;
 }
 
 function showHelp() {
@@ -837,7 +1032,7 @@ function showHelp() {
 	console.log(`  ${chalk.cyan('--tier')} <tier>                   Difficulty tier (varies by scenario)`);
 	console.log(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
-	console.log(`  ${chalk.cyan('--no-json')}                     Skip JSON output`);
+	console.log(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
 	
 	console.log('\n' + chalk.bold('Model Selection:'));
 	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
@@ -923,8 +1118,7 @@ async function executeMultipleBenchmarks(
 	scenarios: string[],
 	tiers: string[],
 	agents: string[],
-	models: (string | undefined)[],
-	noJson: boolean
+	models: (string | undefined)[]
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
@@ -1008,7 +1202,7 @@ async function executeMultipleBenchmarks(
 			async (combo, i) => {
 				const { suite, scenario, tier, agent, model } = combo;
 				console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-				await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId, true); // quiet mode
+				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true); // quiet mode
 			}
 		);
 	} else {
@@ -1017,8 +1211,8 @@ async function executeMultipleBenchmarks(
 			const { suite, scenario, tier, agent, model } = combinations[i];
 			
 			console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-			
-			await executeBenchmark(suite, scenario, tier, agent, model, noJson, batchId, true); // quiet mode
+
+			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true); // quiet mode
 		}
 	}
 	
@@ -1502,14 +1696,8 @@ async function runInteractiveBenchmark() {
 		modelsToUse = selectedModels;
 		console.log(`🎯 Selected Claude Code models: ${modelsToUse.join(', ')}`);
 	}
-	
-	
-	// Ask for JSON output
-	const includeJson = await confirm({
-		message: 'Include JSON output?',
-		initialValue: true
-	});
-	
+
+
 	// Calculate total combinations for automatic parallel decision
 	const totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
 	
@@ -1539,7 +1727,6 @@ async function runInteractiveBenchmark() {
 	if (needsOpenRouterModels || needsAnthropicModels || needsClaudeCodeModels) {
 		console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
 	}
-	console.log(`   ${chalk.cyan('JSON output:')} ${includeJson ? 'Yes' : 'No'}`);
 	console.log(`   ${chalk.cyan('Parallel execution:')} ${useParallel ? `Yes (concurrency: ${concurrency})` : 'No'}`);
 	
 	// Show title before execution
@@ -1551,8 +1738,7 @@ async function runInteractiveBenchmark() {
 		scenariosToUse,
 		tiersToUse,
 		agentsToUse,
-		modelsToUse,
-		!includeJson
+		modelsToUse
 	);
 }
 
@@ -2127,10 +2313,13 @@ function calculateSuccess(
 // SECTION 9: MAIN BENCHMARK RUNNER
 // ============================================================================
 
-async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, noJson?: boolean, batchId?: string, quiet?: boolean) {
+async function executeBenchmark(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string, quiet?: boolean, specialist?: string) {
 	// Initialize logger
 	const logger = BenchmarkLogger.getInstance();
-	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
+
+	// Determine the agent name to log (will be updated if specialist is used)
+	let agentName = agent;
+	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId, !!specialist);
 	const startTime = Date.now();
 
 	// Timeout watchdog based on scenario timeout_minutes (default 60)
@@ -2164,7 +2353,17 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
 			return;
 		}
-	
+
+	// Stage 1.5: Warmup (if configured)
+		if (progress) updateProgress(progress, 1, 'Running warmup phase');
+	const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, quiet);
+		if (!warmupResult.success) {
+			logger.failRun(`Warmup failed: ${warmupResult.error}`, 'warmup');
+			if (!quiet) console.log(chalk.red(`✗ Warmup failed: ${warmupResult.error}`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
+			return;
+		}
+
 	// Stage 2: Workspace
 		if (progress) updateProgress(progress, 2, 'Preparing workspace');
 	const workspacePrep = prepareWorkspaceFromFixture(suite, scenario);
@@ -2179,7 +2378,11 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 		const workspaceDir = workspacePrep.workspaceDir;
 		const fixtureDir = workspacePrep.fixtureDir;
-	
+
+		console.log(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
+		console.log(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
+		console.log(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+
 	// Initialize result structure
 	const result = {
 		suite,
@@ -2206,12 +2409,19 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 
 	// Stage 3: Agent Execution
+	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agent));
 	if (promptContent && agent !== 'echo') {
+		console.log(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
+			console.log(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
 			// Create agent adapter
-		const agentAdapter = createAgentAdapter(agent, model);
-			
+		const agentAdapter = createAgentAdapter(agent, model, specialist);
+
+			// Update the logged agent name with the actual adapter name
+			// (for specialists, this will be "specialist:template-name:base-adapter")
+			logger.updateAgent(agentAdapter.name, runId);
+
 			// Show selected model info - ALWAYS for OpenRouter
 			if (agent === 'openrouter' && 'getModel' in agentAdapter) {
 				const adapterModel = (agentAdapter as any).getModel();
@@ -2255,23 +2465,19 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 				}
 			}
 			
-			// Build system prompt with tool usage guidance
-			const systemPrompt = agent === 'anthropic' 
-				? `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.\n\nAvailable Tools:\n- readFile: Read any file in the workspace\n- writeFile: Modify files (e.g., package.json files)\n- runCommand: Execute shell commands (e.g., pnpm install, pnpm outdated)\n- listFiles: Explore directory structure\n- askUser: Ask questions when you need clarification or approval for major changes\n\nWork efficiently: read files to understand the current state, make necessary changes, run commands to validate, and ask questions only when truly needed for important decisions.`
-				: `You are working on a ${scenarioCfg.title}. The task is: ${scenarioCfg.description || 'Complete the development task.'}\n\nIMPORTANT: You are working in the directory: ${workspaceDir}\nThis is a prepared workspace with the files you need to modify.`;
-			
+			// Build the request messages
+			// For vanilla runs: send ONLY user message (no system prompt for true baseline testing)
+			// For specialist runs: SpecialistAdapter will add the specialist system prompt from template
+			const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+				{
+					role: 'user' as const,
+					content: promptContent
+				}
+			];
+
 			// Build the request
 			const request: AgentRequest = {
-				messages: [
-					{
-						role: 'system' as const,
-						content: systemPrompt
-					},
-					{
-						role: 'user' as const,
-						content: promptContent
-					}
-				],
+				messages,
 				...(workspaceDir && { workspaceDir }),
 			};
 
@@ -2312,19 +2518,22 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 				request.toolHandlers = toolHandlers;
 			}
 
+			// Extract the prompt being sent for logging
+			const promptSent = JSON.stringify(request.messages);
+
 			// Execute agent request
 			const response = await agentAdapter.send(request);
-			
+
 			// Show summary after agent completes
 			console.log(chalk.gray(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`));
-			
+
 			// Update result with agent response
 			result.agent_response = response.content;
 			result.telemetry.tokens.in = response.tokensIn || 0;
 			result.telemetry.tokens.out = response.tokensOut || 0;
 			result.telemetry.cost_usd = response.costUsd || 0;
 			result.telemetry.toolCalls = response.toolCalls ?? 0;
-			
+
 			// Log telemetry to database
 			const duration = Date.now() - startTime;
 			logger.logTelemetry(
@@ -2333,7 +2542,8 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 				response.tokensOut || 0,
 				response.costUsd || 0,
 				duration,
-				workspaceDir
+				workspaceDir,
+				promptSent
 			);
 			
 			// Log oracle usage if available
@@ -2348,18 +2558,20 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			// Telemetry is shown in final results
 			
 		} catch (error) {
+			console.log(chalk.magenta('🔍 DEBUG: Agent execution threw error:', error));
 			logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) console.log(chalk.red('✗ Agent execution failed'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 			return; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
-		// No prompt loaded, skipping agent execution
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
 	} else {
-		// Using echo agent (no actual execution)
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent'));
 	}
 
 	// Stage 4: Validation
+	console.log(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
 	if (progress) updateProgress(progress, 4, 'Running validation commands');
 	const commandLog = workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
 	const diffArtifacts = workspaceDir && fixtureDir ? buildDiffArtifacts(fixtureDir, workspaceDir) : { diffSummary: [], depsDelta: [] };
@@ -2368,8 +2580,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	if (!quiet) console.log(chalk.gray(`  ✓ ${passedCommands}/${commandLog.length} commands passed`));
 
 	// Stage 5: Evaluation
+	console.log(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
 	if (progress) updateProgress(progress, 5, 'Computing scores');
-	
+
 	try {
 		if (workspaceDir) {
 			// Actually run evaluators
@@ -2520,13 +2733,8 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		console.error(chalk.dim(dbError instanceof Error ? dbError.message : String(dbError)));
 	}
 
-	// Optionally write JSON
-	if (!noJson) {
-	writeResult(result, suite, scenario);
-		console.log(`\n${chalk.green('✓')} Results saved to database and JSON`);
-	} else {
-		console.log(`\n${chalk.yellow('⚠')} JSON output disabled, results saved to database only`);
-	}
+	// Results are saved to database only (benchmarks.db is the single source of truth)
+	console.log(`\n${chalk.green('✓')} Results saved to database`);
 	
 	// Note: Database is now created directly in public/ directory
 	
@@ -2535,9 +2743,23 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 	} catch (error) {
 		// Catch-all for unexpected errors
-		logger.failRun(error instanceof Error ? error.message : String(error), 'unknown');
-		if (!quiet) console.log(chalk.red('✗ Unexpected error'));
-		if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+
+		logger.failRun(errorMessage, 'unknown');
+
+		if (!quiet) {
+			console.log(chalk.red('✗ Unexpected error'));
+			console.error(chalk.red('\nError details:'));
+			console.error(chalk.red(errorMessage));
+			if (errorStack) {
+				console.error(chalk.dim('\nStack trace:'));
+				console.error(chalk.dim(errorStack));
+			}
+		}
+		if (quiet) {
+			console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`));
+		}
 	} finally {
 		if (progress) completeProgress(progress);
 		// Clear timeout watchdog if set
@@ -2897,29 +3119,29 @@ async function run() {
 		await createNewScenario(suite, name);
 		return;
 	}
-	
-	const { cmd, suite, scenario, tier, agent, model, noJson } = parsedArgs;
+
+	const { cmd, suite, scenario, tier, agent, model, batchId, specialist } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
 	}
-	
+
 	// Show modern CLI intro with hyperfine-style header
 	console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
 	console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agent}'`)}`);
-	
+
 	log.info(chalk.bold(`Running: ${suite}/${scenario}`));
 	log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agent)}`);
-	
+
 	// Warn if OpenRouter agent but no model specified
 	if (agent === 'openrouter' && !model && !process.env.OPENROUTER_MODEL) {
 		console.log(chalk.yellow(`\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
 		console.log(chalk.gray(`   Tip: Use --model flag or set OPENROUTER_MODEL environment variable`));
 		console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\n`));
 	}
-	
+
 	// Execute the benchmark
-	await executeBenchmark(suite, scenario, tier, agent, model, noJson);
+	await executeBenchmark(suite, scenario, tier, agent, model, batchId, false, specialist);
 }
 
 // Cleanup handlers
