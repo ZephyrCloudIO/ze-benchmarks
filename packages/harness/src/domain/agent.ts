@@ -54,39 +54,69 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 }
 
 export async function createAgentAdapter(agentName: string, model?: string, specialistName?: string, workspaceRoot?: string): Promise<AgentAdapter> {
+	// Log agent creation attempt
+	console.log(chalk.gray('[DEBUG] createAgentAdapter()'));
+	console.log(chalk.gray(`  Agent: ${agentName}`));
+	console.log(chalk.gray(`  Model: ${model || 'default'}`));
+	console.log(chalk.gray(`  Specialist: ${specialistName || 'none'}`));
+	console.log(chalk.gray(`  Workspace root: ${workspaceRoot || 'none'}`));
+
 	// Create base adapter
 	let baseAdapter: AgentAdapter;
 
-	switch (agentName) {
-		case 'openrouter':
-			// Pass model directly to constructor instead of using environment variable
-			baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
-			break;
-		case 'anthropic':
-			if (model) {
-				process.env.CLAUDE_MODEL = model;
-			}
-			baseAdapter = new AnthropicAdapter();
-			break;
-		case 'claude-code':
-			baseAdapter = new ClaudeCodeAdapter(model);
-			break;
-		case 'echo':
-		default:
-			baseAdapter = new EchoAgent();
-			break;
+	try {
+		switch (agentName) {
+			case 'openrouter':
+				console.log(chalk.gray(`  Creating OpenRouterAdapter...`));
+				// Pass model directly to constructor instead of using environment variable
+				baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+				console.log(chalk.gray(`  ✓ OpenRouterAdapter created`));
+				break;
+			case 'anthropic':
+				console.log(chalk.gray(`  Creating AnthropicAdapter...`));
+				if (model) {
+					process.env.CLAUDE_MODEL = model;
+				}
+				baseAdapter = new AnthropicAdapter();
+				console.log(chalk.gray(`  ✓ AnthropicAdapter created`));
+				break;
+			case 'claude-code':
+				console.log(chalk.gray(`  Creating ClaudeCodeAdapter...`));
+				baseAdapter = new ClaudeCodeAdapter(model);
+				console.log(chalk.gray(`  ✓ ClaudeCodeAdapter created`));
+				break;
+			case 'echo':
+			default:
+				console.log(chalk.gray(`  Creating EchoAgent...`));
+				baseAdapter = new EchoAgent();
+				console.log(chalk.gray(`  ✓ EchoAgent created`));
+				break;
+		}
+	} catch (error) {
+		console.error(chalk.red(`[DEBUG] Failed to create base adapter: ${error instanceof Error ? error.message : String(error)}`));
+		throw error;
 	}
 
 	// Wrap with SpecialistAdapter if specialist name provided
 	if (specialistName && workspaceRoot) {
-		const templatePath = resolveSpecialistTemplatePath(specialistName, workspaceRoot);
-		console.log(chalk.blue(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`));
-		console.log(chalk.gray(`     Template: ${templatePath}`));
+		try {
+			console.log(chalk.gray(`  Resolving specialist template path...`));
+			const templatePath = resolveSpecialistTemplatePath(specialistName, workspaceRoot);
+			console.log(chalk.blue(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`));
+			console.log(chalk.gray(`     Template: ${templatePath}`));
 
-		// Lazy load SpecialistAdapter to avoid loading agency-prompt-creator unless needed
-		const { SpecialistAdapter } = await import('../../../agent-adapters/src/specialist.ts');
-		return new SpecialistAdapter(baseAdapter, templatePath);
+			// Lazy load SpecialistAdapter to avoid loading agency-prompt-creator unless needed
+			console.log(chalk.gray(`  Loading SpecialistAdapter...`));
+			const { SpecialistAdapter } = await import('../../../agent-adapters/src/specialist.ts');
+			const specialistAdapter = new SpecialistAdapter(baseAdapter, templatePath);
+			console.log(chalk.gray(`  ✓ SpecialistAdapter created and wrapped base adapter`));
+			return specialistAdapter;
+		} catch (error) {
+			console.error(chalk.red(`[DEBUG] Failed to create specialist adapter: ${error instanceof Error ? error.message : String(error)}`));
+			throw error;
+		}
 	}
 
+	console.log(chalk.gray(`  ✓ Agent adapter creation complete (base adapter only)`));
 	return baseAdapter;
 }

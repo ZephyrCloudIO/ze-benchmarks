@@ -142,6 +142,50 @@ export interface BatchStatistics {
   runs: BenchmarkRun[];
 }
 
+/**
+ * Retry a database operation with exponential backoff on SQLITE_BUSY errors
+ * @param operation Function to execute
+ * @param maxRetries Maximum number of retry attempts (default: 5)
+ * @param baseDelayMs Initial delay in milliseconds (default: 100)
+ * @returns Result of the operation
+ */
+function retryOnBusy<T>(
+  operation: () => T,
+  maxRetries: number = 5,
+  baseDelayMs: number = 100
+): T {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return operation();
+    } catch (error) {
+      lastError = error as Error;
+      const isBusy = error instanceof Error &&
+        (error.message.includes('database is locked') ||
+         error.message.includes('SQLITE_BUSY'));
+
+      if (!isBusy || attempt === maxRetries) {
+        // Not a lock error, or out of retries - throw immediately
+        throw error;
+      }
+
+      // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+      const delayMs = baseDelayMs * Math.pow(2, attempt);
+      console.log(`\x1b[33m[DEBUG] Database locked, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...\x1b[0m`);
+
+      // Synchronous sleep
+      const start = Date.now();
+      while (Date.now() - start < delayMs) {
+        // Busy wait (not ideal but necessary for sync retry)
+      }
+    }
+  }
+
+  // Should never reach here, but TypeScript needs it
+  throw lastError || new Error('Retry failed');
+}
+
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
   private db: Database.Database;
@@ -194,10 +238,14 @@ export class BenchmarkLogger {
     // Enable WAL mode for better concurrent write performance
     // WAL (Write-Ahead Logging) allows concurrent reads while writes are happening
     // and reduces lock contention between parallel benchmarks
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('synchronous = NORMAL');
+    retryOnBusy(() => this.db.pragma('journal_mode = WAL'));
+    retryOnBusy(() => this.db.pragma('synchronous = NORMAL'));
 
-    this.db.exec(SCHEMA);
+    // Log foreign key status at startup for debugging
+    const fkEnabled = retryOnBusy(() => this.db.pragma('foreign_keys', { simple: true }));
+    console.log('\x1b[90m[DEBUG] Foreign keys enabled:', fkEnabled, '\x1b[0m');
+
+    retryOnBusy(() => this.db.exec(SCHEMA));
     this.addBatchIdColumnIfNeeded();
     this.addSuccessTrackingColumnsIfNeeded();
     this.addPackageManagerAndTestResultsColumnsIfNeeded();
@@ -208,13 +256,15 @@ export class BenchmarkLogger {
   private addBatchIdColumnIfNeeded() {
     try {
       // Check if batchId column exists
-      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const columns = retryOnBusy(() =>
+        this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>
+      );
       const hasBatchId = columns.some(col => col.name === 'batchId');
-      
+
       if (!hasBatchId) {
         console.log('Adding batchId column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN batchId TEXT');
-        this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_batchId ON benchmark_runs(batchId)');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN batchId TEXT'));
+        retryOnBusy(() => this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_batchId ON benchmark_runs(batchId)'));
         console.log('✓ batchId column added successfully');
       }
     } catch (error) {
@@ -225,25 +275,27 @@ export class BenchmarkLogger {
   private addSuccessTrackingColumnsIfNeeded() {
     try {
       // Check if success tracking columns exist
-      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const columns = retryOnBusy(() =>
+        this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>
+      );
       const hasIsSuccessful = columns.some(col => col.name === 'is_successful');
       const hasSuccessMetric = columns.some(col => col.name === 'success_metric');
-      
+
       if (!hasIsSuccessful) {
         console.log('Adding is_successful column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN is_successful BOOLEAN DEFAULT 0');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN is_successful BOOLEAN DEFAULT 0'));
         console.log('✓ is_successful column added successfully');
       }
-      
+
       if (!hasSuccessMetric) {
         console.log('Adding success_metric column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN success_metric REAL');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN success_metric REAL'));
         console.log('✓ success_metric column added successfully');
       }
-      
+
       // Add index for is_successful if it doesn't exist
       try {
-        this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_is_successful ON benchmark_runs(is_successful)');
+        retryOnBusy(() => this.db.exec('CREATE INDEX IF NOT EXISTS idx_runs_is_successful ON benchmark_runs(is_successful)'));
       } catch (error) {
         // Index might already exist, ignore error
       }
@@ -254,19 +306,21 @@ export class BenchmarkLogger {
 
   private addPackageManagerAndTestResultsColumnsIfNeeded() {
     try {
-      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const columns = retryOnBusy(() =>
+        this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>
+      );
       const hasPackageManager = columns.some(col => col.name === 'package_manager');
       const hasTestResults = columns.some(col => col.name === 'test_results');
 
       if (!hasPackageManager) {
         console.log('Adding package_manager column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN package_manager TEXT');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN package_manager TEXT'));
         console.log('✓ package_manager column added successfully');
       }
 
       if (!hasTestResults) {
         console.log('Adding test_results column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN test_results TEXT');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN test_results TEXT'));
         console.log('✓ test_results column added successfully');
       }
     } catch (error) {
@@ -276,12 +330,14 @@ export class BenchmarkLogger {
 
   private addSpecialistEnabledColumnIfNeeded() {
     try {
-      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const columns = retryOnBusy(() =>
+        this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>
+      );
       const hasSpecialistEnabled = columns.some(col => col.name === 'specialist_enabled');
 
       if (!hasSpecialistEnabled) {
         console.log('Adding specialist_enabled column to existing database...');
-        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN specialist_enabled BOOLEAN DEFAULT 0');
+        retryOnBusy(() => this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN specialist_enabled BOOLEAN DEFAULT 0'));
         console.log('✓ specialist_enabled column added successfully');
       }
     } catch (error) {
@@ -291,12 +347,14 @@ export class BenchmarkLogger {
 
   private addPromptSentColumnIfNeeded() {
     try {
-      const columns = this.db.prepare("PRAGMA table_info(run_telemetry)").all() as Array<{name: string}>;
+      const columns = retryOnBusy(() =>
+        this.db.prepare("PRAGMA table_info(run_telemetry)").all() as Array<{name: string}>
+      );
       const hasPromptSent = columns.some(col => col.name === 'prompt_sent');
 
       if (!hasPromptSent) {
         console.log('Adding prompt_sent column to existing database...');
-        this.db.exec('ALTER TABLE run_telemetry ADD COLUMN prompt_sent TEXT');
+        retryOnBusy(() => this.db.exec('ALTER TABLE run_telemetry ADD COLUMN prompt_sent TEXT'));
         console.log('✓ prompt_sent column added successfully');
       }
     } catch (error) {
@@ -372,10 +430,45 @@ export class BenchmarkLogger {
     const runId = uuidv4();
     this.currentRunId = runId;
 
-    this.db.prepare(`
-      INSERT INTO benchmark_runs (run_id, batchId, suite, scenario, tier, agent, model, status, specialist_enabled)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'running', ?)
-    `).run(runId, batchId, suite, scenario, tier, agent, model, specialistEnabled ? 1 : 0);
+    // Log database write attempt
+    console.log('\x1b[90m[DEBUG] Database startRun()\x1b[0m');
+    console.log(`\x1b[90m  Run ID: ${runId}\x1b[0m`);
+    console.log(`\x1b[90m  Suite: ${suite}, Scenario: ${scenario}\x1b[0m`);
+    console.log(`\x1b[90m  Tier: ${tier}, Agent: ${agent}, Model: ${model || 'default'}\x1b[0m`);
+    console.log(`\x1b[90m  Batch ID: ${batchId || 'none'}\x1b[0m`);
+    console.log(`\x1b[90m  Specialist: ${specialistEnabled ? 'yes' : 'no'}\x1b[0m`);
+    console.log(`\x1b[90m  Database path: ${this.db.name}\x1b[0m`);
+
+    // If a batchId is provided, ensure the batch exists (critical for child processes)
+    if (batchId) {
+      try {
+        const batchExists = retryOnBusy(() =>
+          this.db.prepare('SELECT 1 FROM batch_runs WHERE batchId = ?').get(batchId)
+        );
+
+        if (!batchExists) {
+          console.log('\x1b[90m[DEBUG] Batch not found in child process, creating batch record\x1b[0m');
+          this.createBatch(batchId);
+        }
+      } catch (error) {
+        console.warn(`\x1b[33m[DEBUG] Failed to check/create batch: ${error instanceof Error ? error.message : String(error)}\x1b[0m`);
+        // Don't throw - we can still proceed without batch tracking
+      }
+    }
+
+    try {
+      retryOnBusy(() =>
+        this.db.prepare(`
+          INSERT INTO benchmark_runs (run_id, batchId, suite, scenario, tier, agent, model, status, specialist_enabled)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'running', ?)
+        `).run(runId, batchId, suite, scenario, tier, agent, model, specialistEnabled ? 1 : 0)
+      );
+
+      console.log(`\x1b[90m  ✓ Database record created successfully\x1b[0m`);
+    } catch (error) {
+      console.error(`\x1b[31m[DEBUG] Failed to create database record: ${error instanceof Error ? error.message : String(error)}\x1b[0m`);
+      throw error;
+    }
 
     return runId;
   }
@@ -413,15 +506,15 @@ export class BenchmarkLogger {
     this.updateTimestamp();
   }
 
-  failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'unknown') {
+  failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'warmup' | 'unknown') {
     if (!this.currentRunId) throw new Error('No active run');
-    
+
     this.db.prepare(`
-      UPDATE benchmark_runs 
+      UPDATE benchmark_runs
       SET status = 'failed', completed_at = CURRENT_TIMESTAMP, metadata = ?
       WHERE run_id = ?
     `).run(JSON.stringify({ error, errorType: errorType || 'unknown' }), this.currentRunId);
-    
+
     this.updateTimestamp();
   }
 
@@ -822,10 +915,32 @@ export class BenchmarkLogger {
   createBatch(batchId: string): void {
     const now = Date.now();
 
-    this.db.prepare(`
-      INSERT OR IGNORE INTO batch_runs (batchId, createdAt, totalRuns, successfulRuns)
-      VALUES (?, ?, 0, 0)
-    `).run(batchId, now);
+    console.log('\x1b[90m[DEBUG] createBatch()\x1b[0m');
+    console.log(`\x1b[90m  Batch ID: ${batchId}\x1b[0m`);
+    console.log(`\x1b[90m  Timestamp: ${now}\x1b[0m`);
+
+    try {
+      const result = retryOnBusy(() =>
+        this.db.prepare(`
+          INSERT OR IGNORE INTO batch_runs (batchId, createdAt, totalRuns, successfulRuns)
+          VALUES (?, ?, 0, 0)
+        `).run(batchId, now)
+      );
+
+      console.log(`\x1b[90m  Insert result: changes=${result.changes}, lastInsertRowid=${result.lastInsertRowid}\x1b[0m`);
+
+      // Verify it was inserted
+      const check = retryOnBusy(() =>
+        this.db.prepare('SELECT * FROM batch_runs WHERE batchId = ?').get(batchId)
+      );
+      console.log(`\x1b[90m  Verification: ${check ? 'EXISTS' : 'NOT FOUND'}\x1b[0m`);
+      if (check) {
+        console.log(`\x1b[90m  Record: ${JSON.stringify(check)}\x1b[0m`);
+      }
+    } catch (error) {
+      console.error(`\x1b[31m[DEBUG] Failed to create batch: ${error}\x1b[0m`);
+      throw error;
+    }
   }
 
   getBatchSuccessfulRunsCount(batchId: string): number {
@@ -1212,6 +1327,27 @@ export class BenchmarkLogger {
     this.db.exec('DELETE FROM evaluation_results');
     this.db.exec('DELETE FROM benchmark_runs');
     this.db.exec('DELETE FROM batch_runs');
+  }
+
+  /**
+   * Force a WAL checkpoint to ensure all writes are visible to other connections
+   * This is critical when using WAL mode and child processes that open new connections
+   */
+  checkpoint() {
+    try {
+      console.log('\x1b[90m[DEBUG] Running WAL checkpoint (TRUNCATE mode)...\x1b[0m');
+      // TRUNCATE mode: checkpoint and truncate the WAL to 0 bytes
+      // This is more aggressive than RESTART and ensures data is fully written
+      const result = this.db.pragma('wal_checkpoint(TRUNCATE)');
+      console.log('\x1b[90m[DEBUG] Checkpoint result:', JSON.stringify(result), '\x1b[0m');
+
+      // Also ensure synchronous write
+      this.db.pragma('synchronous = FULL');
+      console.log('\x1b[90m[DEBUG] Set synchronous = FULL\x1b[0m');
+    } catch (error) {
+      console.error('\x1b[31m[DEBUG] Failed to checkpoint database:', error, '\x1b[0m');
+      throw error;
+    }
   }
 
   close() {

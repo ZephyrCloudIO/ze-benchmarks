@@ -168,19 +168,33 @@ async function runBenchmark(
         args.push(model.specialist);
       }
 
+      // Log child process spawn details
+      console.log(chalk.gray(`\n[DEBUG] Spawning child process for ${modelLabel}`));
+      console.log(chalk.gray(`  Command: ${tsxPath} ${args.join(' ')}`));
+      console.log(chalk.gray(`  CWD: ${resolve(__dirname, '..')}`));
+
       // Execute the benchmark with streaming output (use absolute path to tsx)
       const child = spawn(tsxPath, args, {
         cwd: resolve(__dirname, '..'),
         stdio: ['ignore', 'pipe', 'pipe'] as const
       });
 
+      // Log PID immediately after spawn
+      console.log(chalk.gray(`  PID: ${child.pid}`));
+
       let lastOutput = '';
       let errorOutput = '';
+      let stdoutBuffer = '';
 
       // Stream stdout with real-time updates
       if (child.stdout) {
         child.stdout.on('data', (data) => {
           const output = data.toString();
+          stdoutBuffer += output;
+
+          // Log all stdout in real-time (not just for spinner)
+          console.log(chalk.gray(`  [${modelLabel} stdout]: ${output.trim()}`));
+
           lastOutput = output.trim().split('\n').pop() || lastOutput;
 
           // Update spinner with last meaningful line
@@ -193,13 +207,25 @@ async function runBenchmark(
       // Capture stderr
       if (child.stderr) {
         child.stderr.on('data', (data) => {
-          errorOutput += data.toString();
+          const output = data.toString();
+          errorOutput += output;
+          // Log stderr separately in real-time
+          console.error(chalk.red(`  [${modelLabel} stderr]: ${output.trim()}`));
         });
       }
 
       // Handle completion
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         const duration = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
+        const durationSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
+
+        // Log exit details
+        console.log(chalk.gray(`\n[DEBUG] Child process ${modelLabel} (PID: ${child.pid}) closed`));
+        console.log(chalk.gray(`  Exit code: ${code}`));
+        console.log(chalk.gray(`  Signal: ${signal || 'none'}`));
+        console.log(chalk.gray(`  Duration: ${durationSeconds}s`));
+        console.log(chalk.gray(`  stdout length: ${stdoutBuffer.length} bytes`));
+        console.log(chalk.gray(`  stderr length: ${errorOutput.length} bytes`));
 
         if (code === 0) {
           s.stop(chalk.green(`✓ ${modelLabel} completed (${duration}m)`));
@@ -217,6 +243,10 @@ async function runBenchmark(
       // Handle errors
       child.on('error', (error) => {
         const duration = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
+        console.error(chalk.red(`\n[DEBUG] Child process ${modelLabel} (PID: ${child.pid}) error: ${error.message}`));
+        if (error.stack) {
+          console.error(chalk.gray(error.stack));
+        }
         s.stop(chalk.red(`✗ ${modelLabel} failed (${duration}m)`));
         console.error(chalk.red(error.message));
         promiseResolve({ success: false, model, isSpecialist, error: error.message });
@@ -224,6 +254,10 @@ async function runBenchmark(
     } catch (error) {
       const duration = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
       const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`\n[DEBUG] Benchmark spawn exception for ${modelLabel}: ${errorMsg}`));
+      if (error instanceof Error && error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
       s.stop(chalk.red(`✗ ${modelLabel} failed (${duration}m)`));
       console.error(chalk.red(errorMsg));
       promiseResolve({ success: false, model, isSpecialist, error: errorMsg });
@@ -289,10 +323,25 @@ async function main() {
     // Create batch record in database (uses config or env var BENCHMARK_DB_PATH)
     const logger = BenchmarkLogger.getInstance();
     logger.createBatch(batchId);
-    logger.close();
+
+    // Force WAL checkpoint to ensure batch is visible to child processes
+    // Without this, child processes opening new connections may not see the batch record
+    // causing FOREIGN KEY constraint failures
+    console.log(chalk.blue('💾 Flushing batch record to database...'));
+    logger.checkpoint();
+
+    // Give a brief moment for the filesystem to fully sync the WAL checkpoint
+    // This ensures child processes opening new connections will see the batch record
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // DON'T close logger yet - keep it open so child processes can see the batch
+    // We'll close it after all benchmarks complete
+    console.log(chalk.green('✓ Batch record committed and synced (logger kept open for child processes)\n'));
 
     // Execute warmup once before all benchmarks
     console.log(chalk.blue('\n🔥 Running warmup phase...'));
+    console.log(chalk.blue(`Suite: ${options.suite}, Scenario: ${options.scenario}`));
+
     try {
       const scenarioCfg = loadScenario(options.suite, options.scenario);
       const warmupResult = await executeWarmup(
@@ -304,14 +353,32 @@ async function main() {
       );
 
       if (!warmupResult.success) {
-        console.error(chalk.red(`✗ Warmup failed: ${warmupResult.error}`));
-        console.log(chalk.yellow('⚠️  Continuing with benchmarks anyway (warmup is optional)'));
-      } else {
-        console.log(chalk.green('✓ Warmup completed successfully\n'));
+        console.error(chalk.red(`\n❌ Warmup failed: ${warmupResult.error}`));
+        if (warmupResult.agentError) {
+          console.error(chalk.red(`Agent error: ${warmupResult.agentError}`));
+        }
+        if (warmupResult.controlPath) {
+          console.error(chalk.red(`Expected control path: ${warmupResult.controlPath}`));
+        }
+        console.error(chalk.red('Cannot proceed with benchmarks - control folder required'));
+        process.exit(1);
       }
+
+      console.log(chalk.green('\n✓ Warmup completed successfully'));
+      if (warmupResult.controlPath) {
+        console.log(chalk.blue(`Control folder: ${warmupResult.controlPath}`));
+        if (warmupResult.controlContents && warmupResult.controlContents.length > 0) {
+          console.log(chalk.blue(`Contents (${warmupResult.controlContents.length} items): [${warmupResult.controlContents.slice(0, 5).join(', ')}${warmupResult.controlContents.length > 5 ? '...' : ''}]`));
+        }
+      }
+      console.log(chalk.blue('Proceeding with parallel benchmark execution...\n'));
     } catch (error) {
-      console.error(chalk.red(`✗ Warmup error: ${error instanceof Error ? error.message : String(error)}`));
-      console.log(chalk.yellow('⚠️  Continuing with benchmarks anyway (warmup is optional)\n'));
+      console.error(chalk.red(`\n❌ Warmup exception: ${error instanceof Error ? error.message : String(error)}`));
+      if (error instanceof Error && error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
+      console.error(chalk.red('Cannot proceed with benchmarks - warmup must complete successfully'));
+      process.exit(1);
     }
 
     // Combine all models into one array for parallel execution
@@ -378,6 +445,10 @@ async function main() {
 
     console.log(chalk.bold('\n🌐 View results:'));
     console.log(`  ${chalk.cyan('pnpm dashboard:dev')}\n`);
+
+    // Close the logger now that all benchmarks are complete
+    logger.close();
+    console.log(chalk.gray('Database connection closed\n'));
 
     // Exit with error code if any runs failed
     if (results.some(r => !r.success)) {

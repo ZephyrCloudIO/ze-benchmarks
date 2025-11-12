@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
+import chalk from 'chalk';
 
 export type ToolDefinition = {
 	name: string;
@@ -94,14 +95,34 @@ export function createListFilesTool(): ToolDefinition {
 	};
 }
 
+// Create fetchUrl tool definition
+export function createFetchUrlTool(): ToolDefinition {
+	return {
+		name: 'fetchUrl',
+		description: 'Fetch content from a URL and return it as text. Use this to read documentation, APIs, or any web content.',
+		input_schema: {
+			type: 'object',
+			properties: {
+				url: {
+					type: 'string',
+					description: 'The URL to fetch (e.g., "https://ui.shadcn.com/docs/installation/vite")'
+				}
+			},
+			required: ['url']
+		}
+	};
+}
+
 // Create tool handlers for workspace operations
 export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, ToolHandler> {
 	const handlers = new Map<string, ToolHandler>();
 
 	// readFile handler
 	handlers.set('readFile', async (input: { path: string }): Promise<string> => {
+		console.log(chalk.blue(`[readFile] Reading: ${input.path}`));
+
 		const fullPath = join(workspaceDir, input.path);
-		
+
 		// Security: ensure path is within workspace
 		const resolvedPath = join(workspaceDir, input.path);
 		if (!resolvedPath.startsWith(workspaceDir)) {
@@ -124,17 +145,20 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 		try {
 			const content = readFileSync(fullPath, 'utf8');
-			console.log(`[readFile] Read ${input.path} (${content.length} bytes)`);
+			console.log(chalk.green(`[readFile] ✓ Read ${input.path} (${content.length} bytes)`));
 			return content;
 		} catch (error) {
+			console.error(chalk.red(`[readFile] ❌ Failed to read ${input.path}:`), error);
 			return `Error reading file: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
 
 	// writeFile handler
 	handlers.set('writeFile', async (input: { path: string; content: string }): Promise<string> => {
+		console.log(chalk.blue(`[writeFile] Writing to: ${input.path} (${input.content.length} bytes)`));
+
 		const fullPath = join(workspaceDir, input.path);
-		
+
 		// Security: ensure path is within workspace
 		const resolvedPath = join(workspaceDir, input.path);
 		if (!resolvedPath.startsWith(workspaceDir)) {
@@ -148,17 +172,19 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 		try {
 			writeFileSync(fullPath, input.content, 'utf8');
-			console.log(`[writeFile] Wrote ${input.path} (${input.content.length} bytes)`);
+			console.log(chalk.green(`[writeFile] ✓ Successfully wrote ${input.path}`));
 			return `Successfully wrote to ${input.path}`;
 		} catch (error) {
+			console.error(chalk.red(`[writeFile] ❌ Failed to write ${input.path}:`), error);
 			return `Error writing file: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
 
 	// runCommand handler
 	handlers.set('runCommand', async (input: { command: string; description?: string }): Promise<string> => {
-		console.log(`[runCommand] ${input.description || input.command}`);
-		
+		const desc = input.description || input.command;
+		console.log(chalk.blue(`[runCommand] Starting: ${desc}`));
+
 		try {
 			const output = execSync(input.command, {
 				cwd: workspaceDir,
@@ -167,25 +193,30 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 				maxBuffer: 10 * 1024 * 1024, // 10MB buffer
 				stdio: 'pipe'
 			});
-			
-			console.log(`[runCommand] Completed successfully`);
+
+			console.log(chalk.green(`[runCommand] ✓ Completed: ${desc}`));
+			const preview = output ? output.substring(0, 200) : '(no output)';
+			console.log(chalk.gray(`[runCommand] Output: ${preview}${output && output.length > 200 ? '...' : ''}`));
 			return output || 'Command completed successfully (no output)';
 		} catch (error: any) {
 			const message = error.stderr || error.stdout || error.message || String(error);
-			console.log(`[runCommand] Failed: ${message.slice(0, 200)}`);
+			console.error(chalk.red(`[runCommand] ❌ Failed: ${desc}`));
+			console.error(chalk.gray(`[runCommand] Error: ${message.slice(0, 200)}`));
 			return `Command failed: ${message}`;
 		}
 	});
 
 	// listFiles handler
 	handlers.set('listFiles', async (input: { path: string }): Promise<string> => {
+		console.log(chalk.blue(`[listFiles] Listing: ${input.path}`));
+
 		const fullPath = join(workspaceDir, input.path);
-		
+
 		// Security: block access to node_modules directories
 		if (input.path.includes('node_modules') || input.path.includes('/node_modules/') || input.path.startsWith('node_modules/')) {
 			return `Error: Access to node_modules is not allowed. Please focus on your project files.`;
 		}
-		
+
 		if (!existsSync(fullPath)) {
 			return `Error: Path '${input.path}' does not exist`;
 		}
@@ -206,10 +237,50 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 				return `${type.padEnd(4)} ${entry}`;
 			});
 
-			console.log(`[listFiles] Listed ${input.path} (${details.length} entries, node_modules filtered)`);
+			console.log(chalk.green(`[listFiles] ✓ Found ${details.length} entries in ${input.path}`));
 			return details.join('\n');
 		} catch (error) {
+			console.error(chalk.red(`[listFiles] ❌ Failed to list ${input.path}:`), error);
 			return `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
+		}
+	});
+
+	// fetchUrl handler
+	handlers.set('fetchUrl', async (input: { url: string }): Promise<string> => {
+		console.log(chalk.blue(`[fetchUrl] Fetching: ${input.url}`));
+
+		try {
+			const response = await fetch(input.url);
+
+			if (!response.ok) {
+				console.error(chalk.red(`[fetchUrl] ❌ HTTP ${response.status}: ${input.url}`));
+				return `Error: HTTP ${response.status} - ${response.statusText}`;
+			}
+
+			const contentType = response.headers.get('content-type') || '';
+
+			if (contentType.includes('text/html')) {
+				// For HTML, extract text content (simple approach)
+				const html = await response.text();
+				// Remove script and style tags
+				const cleaned = html
+					.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+					.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+					.replace(/<[^>]+>/g, ' ')
+					.replace(/\s+/g, ' ')
+					.trim();
+
+				console.log(chalk.green(`[fetchUrl] ✓ Fetched HTML from ${input.url} (${cleaned.length} chars)`));
+				return cleaned;
+			} else {
+				// For other content types, return as text
+				const text = await response.text();
+				console.log(chalk.green(`[fetchUrl] ✓ Fetched ${input.url} (${text.length} chars)`));
+				return text;
+			}
+		} catch (error) {
+			console.error(chalk.red(`[fetchUrl] ❌ Failed to fetch ${input.url}:`), error);
+			return `Error fetching URL: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
 
@@ -222,6 +293,7 @@ export function getAllWorkspaceTools(): ToolDefinition[] {
 		createReadFileTool(),
 		createWriteFileTool(),
 		createRunCommandTool(),
-		createListFilesTool()
+		createListFilesTool(),
+		createFetchUrlTool()
 	];
 }

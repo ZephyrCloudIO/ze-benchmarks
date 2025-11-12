@@ -29,8 +29,11 @@ export const SCHEMA = `
     package_manager TEXT,
     test_results TEXT,
     specialist_enabled BOOLEAN DEFAULT 0,
-    metadata TEXT,
-    FOREIGN KEY (batchId) REFERENCES batch_runs(batchId)
+    metadata TEXT
+    -- Note: FOREIGN KEY constraint removed to avoid issues with SQLite WAL mode
+    -- and multiple concurrent connections. Referential integrity is maintained
+    -- by the application logic in BenchmarkLogger.
+    -- FOREIGN KEY (batchId) REFERENCES batch_runs(batchId)
   );
 
   CREATE TABLE IF NOT EXISTS evaluation_results (

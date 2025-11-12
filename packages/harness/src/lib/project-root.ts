@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 
 /**
@@ -48,7 +48,8 @@ export function findZeBenchmarksRoot(startDir: string = process.cwd()): string |
 
     if (existsSync(pkgPath)) {
       try {
-        const pkg = require(pkgPath);
+        const pkgContent = readFileSync(pkgPath, 'utf-8');
+        const pkg = JSON.parse(pkgContent);
         if (pkg.name === 'ze-benchmarks') {
           return currentDir;
         }
