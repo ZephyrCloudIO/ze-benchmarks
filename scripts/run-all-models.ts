@@ -286,9 +286,8 @@ async function main() {
     console.log(chalk.cyan(`\n📦 Batch ID: ${chalk.bold(batchId)}`));
     console.log(chalk.gray(`   Use this ID with: pnpm mint:snapshot <template> ${batchId}\n`));
 
-    // Create batch record in database
-    const dbPath = join(process.cwd(), 'benchmark-report', 'public', 'benchmarks.db');
-    const logger = new BenchmarkLogger(dbPath);
+    // Create batch record in database (uses config or env var BENCHMARK_DB_PATH)
+    const logger = BenchmarkLogger.getInstance();
     logger.createBatch(batchId);
     logger.close();
 

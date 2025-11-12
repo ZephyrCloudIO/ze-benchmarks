@@ -137,17 +137,37 @@ export class BenchmarkLogger {
   private currentRunId: string | null = null;
 
   constructor(dbPath?: string) {
-    // Use absolute path to avoid working directory issues
-    const defaultPath = join(process.cwd(), 'benchmark-report', 'public', 'benchmarks.db');
-    const path = dbPath || process.env.ZE_BENCHMARKS_DB || defaultPath;
-    
+    // Priority: explicit dbPath > BENCHMARK_DB_PATH env var > config > default
+    let path: string;
+
+    if (dbPath) {
+      path = dbPath;
+    } else if (process.env.BENCHMARK_DB_PATH) {
+      path = process.env.BENCHMARK_DB_PATH;
+    } else {
+      // Try to load from config, fallback to legacy path
+      try {
+        // Dynamically import to avoid circular dependencies
+        const configModule = require('../../harness/src/lib/config.js');
+        if (configModule && configModule.getDatabasePath) {
+          path = configModule.getDatabasePath();
+        } else {
+          // Fallback to legacy path
+          path = join(process.cwd(), 'benchmark-report', 'public', 'benchmarks.db');
+        }
+      } catch {
+        // Config not available, use legacy default
+        path = join(process.cwd(), 'benchmark-report', 'public', 'benchmarks.db');
+      }
+    }
+
     console.log(`Database path: ${path}`);
-    
+
     // Ensure directory exists
     mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.initializeSchema();
-    
+
     // Ensure database is properly created and accessible
     this.ensureDatabaseExists();
   }

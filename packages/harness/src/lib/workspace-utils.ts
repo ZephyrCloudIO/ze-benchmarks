@@ -24,7 +24,20 @@ export function findWorkspaceRoot(startDir: string): string {
 }
 
 export function findRepoRoot(): string {
-	return resolve(fileURLToPath(import.meta.url), '../../../../..');
+	// Use project root detection instead of hardcoded traversal
+	const { findZeBenchmarksRoot } = require('./project-root.js');
+	const root = findZeBenchmarksRoot();
+	if (!root) {
+		// Fallback: Look for package.json with name "ze-benchmarks"
+		const { findProjectRoot } = require('./project-root.js');
+		const pkgRoot = findProjectRoot('package.json', fileURLToPath(import.meta.url));
+		if (pkgRoot) {
+			return pkgRoot;
+		}
+		// Last resort: old behavior
+		return resolve(fileURLToPath(import.meta.url), '../../../../..');
+	}
+	return root;
 }
 
 export function prepareWorkspaceFromFixture(suite: string, scenario: string, getScenarioDir: (suite: string, scenario: string) => string): { workspaceDir: string; fixtureDir: string } | undefined {

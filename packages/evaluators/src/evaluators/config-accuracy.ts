@@ -7,9 +7,8 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
-			// Get reference directory path
-			const referencePath = this.getReferencePath(ctx);
-			if (!referencePath || !fs.existsSync(referencePath)) {
+			// Use reference path from context (no filesystem traversal needed)
+			if (!ctx.referencePath || !fs.existsSync(ctx.referencePath)) {
 				return {
 					name: this.meta.name,
 					score: 0,
@@ -18,10 +17,10 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 			}
 
 			const checks = [
-				this.checkViteConfig(ctx.workspaceDir, referencePath),
-				this.checkTailwindSetup(ctx.workspaceDir, referencePath),
-				this.checkTsConfig(ctx.workspaceDir, referencePath),
-				this.checkComponentsJson(ctx.workspaceDir, referencePath),
+				this.checkViteConfig(ctx.workspaceDir, ctx.referencePath),
+				this.checkTailwindSetup(ctx.workspaceDir, ctx.referencePath),
+				this.checkTsConfig(ctx.workspaceDir, ctx.referencePath),
+				this.checkComponentsJson(ctx.workspaceDir, ctx.referencePath),
 			];
 
 			const results = await Promise.all(checks);
@@ -44,39 +43,6 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 				details: `Evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
 			};
 		}
-	}
-
-	private getReferencePath(ctx: EvaluationContext): string | null {
-		if (!ctx.scenario.reference_path) {
-			return null;
-		}
-
-		// Find the ze-benchmarks root by looking for suites directory
-		// We're in ze-benchmarks/packages/evaluators, so go up and find suites
-		let currentDir = __dirname;
-		let suitesDir = null;
-
-		// Go up max 10 levels to find suites directory
-		for (let i = 0; i < 10; i++) {
-			const possibleSuitesDir = path.join(currentDir, 'suites');
-			if (fs.existsSync(possibleSuitesDir)) {
-				suitesDir = possibleSuitesDir;
-				break;
-			}
-			const parent = path.dirname(currentDir);
-			if (parent === currentDir) break; // Reached root
-			currentDir = parent;
-		}
-
-		if (!suitesDir) {
-			return null;
-		}
-
-		// Construct path: suites/{suite}/scenarios/{scenario-name}/../reference_path
-		const scenarioDir = path.join(suitesDir, ctx.scenario.suite, 'scenarios', ctx.scenario.id.replace('ZE_', ''));
-		const referencePath = path.resolve(scenarioDir, ctx.scenario.reference_path);
-
-		return fs.existsSync(referencePath) ? referencePath : null;
 	}
 
 	private checkViteConfig(workspaceDir: string, referencePath: string): { name: string; score: number; reason: string } {
