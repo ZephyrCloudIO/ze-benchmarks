@@ -1,10 +1,28 @@
 import { config } from 'dotenv';
 import { OpenAI } from 'openai';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 // Load environment variables from .env file in project root
-config({ path: resolve(process.cwd(), '.env') });
+// Find workspace root by looking for pnpm-workspace.yaml (topmost one)
+function findWorkspaceRoot(startDir: string): string {
+  let currentDir = startDir;
+  let lastWorkspaceRoot = startDir;
+
+  while (currentDir !== resolve(currentDir, '..')) {
+    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
+      lastWorkspaceRoot = currentDir;
+    }
+    currentDir = resolve(currentDir, '..');
+  }
+
+  return lastWorkspaceRoot;
+}
+
+const workspaceRoot = findWorkspaceRoot(process.cwd());
+const envPath = resolve(workspaceRoot, '.env');
+config({ path: envPath });
 
 interface ToolResult {
   tool_call_id: string;

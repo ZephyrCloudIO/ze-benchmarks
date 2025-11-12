@@ -25,6 +25,9 @@ import chalk from 'chalk';
 import { v4 as uuidv4 } from 'uuid';
 import { BenchmarkLogger } from '../packages/database/src/logger';
 import { spinner } from '@clack/prompts';
+import { executeWarmup } from '../packages/harness/src/domain/warmup';
+import { loadScenario } from '../packages/harness/src/domain/scenario';
+import { createAgentAdapter } from '../packages/harness/src/domain/agent';
 
 // ESM __dirname polyfill
 const __filename = fileURLToPath(import.meta.url);
@@ -154,7 +157,9 @@ async function runBenchmark(
         '--tier', tier,
         '--agent', agent,
         '--model', model.model,
-        '--batch-id', batchId
+        '--batch-id', batchId,
+        '--skip-warmup', // Skip warmup in child processes (already done once in parent)
+        '--quiet' // Quiet mode for cleaner parallel output
       ];
 
       // Add specialist flag when provided
@@ -286,6 +291,29 @@ async function main() {
     const logger = new BenchmarkLogger(dbPath);
     logger.createBatch(batchId);
     logger.close();
+
+    // Execute warmup once before all benchmarks
+    console.log(chalk.blue('\n🔥 Running warmup phase...'));
+    try {
+      const scenarioCfg = loadScenario(options.suite, options.scenario);
+      const warmupResult = await executeWarmup(
+        options.suite,
+        options.scenario,
+        scenarioCfg,
+        createAgentAdapter,
+        false // quiet = false for warmup to show output
+      );
+
+      if (!warmupResult.success) {
+        console.error(chalk.red(`✗ Warmup failed: ${warmupResult.error}`));
+        console.log(chalk.yellow('⚠️  Continuing with benchmarks anyway (warmup is optional)'));
+      } else {
+        console.log(chalk.green('✓ Warmup completed successfully\n'));
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Warmup error: ${error instanceof Error ? error.message : String(error)}`));
+      console.log(chalk.yellow('⚠️  Continuing with benchmarks anyway (warmup is optional)\n'));
+    }
 
     // Combine all models into one array for parallel execution
     const allBenchmarks = [
