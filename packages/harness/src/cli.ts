@@ -95,7 +95,13 @@ export { findRepoRoot, validateName, checkSuiteExists, checkScenarioExists };
 // ============================================================================
 
 async function run() {
+	// Log entry point immediately (FIRST THING)
+	console.log(chalk.gray('[DEBUG] Benchmark CLI started'));
+	console.log(chalk.gray(`  Args: ${JSON.stringify(process.argv)}`));
+	console.log(chalk.gray(`  CWD: ${process.cwd()}`));
+
 	const parsedArgs = parseArgs(process.argv);
+	console.log(chalk.gray(`  Parsed args: ${JSON.stringify(parsedArgs)}`));
 
 	// Skip environment validation for creation commands (they don't need API keys)
 	const skipValidation = parsedArgs.cmd === 'new-suite' || parsedArgs.cmd === 'new-scenario';
@@ -412,10 +418,73 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, quiet } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
+	}
+
+	// Log resolved paths BEFORE any benchmark operations
+	try {
+		console.log(chalk.gray('[DEBUG] Path resolution:'));
+		const repoRoot = findRepoRoot();
+		console.log(chalk.gray(`  Repo root: ${repoRoot}`));
+
+		// Try to resolve scenario paths
+		try {
+			const { getScenarioDir } = await import('./domain/scenario.ts');
+			const scenarioDir = getScenarioDir(suite, scenario);
+			console.log(chalk.gray(`  Scenario dir: ${scenarioDir}`));
+			console.log(chalk.gray(`  Scenario dir exists: ${existsSync(scenarioDir)}`));
+
+			const scenarioYaml = join(scenarioDir, 'scenario.yaml');
+			console.log(chalk.gray(`  Scenario yaml: ${scenarioYaml}`));
+			console.log(chalk.gray(`  Scenario yaml exists: ${existsSync(scenarioYaml)}`));
+		} catch (pathErr) {
+			console.error(chalk.red(`[DEBUG] Failed to resolve scenario paths: ${pathErr instanceof Error ? pathErr.message : String(pathErr)}`));
+		}
+	} catch (rootErr) {
+		console.error(chalk.red(`[DEBUG] Failed to resolve repo root: ${rootErr instanceof Error ? rootErr.message : String(rootErr)}`));
+	}
+
+	// Handle warmup-only mode
+	if (warmupOnly) {
+		console.log(chalk.blue('Running warmup only...'));
+		console.log(chalk.blue(`Suite: ${suite}, Scenario: ${scenario}`));
+
+		// Import necessary modules
+		const { loadScenario } = await import('./domain/scenario.ts');
+		const { executeWarmup } = await import('./domain/warmup.ts');
+		const { createAgentAdapter } = await import('./domain/agent.ts');
+
+		try {
+			const scenarioCfg = loadScenario(suite, scenario);
+			const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, createAgentAdapter, false);
+
+			if (!warmupResult.success) {
+				console.error(chalk.red(`\n❌ Warmup failed: ${warmupResult.error}`));
+				if (warmupResult.agentError) {
+					console.error(chalk.red(`Agent error: ${warmupResult.agentError}`));
+				}
+				process.exit(1);
+			}
+
+			console.log(chalk.green('\n✓ Warmup completed successfully'));
+			console.log(chalk.blue(`Control folder: ${warmupResult.controlPath}`));
+			if (warmupResult.controlContents && warmupResult.controlContents.length > 0) {
+				console.log(chalk.blue(`Contents (${warmupResult.controlContents.length} items):`));
+				warmupResult.controlContents.forEach(item => {
+					console.log(chalk.gray(`  - ${item}`));
+				});
+			}
+			process.exit(0);
+		} catch (error) {
+			console.error(chalk.red(`\n❌ Warmup exception: ${error instanceof Error ? error.message : String(error)}`));
+			if (error instanceof Error && error.stack) {
+				console.error(chalk.gray(error.stack));
+			}
+			process.exit(1);
+		}
 	}
 
 	// Show modern CLI intro with hyperfine-style header (skip if quiet mode)
@@ -479,6 +548,12 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 run().catch((err) => {
+	console.error(chalk.red('\n[DEBUG] CLI run() caught exception'));
+	console.error(chalk.red(`  Error: ${err instanceof Error ? err.message : String(err)}`));
+	if (err instanceof Error && err.stack) {
+		console.error(chalk.gray(`  Stack trace:\n${err.stack}`));
+	}
+
 	console.log(`\n${chalk.red('✗')} Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
 
 	// Try to log the error to database if logger is available

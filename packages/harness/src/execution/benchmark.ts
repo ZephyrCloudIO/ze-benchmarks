@@ -112,15 +112,29 @@ export async function executeBenchmark(
 	// Stage 1.5: Warmup (if configured and not skipped)
 	if (!skipWarmup) {
 		if (progress) updateProgress(progress, 1, 'Running warmup phase');
+		if (!quiet) {
+			console.log(chalk.blue('[Benchmark] Running warmup phase...'));
+		}
 		const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, createAgentAdapter, quiet);
 		if (!warmupResult.success) {
 			logger.failRun(`Warmup failed: ${warmupResult.error}`, 'warmup');
-			if (!quiet) console.log(chalk.red(`✗ Warmup failed: ${warmupResult.error}`));
+			if (!quiet) {
+				console.log(chalk.red(`[Benchmark] ✗ Warmup failed: ${warmupResult.error}`));
+				if (warmupResult.agentError) {
+					console.log(chalk.red(`[Benchmark] Agent error: ${warmupResult.agentError}`));
+				}
+			}
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
 			return;
 		}
+		if (!quiet) {
+			console.log(chalk.green('[Benchmark] ✓ Warmup completed successfully'));
+		}
 	} else {
-		if (!quiet) console.log(chalk.gray('⏭️  Skipping warmup phase (--skip-warmup flag set)'));
+		if (!quiet) {
+			console.log(chalk.yellow('[Benchmark] Skipping warmup (--skip-warmup flag set)'));
+			console.log(chalk.gray('[Benchmark] Note: Not validating control folder structure - it varies by scenario'));
+		}
 	}
 
 	// Stage 2: Workspace

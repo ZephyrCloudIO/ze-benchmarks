@@ -85,9 +85,10 @@ export function parseArgs(argv: string[]) {
 	const specialist = specialistIndex !== -1 ? rest[specialistIndex + 1] : undefined;
 
 	const skipWarmup = rest.includes('--skip-warmup');
+	const warmupOnly = rest.includes('--warmup-only');
 	const quiet = rest.includes('--quiet');
 
-	return { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, quiet } as const;
+	return { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet } as const;
 }
 
 export function showHelp() {
@@ -116,6 +117,7 @@ export function showHelp() {
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
 	console.log(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
 	console.log(`  ${chalk.cyan('--skip-warmup')}                  Skip warmup phase (for parallel execution)`);
+	console.log(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
 	console.log(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);
 
 	console.log('\n' + chalk.bold('Model Selection:'));

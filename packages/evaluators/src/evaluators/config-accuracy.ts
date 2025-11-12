@@ -1,20 +1,31 @@
 import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import chalk from 'chalk';
 
 export class ConfigAccuracyEvaluator implements Evaluator {
 	meta = { name: 'ConfigAccuracyEvaluator' } as const;
 
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
+			// Log the paths received from context
+			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Suites dir from context: ${ctx.suitesDir || 'not provided'}`));
+			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Reference path from context: ${ctx.referencePath || 'not provided'}`));
+			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Workspace dir: ${ctx.workspaceDir}`));
+
 			// Use reference path from context (no filesystem traversal needed)
 			if (!ctx.referencePath || !fs.existsSync(ctx.referencePath)) {
+				console.error(chalk.red(`[ConfigAccuracyEvaluator] ❌ Reference not found: ${ctx.referencePath || 'undefined'}`));
 				return {
 					name: this.meta.name,
 					score: 0,
 					details: 'Reference implementation not found',
 				};
 			}
+
+			const contents = fs.readdirSync(ctx.referencePath);
+			console.log(chalk.green(`[ConfigAccuracyEvaluator] ✓ Reference found`));
+			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
 
 			const checks = [
 				this.checkViteConfig(ctx.workspaceDir, ctx.referencePath),
