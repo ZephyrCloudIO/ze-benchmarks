@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 import { getAllPackageJsonPaths, readJson } from '../utils/package-json.ts';
 import { versionSatisfies } from '../utils/semver.ts';
+import { findProjectDir } from '../utils/workspace.ts';
 
 export class DependencyTargetsEvaluator implements Evaluator {
 	meta = { name: 'DependencyTargetsEvaluator' } as const;
@@ -13,13 +14,23 @@ export class DependencyTargetsEvaluator implements Evaluator {
 			return { name: this.meta.name, score: 1, details: 'No required targets' };
 		}
 
-		const pkgPaths = getAllPackageJsonPaths(ctx.workspaceDir);
+		// Find the generated project directory (not 'control')
+		const projectDir = findProjectDir(ctx.workspaceDir);
+		if (!projectDir) {
+			return {
+				name: this.meta.name,
+				score: 0,
+				details: 'Generated project directory not found in workspace',
+			};
+		}
+
+		const pkgPaths = getAllPackageJsonPaths(projectDir);
 		let total = 0;
 		let ok = 0;
 		const misses: string[] = [];
 
 		for (const pkgPath of pkgPaths) {
-			const rel = relative(ctx.workspaceDir, pkgPath) || '.';
+			const rel = relative(projectDir, pkgPath) || '.';
 			const pkg = readJson(pkgPath);
 
 			for (const target of targets) {

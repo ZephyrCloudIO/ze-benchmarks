@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as semver from 'semver';
 import chalk from 'chalk';
+import { findProjectDir } from '../utils/workspace.ts';
 
 export class DependencyProximityEvaluator implements Evaluator {
 	meta = { name: 'DependencyProximityEvaluator' } as const;
@@ -28,7 +29,17 @@ export class DependencyProximityEvaluator implements Evaluator {
 			console.log(chalk.green(`[DependencyProximityEvaluator] ✓ Reference found`));
 			console.log(chalk.blue(`[DependencyProximityEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
 
-			const workspacePkgPath = path.join(ctx.workspaceDir, 'package.json');
+			// Find the generated project directory (not 'control')
+			const projectDir = findProjectDir(ctx.workspaceDir);
+			if (!projectDir) {
+				return {
+					name: this.meta.name,
+					score: 0,
+					details: 'Generated project directory not found in workspace',
+				};
+			}
+
+			const workspacePkgPath = path.join(projectDir, 'package.json');
 			const referencePkgPath = path.join(ctx.referencePath, 'package.json');
 
 			if (!fs.existsSync(workspacePkgPath)) {

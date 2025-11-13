@@ -1,12 +1,23 @@
 import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { findProjectDir } from '../utils/workspace.ts';
 
 export class FileStructureEvaluator implements Evaluator {
 	meta = { name: 'FileStructureEvaluator' } as const;
 
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
+			// Find the generated project directory (not 'control')
+			const projectDir = findProjectDir(ctx.workspaceDir);
+			if (!projectDir) {
+				return {
+					name: this.meta.name,
+					score: 0,
+					details: 'Generated project directory not found in workspace',
+				};
+			}
+
 			// Define required files for shadcn-generate-vite benchmark
 			const requiredFiles = [
 				'package.json',
@@ -28,7 +39,7 @@ export class FileStructureEvaluator implements Evaluator {
 			const missingFiles: string[] = [];
 
 			for (const file of requiredFiles) {
-				const filePath = path.join(ctx.workspaceDir, file);
+				const filePath = path.join(projectDir, file);
 				if (fs.existsSync(filePath)) {
 					existingFiles.push(file);
 				} else {
