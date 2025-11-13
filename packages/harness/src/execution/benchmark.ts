@@ -291,11 +291,20 @@ export async function executeBenchmark(
 				request.toolHandlers = toolHandlers;
 			}
 
-			// Extract the prompt being sent for logging
-			const promptSent = JSON.stringify(request.messages);
-
 			// Execute agent request
 			const response = await agentAdapter.send(request);
+
+			// Extract the prompt being sent for logging
+			// For specialist adapters, get the transformed messages (with system prompt)
+			// For vanilla adapters, use the original request messages
+			let messagesForLogging = request.messages;
+			if ('getLastTransformedMessages' in agentAdapter) {
+				const transformed = (agentAdapter as any).getLastTransformedMessages();
+				if (transformed) {
+					messagesForLogging = transformed;
+				}
+			}
+			const promptSent = JSON.stringify(messagesForLogging);
 
 			// Show summary after agent completes
 			console.log(chalk.gray(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`));

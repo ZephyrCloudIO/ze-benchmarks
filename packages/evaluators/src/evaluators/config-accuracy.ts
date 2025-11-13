@@ -2,6 +2,7 @@ import type { EvaluationContext, Evaluator, EvaluatorResult } from '../types.ts'
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { findProjectDir } from '../utils/workspace.ts';
 
 export class ConfigAccuracyEvaluator implements Evaluator {
 	meta = { name: 'ConfigAccuracyEvaluator' } as const;
@@ -27,11 +28,21 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 			console.log(chalk.green(`[ConfigAccuracyEvaluator] ✓ Reference found`));
 			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
 
+			// Find the generated project directory (not 'control')
+			const projectDir = findProjectDir(ctx.workspaceDir);
+			if (!projectDir) {
+				return {
+					name: this.meta.name,
+					score: 0,
+					details: 'Generated project directory not found in workspace',
+				};
+			}
+
 			const checks = [
-				this.checkViteConfig(ctx.workspaceDir, ctx.referencePath),
-				this.checkTailwindSetup(ctx.workspaceDir, ctx.referencePath),
-				this.checkTsConfig(ctx.workspaceDir, ctx.referencePath),
-				this.checkComponentsJson(ctx.workspaceDir, ctx.referencePath),
+				this.checkViteConfig(projectDir, ctx.referencePath),
+				this.checkTailwindSetup(projectDir, ctx.referencePath),
+				this.checkTsConfig(projectDir, ctx.referencePath),
+				this.checkComponentsJson(projectDir, ctx.referencePath),
 			];
 
 			const results = await Promise.all(checks);

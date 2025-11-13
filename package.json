@@ -22,7 +22,9 @@
     "bench:run": "tsx scripts/run-all-models.ts",
     "bench:compare": "tsx scripts/compare-batches.ts",
     "export:prompts": "tsx scripts/export-batch-prompts.ts",
-    "clear:db": "tsx scripts/clear-database.ts"
+    "validate:prompts": "tsx scripts/validate-prompts.ts",
+    "clear:db": "tsx scripts/clear-database.ts",
+    "workflow:iterate": "tsx scripts/workflow-iterate.ts"
   },
   "engines": {
     "node": ">=24"

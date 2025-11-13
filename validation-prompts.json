@@ -1,0 +1,100 @@
+{
+  "batchId": "133d4f2a-ea78-4eec-89eb-192191650371",
+  "exportedAt": "2025-11-12T21:56:52.193Z",
+  "totalRuns": 5,
+  "runs": [
+    {
+      "runId": "eb68e878-f373-42ec-81fd-7ac75132445c",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\nSet up a new {framework} project with shadcn/ui, using {packageManager} and configuring {features}\n\nAdd {componentName} component to the project using the shadcn CLI\n\nDebug {issueType} issue in shadcn/ui project: {description}\n\nConfigure theming with {themeType} using {baseColor} color palette"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4444444444444444,
+      "success": false,
+      "timestamp": "2025-11-12 21:50:22"
+    },
+    {
+      "runId": "fd6cebdc-5bee-4412-b0a2-431217c533f9",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\nSet up a new {framework} project with shadcn/ui, using {packageManager} and configuring {features}\n\nAdd {componentName} component to the project using the shadcn CLI\n\nDebug {issueType} issue in shadcn/ui project: {description}\n\nConfigure theming with {themeType} using {baseColor} color palette"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.3944444444444445,
+      "success": false,
+      "timestamp": "2025-11-12 21:50:22"
+    },
+    {
+      "runId": "7bb181c5-ded0-4d2a-9314-0b5652dc9fee",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "openai/gpt-4o",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.40555555555555556,
+      "success": false,
+      "timestamp": "2025-11-12 21:50:22"
+    },
+    {
+      "runId": "6c51a471-f9a6-46f1-824c-be451c35f9fc",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4361111111111111,
+      "success": false,
+      "timestamp": "2025-11-12 21:50:22"
+    },
+    {
+      "runId": "1287e07b-8b12-41c7-b245-c0c7064b2700",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4444444444444444,
+      "success": false,
+      "timestamp": "2025-11-12 21:50:22"
+    }
+  ]
+}
