@@ -111,3 +111,7 @@ results/summary.json
 
 # Snapshot files
 snapshot.json5
+
+# Wrangler local development state
+.wrangler/
+drizzle/
