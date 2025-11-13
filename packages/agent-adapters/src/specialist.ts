@@ -123,11 +123,16 @@ export class SpecialistAdapter implements AgentAdapter {
    */
   private loadTemplate(templatePath: string): SpecialistTemplate {
     try {
+      console.log('[SpecialistAdapter] Loading template from:', templatePath);
+
       // Resolve template path (automatically use enriched version if available)
       const resolvedPath = this.resolveTemplatePath(templatePath);
 
       const contents = readFileSync(resolvedPath, 'utf-8');
       const template = JSON5.parse(contents) as SpecialistTemplate;
+
+      console.log('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
+      console.log('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
 
       // Basic validation
       if (!template.name || !template.prompts) {
@@ -261,10 +266,13 @@ export class SpecialistAdapter implements AgentAdapter {
         throw new Error('No user message found in request');
       }
 
+      console.log('[SpecialistAdapter] Processing request with user prompt:', userMessage.substring(0, 100) + '...');
+
       let finalPrompt: string;
 
       // Use LLM-powered approach if enabled
       if (this.llmConfig.enabled) {
+        console.log('[SpecialistAdapter] Using LLM-powered prompt selection');
         try {
           finalPrompt = await this.createPromptWithLLM(userMessage, this.getModelName(), request);
         } catch (error) {
@@ -465,6 +473,8 @@ export class SpecialistAdapter implements AgentAdapter {
     const cacheKey = createCacheKey(userPrompt);
 
     // Phase 1: Select best prompt template
+    console.log('[SpecialistAdapter] Phase 1: Selecting prompt template');
+
     const selectionStart = Date.now();
     let selectionResult: PromptSelectionResult;
     let selectionCacheHit = false;
@@ -473,10 +483,16 @@ export class SpecialistAdapter implements AgentAdapter {
     if (cachedSelection) {
       selectionResult = cachedSelection;
       selectionCacheHit = true;
+      console.log('  Using cached selection');
     } else {
       selectionResult = await this.selectPromptWithLLM(userPrompt, model);
       this.llmCache.setSelection(cacheKey, selectionResult);
+      console.log('  LLM selected prompt');
     }
+
+    console.log('  Selected prompt ID:', selectionResult.selectedPromptId);
+    console.log('  Confidence:', selectionResult.confidence);
+    console.log('  Reasoning:', selectionResult.reasoning);
 
     const selectionDuration = Date.now() - selectionStart;
 
@@ -525,12 +541,18 @@ export class SpecialistAdapter implements AgentAdapter {
     const taskType = this.extractTaskTypeFromPromptId(selectionResult.selectedPromptId);
     const defaultedVars = applyDefaults(extractedVars, selectionResult.selectedPromptId);
 
+    console.log('[SpecialistAdapter] Phase 4: Building context');
+    console.log('  Task type:', taskType);
+    console.log('  Extracted variables:', Object.keys(defaultedVars));
+
     // Build base context from request
     const baseContext = request ? this.buildTemplateContext(request) : {
       workspaceDir: undefined,
       hasTools: false,
       toolCount: 0
     };
+
+    console.log('  Base context:', Object.keys(baseContext));
 
     // Build context using agency-prompt-creator (includes documentation filtering)
     const templateContext = buildPromptCreatorContext(
@@ -545,11 +567,28 @@ export class SpecialistAdapter implements AgentAdapter {
       }
     );
 
+    console.log('  Template context keys:', Object.keys(templateContext));
+    console.log('  Documentation in context:', templateContext.documentation?.length || 0);
+    if (templateContext.documentation && templateContext.documentation.length > 0) {
+      console.log('  Documentation entries:', templateContext.documentation.map((d: any) => d.title));
+    }
+
     // Phase 5: Append documentation section if available
     const promptWithDocs = this.appendDocumentationSection(templateContent, templateContext);
 
+    console.log('[SpecialistAdapter] Phase 5: Appended documentation section');
+    console.log('  Template length before:', templateContent.length);
+    console.log('  Template length after:', promptWithDocs.length);
+    console.log('  Documentation section added:', promptWithDocs.length > templateContent.length);
+
     // Phase 6: Substitute and return
-    return substituteTemplate(promptWithDocs, templateContext);
+    const finalPrompt = substituteTemplate(promptWithDocs, templateContext);
+
+    console.log('[SpecialistAdapter] Phase 6: Final prompt generated');
+    console.log('  Final prompt length:', finalPrompt.length);
+    console.log('  Contains "Relevant Documentation":', finalPrompt.includes('Relevant Documentation'));
+
+    return finalPrompt;
   }
 
   /**
@@ -561,6 +600,9 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const prompt = buildPromptSelectionPrompt(userPrompt, this.template.prompts, model);
+
+    console.log('[SpecialistAdapter] Prompt selection LLM prompt (first 500 chars):');
+    console.log(prompt.substring(0, 500) + '...');
 
     try {
       const response = await Promise.race([

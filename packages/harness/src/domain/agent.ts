@@ -35,7 +35,7 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 	const templateName = specialistName.replace(/^@[^/]+\//, '');
 
 	// Construct template path relative to workspace root
-	const templatePath = `starting_from_outcome/${templateName}.json5`;
+	const templatePath = `starting_from_outcome/${templateName}-template.json5`;
 	const absolutePath = resolve(workspaceRoot, templatePath);
 
 	// Verify template exists
