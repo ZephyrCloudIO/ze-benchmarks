@@ -27,6 +27,7 @@ interface SyncOptions {
   dryRun: boolean;
   limit?: number;
   force: boolean;
+  quiet: boolean;
 }
 
 interface SyncStats {
@@ -109,7 +110,7 @@ async function checkDatabaseSchema(): Promise<boolean> {
  * Sync batch_runs table
  */
 async function syncBatches(localDb: Database.Database, options: SyncOptions, stats: SyncStats): Promise<void> {
-  console.log('\nSyncing batch_runs...');
+  if (!options.quiet) console.log('\nSyncing batch_runs...');
   
   let query = 'SELECT * FROM batch_runs ORDER BY createdAt DESC';
   if (options.limit) {
@@ -119,7 +120,7 @@ async function syncBatches(localDb: Database.Database, options: SyncOptions, sta
   const batches = localDb.prepare(query).all() as any[];
   stats.batches.total = batches.length;
   
-  console.log(`   Found ${batches.length} batches`);
+  if (!options.quiet) console.log(`   Found ${batches.length} batches`);
   
   for (const batch of batches) {
     try {
@@ -127,14 +128,14 @@ async function syncBatches(localDb: Database.Database, options: SyncOptions, sta
       if (!options.force && !options.dryRun) {
         const exists = await batchExists(batch.batchId);
         if (exists) {
-          console.log(`   Skipping batch ${batch.batchId} (already exists)`);
+          if (!options.quiet) console.log(`   Skipping batch ${batch.batchId} (already exists)`);
           stats.batches.skipped++;
           continue;
         }
       }
       
       if (options.dryRun) {
-        console.log(`   Would sync batch: ${batch.batchId}`);
+        if (!options.quiet) console.log(`   Would sync batch: ${batch.batchId}`);
         stats.batches.synced++;
         continue;
       }
@@ -142,7 +143,7 @@ async function syncBatches(localDb: Database.Database, options: SyncOptions, sta
       // Transform data to match Worker API format
       const createdAt = transformTimestamp(batch.createdAt, true);
       if (!createdAt || typeof createdAt !== 'number') {
-        console.log(`   Skipping batch ${batch.batchId} (invalid createdAt)`);
+        if (!options.quiet) console.log(`   Skipping batch ${batch.batchId} (invalid createdAt)`);
         stats.batches.skipped++;
         continue;
       }
@@ -173,10 +174,10 @@ async function syncBatches(localDb: Database.Database, options: SyncOptions, sta
         throw new Error(`HTTP ${response.status}: ${error}`);
       }
       
-      console.log(`   Synced batch: ${batch.batchId}`);
+      if (!options.quiet) console.log(`   Synced batch: ${batch.batchId}`);
       stats.batches.synced++;
     } catch (error: any) {
-      console.error(`   Error syncing batch ${batch.batchId}: ${error.message}`);
+      if (!options.quiet) console.error(`   Error syncing batch ${batch.batchId}: ${error.message}`);
       stats.batches.errors++;
     }
   }
@@ -186,7 +187,7 @@ async function syncBatches(localDb: Database.Database, options: SyncOptions, sta
  * Sync benchmark_runs table
  */
 async function syncRuns(localDb: Database.Database, options: SyncOptions, stats: SyncStats): Promise<void> {
-  console.log('\nSyncing benchmark_runs...');
+  if (!options.quiet) console.log('\nSyncing benchmark_runs...');
   
   let query = 'SELECT * FROM benchmark_runs ORDER BY started_at DESC';
   if (options.limit) {
@@ -196,7 +197,7 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
   const runs = localDb.prepare(query).all() as any[];
   stats.runs.total = runs.length;
   
-  console.log(`   Found ${runs.length} runs`);
+  if (!options.quiet) console.log(`   Found ${runs.length} runs`);
   
   // Get evaluations and telemetry for each run
   for (const run of runs) {
@@ -205,14 +206,14 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
       if (!options.force && !options.dryRun) {
         const exists = await runExists(run.run_id);
         if (exists) {
-          console.log(`   Skipping run ${run.run_id} (already exists)`);
+          if (!options.quiet) console.log(`   Skipping run ${run.run_id} (already exists)`);
           stats.runs.skipped++;
           continue;
         }
       }
       
       if (options.dryRun) {
-        console.log(`   Would sync run: ${run.run_id}`);
+        if (!options.quiet) console.log(`   Would sync run: ${run.run_id}`);
         stats.runs.synced++;
         continue;
       }
@@ -234,7 +235,7 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
       
       // Skip runs with 'running' status (they're not complete)
       if (run.status === 'running') {
-        console.log(`   Skipping run ${run.run_id} (status: running)`);
+        if (!options.quiet) console.log(`   Skipping run ${run.run_id} (status: running)`);
         stats.runs.skipped++;
         continue;
       }
@@ -242,7 +243,7 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
       // Ensure startedAt is a valid string
       const startedAt = transformTimestamp(run.started_at, false);
       if (!startedAt || typeof startedAt !== 'string') {
-        console.log(`   Skipping run ${run.run_id} (invalid started_at)`);
+        if (!options.quiet) console.log(`   Skipping run ${run.run_id} (invalid started_at)`);
         stats.runs.skipped++;
         continue;
       }
@@ -296,7 +297,7 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
       }
       
       const result = await response.json();
-      console.log(`   Synced run: ${run.run_id}`);
+      if (!options.quiet) console.log(`   Synced run: ${run.run_id}`);
       stats.runs.synced++;
       
       // Track evaluations and telemetry
@@ -307,7 +308,7 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
         stats.telemetry.synced++;
       }
     } catch (error: any) {
-      console.error(`   Error syncing run ${run.run_id}: ${error.message}`);
+      if (!options.quiet) console.error(`   Error syncing run ${run.run_id}: ${error.message}`);
       stats.runs.errors++;
     }
   }
@@ -317,24 +318,26 @@ async function syncRuns(localDb: Database.Database, options: SyncOptions, stats:
  * Main sync function
  */
 async function syncToD1(options: SyncOptions): Promise<void> {
-  console.log('Starting sync: Local SQLite → Cloudflare D1\n');
-  console.log(`   Local DB: ${LOCAL_DB_PATH}`);
-  console.log(`   Worker URL: ${WORKER_URL}`);
-  
-  // Detect if using local or remote
-  const isLocal = WORKER_URL.includes('localhost') || WORKER_URL.includes('127.0.0.1');
-  if (isLocal) {
-    console.log(`   ⚠️  Target: LOCAL Worker (localhost:8787) → Local D1`);
-    console.log(`   💡 To sync to REMOTE D1, set ZE_BENCHMARKS_WORKER_URL to your production Worker URL`);
-  } else {
-    console.log(`   ✅ Target: REMOTE Worker (${WORKER_URL}) → Remote D1`);
+  if (!options.quiet) {
+    console.log('Starting sync: Local SQLite → Cloudflare D1\n');
+    console.log(`   Local DB: ${LOCAL_DB_PATH}`);
+    console.log(`   Worker URL: ${WORKER_URL}`);
+    
+    // Detect if using local or remote
+    const isLocal = WORKER_URL.includes('localhost') || WORKER_URL.includes('127.0.0.1');
+    if (isLocal) {
+      console.log(`   ⚠️  Target: LOCAL Worker (localhost:8787) → Local D1`);
+      console.log(`   💡 To sync to REMOTE D1, set ZE_BENCHMARKS_WORKER_URL to your production Worker URL`);
+    } else {
+      console.log(`   ✅ Target: REMOTE Worker (${WORKER_URL}) → Remote D1`);
+    }
+    
+    console.log(`   Dry Run: ${options.dryRun ? 'YES' : 'NO'}`);
+    if (options.limit) {
+      console.log(`   Limit: ${options.limit} records per table`);
+    }
+    console.log('');
   }
-  
-  console.log(`   Dry Run: ${options.dryRun ? 'YES' : 'NO'}`);
-  if (options.limit) {
-    console.log(`   Limit: ${options.limit} records per table`);
-  }
-  console.log('');
   
   // Check if local database exists
   if (!existsSync(LOCAL_DB_PATH)) {
@@ -349,7 +352,7 @@ async function syncToD1(options: SyncOptions): Promise<void> {
       if (!response.ok) {
         throw new Error(`Worker API returned ${response.status}`);
       }
-      console.log('Worker API is accessible');
+      if (!options.quiet) console.log('Worker API is accessible');
       
       // Check if database schema is initialized
       const schemaExists = await checkDatabaseSchema();
@@ -360,10 +363,10 @@ async function syncToD1(options: SyncOptions): Promise<void> {
         console.error('\nOr ensure Wrangler auto-applies migrations when the Worker starts.');
         process.exit(1);
       }
-      console.log('Database schema verified\n');
+      if (!options.quiet) console.log('Database schema verified\n');
     } catch (error: any) {
       console.error(`Cannot connect to Worker API: ${error.message}`);
-      console.log(`   Make sure the Worker is running: cd worker && pnpm dev`);
+      if (!options.quiet) console.log(`   Make sure the Worker is running: cd worker && pnpm dev`);
       process.exit(1);
     }
   }
@@ -383,18 +386,20 @@ async function syncToD1(options: SyncOptions): Promise<void> {
     await syncBatches(localDb, options, stats);
     await syncRuns(localDb, options, stats);
     
-    // Print summary
-    console.log('\nSync Summary:');
-    console.log(`   Batches: ${stats.batches.synced}/${stats.batches.total} synced, ${stats.batches.skipped} skipped, ${stats.batches.errors} errors`);
-    console.log(`   Runs: ${stats.runs.synced}/${stats.runs.total} synced, ${stats.runs.skipped} skipped, ${stats.runs.errors} errors`);
-    console.log(`   Evaluations: ${stats.evaluations.synced} synced`);
-    console.log(`   Telemetry: ${stats.telemetry.synced} synced`);
-    
-    if (options.dryRun) {
-      console.log('\nThis was a dry run. No data was actually synced.');
-      console.log('   Run without --dry-run to perform the actual sync.');
-    } else {
-      console.log('\nSync complete!');
+    // Print summary (only if not quiet)
+    if (!options.quiet) {
+      console.log('\nSync Summary:');
+      console.log(`   Batches: ${stats.batches.synced}/${stats.batches.total} synced, ${stats.batches.skipped} skipped, ${stats.batches.errors} errors`);
+      console.log(`   Runs: ${stats.runs.synced}/${stats.runs.total} synced, ${stats.runs.skipped} skipped, ${stats.runs.errors} errors`);
+      console.log(`   Evaluations: ${stats.evaluations.synced} synced`);
+      console.log(`   Telemetry: ${stats.telemetry.synced} synced`);
+      
+      if (options.dryRun) {
+        console.log('\nThis was a dry run. No data was actually synced.');
+        console.log('   Run without --dry-run to perform the actual sync.');
+      } else {
+        console.log('\nSync complete!');
+      }
     }
   } finally {
     localDb.close();
@@ -406,7 +411,8 @@ const args = process.argv.slice(2);
 const options: SyncOptions = {
   dryRun: args.includes('--dry-run'),
   limit: args.includes('--limit') ? parseInt(args[args.indexOf('--limit') + 1]) : undefined,
-  force: args.includes('--force')
+  force: args.includes('--force'),
+  quiet: args.includes('--quiet')
 };
 
 // Run sync

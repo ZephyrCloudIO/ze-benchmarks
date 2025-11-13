@@ -1079,35 +1079,31 @@ async function executeMultipleBenchmarks(
 	
 	// Auto-sync to D1 if enabled
 	if (process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
-		console.log('\n' + chalk.blue('Syncing to D1...'));
+		console.log(chalk.blue('Syncing to D1...'));
 		try {
 			const workerDir = join(process.cwd(), 'worker');
 			
-			// Run sync script asynchronously (don't block)
-			const syncProcess = spawn('pnpm', ['sync'], {
+			// Run sync script silently in background
+			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
 				cwd: workerDir,
-				stdio: 'inherit',
+				stdio: 'pipe',
 				shell: true,
 				env: { ...process.env }
 			});
 			
 			// Don't wait for sync to complete - let it run in background
 			syncProcess.on('error', (error) => {
-				console.error(chalk.red(`\n⚠️  Sync process failed to start: ${error.message}`));
-				console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+				// Silent failure - don't interrupt CLI flow
 			});
 			
 			syncProcess.on('exit', (code) => {
 				if (code === 0) {
-					console.log(chalk.green('\n✓ Sync completed successfully'));
-				} else {
-					console.error(chalk.yellow(`\n⚠️  Sync exited with code ${code}`));
-					console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+					// Silent success - sync completed
 				}
+				// Silent failure - don't interrupt CLI flow
 			});
 		} catch (error: any) {
-			console.error(chalk.red(`\n⚠️  Auto-sync failed: ${error.message}`));
-			console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+			// Silent failure - don't interrupt CLI flow
 		}
 	}
 	
@@ -2486,35 +2482,31 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 
 	// Auto-sync to D1 if enabled and not in batch mode (batches sync after completion)
 	if (!batchId && process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
-		console.log(chalk.blue('\nSyncing to D1...'));
+		console.log(chalk.blue('Syncing to D1...'));
 		try {
 			const workerDir = join(process.cwd(), 'worker');
 			
-			// Run sync script asynchronously (don't block)
-			const syncProcess = spawn('pnpm', ['sync'], {
+			// Run sync script silently in background
+			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
 				cwd: workerDir,
-				stdio: 'inherit',
+				stdio: 'pipe',
 				shell: true,
 				env: { ...process.env }
 			});
 			
 			// Don't wait for sync to complete - let it run in background
 			syncProcess.on('error', (error) => {
-				console.error(chalk.red(`\n⚠️  Sync process failed to start: ${error.message}`));
-				console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+				// Silent failure - don't interrupt CLI flow
 			});
 			
 			syncProcess.on('exit', (code) => {
 				if (code === 0) {
-					console.log(chalk.green('\n✓ Sync completed successfully'));
-				} else {
-					console.error(chalk.yellow(`\n⚠️  Sync exited with code ${code}`));
-					console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+					// Silent success - sync completed
 				}
+				// Silent failure - don't interrupt CLI flow
 			});
 		} catch (error: any) {
-			console.error(chalk.red(`\n⚠️  Auto-sync failed: ${error.message}`));
-			console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+			// Silent failure - don't interrupt CLI flow
 		}
 	}
 
