@@ -419,8 +419,8 @@ export class SpecialistAdapter implements AgentAdapter {
     return {
       enabled: true, // Always enabled
       provider: templateConfig?.provider || 'openrouter',
-      selectionModel: process.env.LLM_SELECTION_MODEL || templateConfig?.selection_model || 'x-ai/grok-beta',
-      extractionModel: process.env.LLM_EXTRACTION_MODEL || templateConfig?.extraction_model || 'x-ai/grok-beta',
+      selectionModel: process.env.LLM_SELECTION_MODEL || templateConfig?.selection_model || 'anthropic/claude-3.5-haiku',
+      extractionModel: process.env.LLM_EXTRACTION_MODEL || templateConfig?.extraction_model || 'anthropic/claude-3.5-haiku',
       timeoutMs: parseInt(process.env.LLM_SELECTION_TIMEOUT || '') || templateConfig?.timeout_ms || 10000,
       cacheTtlMs: templateConfig?.cache_ttl_ms || 3600000, // 1 hour default
       fallbackToStatic: templateConfig?.fallback_to_static ?? true
