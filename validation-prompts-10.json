@@ -1,0 +1,1293 @@
+{
+  "batchId": "9905696b-d640-4695-9ead-e2b2d763daab",
+  "exportedAt": "2025-11-13T03:53:20.359Z",
+  "totalRuns": 6,
+  "summary": {
+    "durationMs": 583970,
+    "toolCalls": 168,
+    "tokensIn": 1666740,
+    "tokensOut": 25876,
+    "totalCost": 5.350233
+  },
+  "runs": [
+    {
+      "runId": "95dfcb93-568a-461d-b7f9-53ae67e4dec4",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\n## Relevant Documentation\n\nThe following documentation resources are most relevant to your task:\n\n\n### CLI commands reference\n\nThis documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\n\n**Key Concepts**: {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}, \n\n**Reference**: https://ui.shadcn.com/docs/cli\n\n\n**Code Patterns**:\n\n- {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}\n\n\n\n\n---\n\n### Official shadcn/ui documentation\n\nshadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\n\n**Key Concepts**: {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}, \n\n**Reference**: https://ui.shadcn.com/docs\n\n\n**Code Patterns**:\n\n- {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}\n\n\n\n\n---\n\n### Next.js installation guide\n\nThis documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\n\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\n\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\n\n**Key Concepts**: {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/next\n\n\n**Code Patterns**:\n\n- {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### components.json configuration\n\nThis documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\n\n**Key Concepts**: {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/components-json\n\n\n**Code Patterns**:\n\n- {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### Installation and configuration information for manual install\n\nThis documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\n\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\n\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\n\n**Key Concepts**: {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/manual\n\n\n**Code Patterns**:\n\n- {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}\n\n\n\n\n---\n"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7668650793650794,
+      "weightedScore": 8.3576,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-KiiLkB",
+      "durationMs": 133594,
+      "toolCalls": 36,
+      "tokensIn": 427619,
+      "tokensOut": 5242,
+      "costUsd": 1.3614870000000001,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 1,
+                "reason": "All checks passed"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 1,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, path aliases configured"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.9142857142857144,
+          "maxScore": 1,
+          "details": {
+            "score": "0.91",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.7,
+                "workspace": "^4.0.0",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0.7,
+                "workspace": "^4.0.0",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 1,
+                "workspace": "^24.10.1",
+                "reference": "^24.10.1",
+                "reason": "Exact or compatible version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.9875,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 5,
+                "reasoning": "The agent correctly installed the required dependencies, including Vite, Tailwind CSS, and TypeScript, with optimal version selection and semantic versioning adherence."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent maintained stability and compatibility by properly handling major/minor/patch updates, and did not introduce any breaking changes or regressions."
+              },
+              {
+                "category": "best_practices",
+                "score": 5,
+                "reasoning": "The agent followed semantic versioning principles, properly categorized dependencies, and considered security and vulnerability aspects."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent demonstrated seamless monorepo management, workspace-level dependency management, and cross-package dependency alignment."
+              },
+              {
+                "category": "technical_execution",
+                "score": 5,
+                "reasoning": "The agent executed commands correctly, handled errors, and performed automated checks, ensuring a robust technical flow."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations, identified risks, benefits, and assumptions, and justified decisions and skipped updates."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 4,
+                "reasoning": "The agent facilitated ongoing stability and upgradeability, but could improve by removing deprecated/unused dependencies and modernizing the landscape further."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 4.6,
+                "reasoning": "The agent demonstrated excellent performance in most categories, but could improve in long-term maintainability and overall execution integrity."
+              }
+            ],
+            "overall_assessment": "The agent performed exceptionally well in most categories, with minor areas for improvement in long-term maintainability and overall execution integrity. The agent's ability to manage dependencies, ensure safety and stability, and follow best practices is commendable.",
+            "normalized_score": 0.9875,
+            "input_tokens": 1803
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    },
+    {
+      "runId": "92b592a5-045b-4694-af70-0dc98b33d9f4",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7761904761904762,
+      "weightedScore": 8.4469,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-WRQBxw",
+      "durationMs": 92052,
+      "toolCalls": 27,
+      "tokensIn": 146062,
+      "tokensOut": 3448,
+      "costUsd": 0.489906,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 1,
+                "reason": "All checks passed"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 1,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, path aliases configured"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.9857142857142858,
+          "maxScore": 1,
+          "details": {
+            "score": "0.99",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.9,
+                "workspace": "^4.1.16",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 1,
+                "workspace": "^4.1.17",
+                "reference": "^4.1.17",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 1,
+                "workspace": "^24.10.1",
+                "reference": "^24.10.1",
+                "reason": "Exact or compatible version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 5,
+                "reasoning": "The agent correctly updated dependencies with semantic versioning, pinned versions, and handled major/minor/patch updates appropriately. The version updates were also correct and followed best practices."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent maintained stability and compatibility by introducing no breaking changes, ensuring proper migration strategies, and preventing regressions. The rollback considerations were also well-handled."
+              },
+              {
+                "category": "best_practices",
+                "score": 5,
+                "reasoning": "The agent adhered to semantic versioning principles, properly categorized dependencies, and considered security and vulnerability aspects. The adherence to best practices was exemplary."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent managed workspace-level dependencies effectively, aligned cross-package dependencies, and ensured build system compatibility with pnpm workspace handling."
+              },
+              {
+                "category": "technical_execution",
+                "score": 5,
+                "reasoning": "The agent executed commands correctly, handled errors and recovery procedures, and validated through automated checks (build/test/lint). The technical flow was robust."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations and reasoning, identified risks, benefits, and assumptions, and justified decisions and skipped updates. The communication was transparent and structured."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 5,
+                "reasoning": "The agent ensured future compatibility and modernization, removed deprecated/unused dependencies, and facilitated ongoing stability and upgradeability. The landscape was modernized."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 5,
+                "reasoning": "The agent demonstrated excellent performance across all categories, with no significant issues, violations, or failures. The overall execution integrity was exemplary."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated exceptional performance, adhering to best practices, ensuring stability, and maintaining a modernized landscape. The execution was robust, and the communication was transparent and structured.",
+            "normalized_score": 1,
+            "input_tokens": 1831
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    },
+    {
+      "runId": "7f40f463-5847-42c5-875b-b688668a2a40",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\n## Relevant Documentation\n\nThe following documentation resources are most relevant to your task:\n\n\n### CLI commands reference\n\nThis documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\n\n**Key Concepts**: {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}, \n\n**Reference**: https://ui.shadcn.com/docs/cli\n\n\n**Code Patterns**:\n\n- {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}\n\n\n\n\n---\n\n### Official shadcn/ui documentation\n\nshadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\n\n**Key Concepts**: {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}, \n\n**Reference**: https://ui.shadcn.com/docs\n\n\n**Code Patterns**:\n\n- {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}\n\n\n\n\n---\n\n### Next.js installation guide\n\nThis documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\n\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\n\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\n\n**Key Concepts**: {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/next\n\n\n**Code Patterns**:\n\n- {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### components.json configuration\n\nThis documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\n\n**Key Concepts**: {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/components-json\n\n\n**Code Patterns**:\n\n- {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### Installation and configuration information for manual install\n\nThis documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\n\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\n\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\n\n**Key Concepts**: {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/manual\n\n\n**Code Patterns**:\n\n- {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}\n\n\n\n\n---\n"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7439285714285714,
+      "weightedScore": 8.0734,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-Qntxav",
+      "durationMs": 135903,
+      "toolCalls": 34,
+      "tokensIn": 416782,
+      "tokensOut": 7556,
+      "costUsd": 1.363686,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.8525,
+          "maxScore": 1,
+          "details": {
+            "score": "0.85",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.8428571428571429,
+          "maxScore": 1,
+          "details": {
+            "score": "0.84",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.9,
+                "workspace": "^4.1.16",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 1,
+                "workspace": "^24.10.1",
+                "reference": "^24.10.1",
+                "reason": "Exact or compatible version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 5,
+                "reasoning": "The agent correctly updated dependencies with semantic versioning, handled major/minor/patch updates, and applied constraint management and version pinning. The selected versions are optimal and adhere to best practices."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent demonstrated risk assessment and compatibility preservation, handled breaking changes, and implemented regression prevention and rollback considerations. The project maintains full stability and is free from instability."
+              },
+              {
+                "category": "best_practices",
+                "score": 5,
+                "reasoning": "The agent followed semantic versioning principles, properly categorized dependencies, and considered security and vulnerability aspects. The project adheres to best practices and maintains a secure and stable environment."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent effectively managed workspace-level dependencies, aligned cross-package dependencies, and ensured build system compatibility. The project demonstrates seamless monorepo management and coordination."
+              },
+              {
+                "category": "technical_execution",
+                "score": 5,
+                "reasoning": "The agent executed commands correctly, handled errors, and implemented automated checks. The project showcases a robust technical flow and correct execution of commands."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations, identified risks, benefits, and assumptions, and justified decisions and skipped updates. The communication is transparent, structured, and easy to follow."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 5,
+                "reasoning": "The agent ensured future compatibility, modernized the project, removed deprecated/unused dependencies, and facilitated ongoing stability and upgradeability. The project is well-maintained and prepared for future development."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 5,
+                "reasoning": "The agent demonstrated excellent performance across all categories, showcasing a comprehensive understanding of dependency management, safety, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The project is a prime example of a well-managed and maintainable codebase."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated exceptional performance in dependency management, safety, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The project is well-structured, maintainable, and prepared for future development.",
+            "normalized_score": 1,
+            "input_tokens": 1755
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    },
+    {
+      "runId": "0f9414d9-8c93-4c19-8c16-f61745b1ce64",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.6844047619047618,
+      "weightedScore": 7.4086,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-mhkdA1",
+      "durationMs": 181093,
+      "toolCalls": 50,
+      "tokensIn": 616423,
+      "tokensOut": 7990,
+      "costUsd": 1.969119,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.8525,
+          "maxScore": 1,
+          "details": {
+            "score": "0.85",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.7571428571428571,
+          "maxScore": 1,
+          "details": {
+            "score": "0.76",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.3,
+                "workspace": "^3.4.18",
+                "reference": "^4.1.17",
+                "reason": "Version mismatch"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 1,
+                "workspace": "^24.10.1",
+                "reference": "^24.10.1",
+                "reason": "Exact or compatible version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.5500000000000002,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly added the required dependencies, but some of the versions could be more up-to-date. For example, `@radix-ui/react-slot` is at `^1.2.3` instead of the latest version. Additionally, some dependencies like `@types/node` and `@types/react` are not pinned to specific versions, which could lead to version drift over time."
+              },
+              {
+                "category": "safety_stability",
+                "score": 3,
+                "reasoning": "The agent introduced some breaking changes by adding new dependencies, which could potentially break the existing codebase. However, it also maintained the stability of the project by not introducing any major version updates. The agent should have assessed the compatibility of the new dependencies more thoroughly."
+              },
+              {
+                "category": "best_practices",
+                "score": 4,
+                "reasoning": "The agent followed some best practices, such as using semantic versioning and categorizing dependencies correctly. However, it could have done a better job of removing unused dependencies and ensuring that all dependencies are properly pinned."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 3,
+                "reasoning": "The agent managed the monorepo workspace correctly, but it could have done a better job of aligning cross-package dependencies and ensuring build system compatibility."
+              },
+              {
+                "category": "technical_execution",
+                "score": 2,
+                "reasoning": "The agent executed some commands correctly, but it failed to execute others, such as `pnpm build`. This indicates a lack of robust error handling and recovery procedures."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 2,
+                "reasoning": "The agent's communication was not transparent, as it did not provide clear explanations for its decisions and skipped updates. It also did not identify any risks, benefits, or assumptions."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 3,
+                "reasoning": "The agent did not prioritize long-term maintainability, as it introduced some technical debt by not removing deprecated dependencies and not facilitating ongoing stability and upgradeability."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 3,
+                "reasoning": "The agent's overall performance was average, with some strengths and weaknesses. It demonstrated some best practices, but it also introduced some issues and failed to execute some commands correctly."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated some strengths, such as following best practices and managing the monorepo workspace correctly. However, it also introduced some issues, such as breaking changes and poor communication. Overall, its performance was average, with room for improvement in several areas.",
+            "normalized_score": 0.5500000000000002,
+            "input_tokens": 1433
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    },
+    {
+      "runId": "4fc85ed9-883c-40a9-aee3-6879acf289e8",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "openai/gpt-4o",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.5744047619047619,
+      "weightedScore": 5.8439,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-njlcUd",
+      "durationMs": 29752,
+      "toolCalls": 16,
+      "tokensIn": 31141,
+      "tokensOut": 1334,
+      "costUsd": 0.09119250000000001,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.5,
+          "maxScore": 1,
+          "details": {
+            "score": "0.50",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 1,
+                "reason": "All checks passed"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 0,
+                "reason": "src/index.css does not exist"
+              },
+              {
+                "name": "tsconfig",
+                "score": 1,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, path aliases configured"
+              },
+              {
+                "name": "components.json",
+                "score": 0,
+                "reason": "missing style config, missing aliases, missing component paths"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.5571428571428572,
+          "maxScore": 1,
+          "details": {
+            "score": "0.56",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "react-dom",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.9,
+                "workspace": "^4.1.16",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 1,
+                "workspace": "^4.1.17",
+                "reference": "^4.1.17",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^24.10.1",
+                "reason": "Dependency not installed"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 0.5,
+          "maxScore": 1,
+          "details": {
+            "score": "0.50",
+            "total": 12,
+            "present": 6,
+            "missing": 6,
+            "missingFiles": [
+              "tsconfig.node.json",
+              "src/index.css",
+              "src/main.tsx",
+              "src/App.tsx",
+              "src/components/ui/button.tsx",
+              "src/lib/utils.ts"
+            ]
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.6125000000000002,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly added the required dependencies (vite, tailwindcss, @tailwindcss/vite, typescript) with appropriate versions. However, it did not demonstrate optimal version selection, as the versions are not pinned to specific ranges (e.g., ^4.1.17 instead of ~4.1.17)."
+              },
+              {
+                "category": "safety_stability",
+                "score": 3,
+                "reasoning": "The agent did not assess the potential risks and compatibility issues associated with the added dependencies. It also did not provide a clear plan for handling breaking changes or migrations. However, it did not introduce any instability or breaking changes in the provided code."
+              },
+              {
+                "category": "best_practices",
+                "score": 4,
+                "reasoning": "The agent followed semantic versioning principles and properly categorized dependencies. However, it did not provide explicit security and vulnerability considerations, and the version updates could be more robust."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 3,
+                "reasoning": "The agent did not demonstrate seamless monorepo management. It added dependencies without considering the workspace-level dependency management and cross-package dependency alignment. However, it did not introduce any significant issues with build system compatibility."
+              },
+              {
+                "category": "technical_execution",
+                "score": 4,
+                "reasoning": "The agent executed the commands correctly, but it did not provide clear error handling and recovery procedures. It also did not validate the build/test/lint process."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 3,
+                "reasoning": "The agent provided some explanations and reasoning, but it did not clearly identify risks, benefits, and assumptions. It also did not justify its decisions and skipped updates."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 2,
+                "reasoning": "The agent did not consider future compatibility and modernization. It did not remove deprecated/unused dependencies, and the added dependencies may create technical debt in the long term."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 3,
+                "reasoning": "The agent demonstrated a functional but not optimal performance across all categories. It introduced some issues and did not follow best practices in all areas."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated a functional but not optimal performance. It introduced some issues and did not follow best practices in all areas. However, it did not create significant technical debt or instability.",
+            "normalized_score": 0.6125000000000002,
+            "input_tokens": 1613
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    },
+    {
+      "runId": "d2cc5d33-8199-4e26-8803-5afd5cc71fca",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "openai/gpt-4o",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\n## Relevant Documentation\n\nThe following documentation resources are most relevant to your task:\n\n\n### CLI commands reference\n\nThis documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\n\n**Key Concepts**: {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}, \n\n**Reference**: https://ui.shadcn.com/docs/cli\n\n\n**Code Patterns**:\n\n- {\"title\":\"CLI commands reference\",\"summary\":\"This documentation provides a comprehensive reference for the shadcn CLI tool, which is used to initialize, configure, and manage shadcn/ui components in projects. The CLI offers several commands including 'init' for project setup with dependency installation and CSS variable configuration, 'add' for installing individual or multiple components, 'view' for previewing registry items before installation, 'search'/'list' for discovering available components across registries, and 'build' for generating registry JSON files. Each command supports various options for customization including working directory specification, confirmation prompts, CSS variable usage, and src directory preferences.\",\"key_concepts\":[\"CLI initialization with init command\",\"Component installation via add command\",\"Registry item preview with view command\",\"Component discovery through search/list commands\",\"Registry build process for JSON generation\",\"CSS variables configuration for theming\",\"Support for multiple package managers (pnpm, npm, yarn, bun)\",\"Namespaced registry support\",\"Force overwrite and confirmation prompt options\",\"Working directory and path customization\"],\"link\":\"https://ui.shadcn.com/docs/cli\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add [component]\",\"pnpm dlx shadcn@latest add button card dialog\",\"pnpm dlx shadcn@latest view @acme/auth @v0/dashboard\",\"pnpm dlx shadcn@latest search @shadcn -q \\\"button\\\"\",\"pnpm dlx shadcn@latest build --output ./public/registry\"],\"relevance_score\":74}\n\n\n\n\n---\n\n### Official shadcn/ui documentation\n\nshadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\n\n**Key Concepts**: {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}, \n\n**Reference**: https://ui.shadcn.com/docs\n\n\n**Code Patterns**:\n\n- {\"title\":\"Official shadcn/ui documentation\",\"summary\":\"shadcn/ui is a component distribution platform and design system that fundamentally differs from traditional component libraries. Instead of installing pre-packaged components from NPM, shadcn/ui provides direct access to component source code that developers can copy into their projects and fully customize. This 'Open Code' approach gives developers complete transparency and control over their components, making it easy to modify behavior, styling, and functionality without wrestling with library overrides or wrappers. The platform is built on five core principles: Open Code (full access to modify component source), Composition (consistent, predictable API across all components), Distribution (flat-file schema and CLI for component management), Beautiful Defaults (carefully designed styles that work together), and AI-Ready (code structure optimized for LLM understanding and generation).\",\"key_concepts\":[\"Open Code - direct access to component source code for full customization\",\"Composition - shared, predictable interface across all components\",\"Distribution - flat-file schema and CLI for component distribution\",\"Beautiful Defaults - pre-designed consistent styling system\",\"AI-Ready - code structure optimized for LLM integration\",\"Not a traditional component library - code ownership model\",\"Cross-framework support via CLI\",\"Component customization without library overrides\",\"Unified design system with consistent API\"],\"link\":\"https://ui.shadcn.com/docs\",\"code_patterns\":[\"Components are copied directly into project rather than installed as dependencies\",\"All components share a common composable interface for predictability\",\"CLI tool used to distribute and install components: schema-based distribution\",\"Components built on Radix UI primitives with Tailwind CSS styling\",\"Flat-file structure defines components, dependencies, and properties\"],\"relevance_score\":70}\n\n\n\n\n---\n\n### Next.js installation guide\n\nThis documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\n\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\n\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\n\n**Key Concepts**: {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/next\n\n\n**Code Patterns**:\n\n- {\"title\":\"Next.js installation guide\",\"summary\":\"This documentation provides a comprehensive installation and setup guide for integrating shadcn/ui with Next.js projects. It covers the initial project creation process using the shadcn CLI tool, which can be used to either create a new Next.js project or configure an existing one. The guide emphasizes the use of package managers (pnpm, npm, yarn, or bun) to execute the initialization command that sets up the necessary configuration for shadcn/ui components.\\n\\nThe documentation demonstrates the component installation workflow, showing how to add individual UI components like the Button component to a project using the CLI's add command. It includes practical code examples showing how to import and use installed components within Next.js pages, specifically demonstrating the Button component usage in an app/page.tsx file. The guide also references deployment options via Vercel and mentions the availability of source code on GitHub.\\n\\nThe documentation is part of a larger shadcn/ui ecosystem that includes various components, theming options, dark mode support, and integration with modern React and Next.js features. It serves as an entry point for developers looking to quickly bootstrap a Next.js project with a comprehensive UI component library built on top of Radix UI and Tailwind CSS.\",\"key_concepts\":[\"shadcn/ui CLI initialization for Next.js projects\",\"Component installation via CLI add command\",\"Package manager flexibility (pnpm, npm, yarn, bun)\",\"Component import patterns using path aliases\",\"Integration with existing or new Next.js projects\",\"Button component as example implementation\",\"Deployment workflow with Vercel\",\"Monorepo support option\"],\"link\":\"https://ui.shadcn.com/docs/installation/next\",\"code_patterns\":[\"pnpm dlx shadcn@latest init\",\"pnpm dlx shadcn@latest add button\",\"import { Button } from \\\"@/components/ui/button\\\"\",\"export default function Home() { return (<div><Button>Click me</Button></div>) }\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### components.json configuration\n\nThis documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\n\n**Key Concepts**: {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/components-json\n\n\n**Code Patterns**:\n\n- {\"title\":\"components.json configuration\",\"summary\":\"This documentation describes the components.json configuration file used by shadcn/ui to customize component generation for a project. The file is optional and only required when using the CLI to add components, not for copy-paste installation. It can be initialized using the `pnpm dlx shadcn@latest init` command and contains settings that control how components are generated, styled, and integrated into the project structure.\",\"key_concepts\":[\"components.json configuration file\",\"CLI-based component installation\",\"Tailwind CSS integration (v3 and v4 support)\",\"CSS variables vs utility classes for theming\",\"Path aliases for component organization\",\"React Server Components support\",\"TypeScript/JavaScript component generation\",\"Namespaced registries for multiple component sources\",\"Private registry authentication\",\"Style selection (new-york vs default)\"],\"link\":\"https://ui.shadcn.com/docs/components-json\",\"code_patterns\":[\"{\\\"$schema\\\": \\\"https://ui.shadcn.com/schema.json\\\"}\",\"{\\\"style\\\": \\\"new-york\\\"}\",\"{\\\"tailwind\\\": {\\\"config\\\": \\\"tailwind.config.js\\\", \\\"css\\\": \\\"styles/global.css\\\", \\\"baseColor\\\": \\\"zinc\\\", \\\"cssVariables\\\": true, \\\"prefix\\\": \\\"tw-\\\"}}\",\"{\\\"aliases\\\": {\\\"utils\\\": \\\"@/lib/utils\\\", \\\"components\\\": \\\"@/components\\\", \\\"ui\\\": \\\"@/app/ui\\\"}}\",\"{\\\"registries\\\": {\\\"@private\\\": {\\\"url\\\": \\\"https://api.company.com/registry/{name}.json\\\", \\\"headers\\\": {\\\"Authorization\\\": \\\"Bearer ${REGISTRY_TOKEN}\\\"}}}}\"],\"relevance_score\":60}\n\n\n\n\n---\n\n### Installation and configuration information for manual install\n\nThis documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\n\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\n\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\n\n**Key Concepts**: {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}, \n\n**Reference**: https://ui.shadcn.com/docs/installation/manual\n\n\n**Code Patterns**:\n\n- {\"title\":\"Installation and configuration information for manual install\",\"summary\":\"This documentation provides comprehensive instructions for manually installing and configuring shadcn/ui components in a project without using the CLI. It covers the complete setup process including installing Tailwind CSS v4, adding required dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react, tw-animate-css), and configuring path aliases in tsconfig.json. The guide emphasizes manual configuration for developers who prefer more control over their setup or need to integrate shadcn/ui into existing projects.\\n\\nThe documentation details the theming system using CSS variables with support for both light and dark modes. It provides extensive CSS variable definitions for colors (background, foreground, primary, secondary, muted, accent, destructive, border, input, ring), chart colors, sidebar theming, and border radius values. The theming uses the OKLCH color space and Tailwind CSS v4's @theme inline directive to map CSS variables to Tailwind utilities. A custom dark mode variant is configured using @custom-variant.\\n\\nThe setup concludes with creating a cn utility helper function for merging Tailwind classes and a components.json configuration file that defines project structure, style preferences, and path aliases. This configuration file serves as the foundation for the shadcn/ui component system, specifying the New York style variant, TypeScript usage, CSS variables approach, and icon library choice (Lucide).\",\"key_concepts\":[\"Manual installation without CLI\",\"Tailwind CSS v4 integration\",\"CSS variables for theming\",\"OKLCH color space usage\",\"Dark mode configuration with custom variants\",\"Path aliases configuration in TypeScript\",\"cn utility helper for class merging\",\"components.json schema and configuration\",\"tw-animate-css integration\",\"Comprehensive color system with semantic tokens\"],\"link\":\"https://ui.shadcn.com/docs/installation/manual\",\"code_patterns\":[\"pnpm add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css\",\"{ \\\"compilerOptions\\\": { \\\"baseUrl\\\": \\\".\\\", \\\"paths\\\": { \\\"@/*\\\": [\\\"./*\\\"] } } }\",\"@import \\\"tailwindcss\\\"; @import \\\"tw-animate-css\\\"; @custom-variant dark (&:is(.dark *));\",\"export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }\",\"--color-primary: var(--primary); --radius-lg: var(--radius);\"],\"relevance_score\":60}\n\n\n\n\n---\n"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.478968253968254,
+      "weightedScore": 4.5879,
+      "success": false,
+      "timestamp": "2025-11-13 03:49:30",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-COkKY4",
+      "durationMs": 11576,
+      "toolCalls": 5,
+      "tokensIn": 28713,
+      "tokensOut": 306,
+      "costUsd": 0.0748425,
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.125,
+          "maxScore": 1,
+          "details": {
+            "score": "0.13",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0,
+                "reason": "File does not exist"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 0,
+                "reason": "src/index.css does not exist"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.5,
+                "reason": "tsconfig.json exists, missing tsconfig.app.json, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 0,
+                "reason": "components.json does not exist (shadcn not initialized)"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.2857142857142857,
+          "maxScore": 1,
+          "details": {
+            "score": "0.29",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "react-dom",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^24.10.1",
+                "reason": "Dependency not installed"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No required targets"
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 0.25,
+          "maxScore": 1,
+          "details": {
+            "score": "0.25",
+            "total": 12,
+            "present": 3,
+            "missing": 9,
+            "missingFiles": [
+              "vite.config.ts",
+              "tsconfig.app.json",
+              "tsconfig.node.json",
+              "src/index.css",
+              "src/main.tsx",
+              "src/App.tsx",
+              "src/components/ui/button.tsx",
+              "src/lib/utils.ts",
+              "components.json"
+            ]
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "Install succeeded"
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "No integrity issues detected"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.65,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly added the required dependencies (typescript and vite) with appropriate version constraints. However, it did not address the issue of shadcn not supporting Vite directly, which might lead to potential issues in the future."
+              },
+              {
+                "category": "safety_stability",
+                "score": 3,
+                "reasoning": "The agent introduced a potential instability by not properly handling the shadcn framework's incompatibility with Vite. However, it did not introduce any breaking changes or major issues."
+              },
+              {
+                "category": "best_practices",
+                "score": 4,
+                "reasoning": "The agent followed semantic versioning principles and properly categorized dependencies. However, it did not address the security and vulnerability considerations related to the shadcn framework."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 3,
+                "reasoning": "The agent did not demonstrate seamless monorepo management, as it did not properly handle the shadcn framework's incompatibility with Vite. However, it did not introduce any major issues with workspace-level dependency management."
+              },
+              {
+                "category": "technical_execution",
+                "score": 4,
+                "reasoning": "The agent correctly executed the necessary commands (pnpm install, etc.) and handled errors. However, it did not properly validate the build/test/lint process due to the shadcn framework's incompatibility."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 4,
+                "reasoning": "The agent provided a clear explanation of the issue with shadcn and Vite, but did not provide a clear justification for the manual setup approach."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 3,
+                "reasoning": "The agent did not address the long-term maintainability of the project, as it did not remove deprecated/unused dependencies or facilitate ongoing stability and upgradeability."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 3.5,
+                "reasoning": "The agent demonstrated a good understanding of the task requirements but struggled with the shadcn framework's incompatibility with Vite. It showed some issues with safety, stability, and maintainability, but overall, it performed reasonably well."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated a good understanding of the task requirements but struggled with the shadcn framework's incompatibility with Vite. It showed some issues with safety, stability, and maintainability, but overall, it performed reasonably well.",
+            "normalized_score": 0.65,
+            "input_tokens": 1435
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "Lockfile mismatch"
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": "No test run recorded"
+        }
+      ]
+    }
+  ]
+}
