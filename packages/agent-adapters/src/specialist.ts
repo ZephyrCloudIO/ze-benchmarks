@@ -3,8 +3,20 @@ import { resolve, dirname, basename, join } from 'node:path';
 import JSON5 from 'json5';
 import { OpenAI } from 'openai';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
-import type { SpecialistTemplate, TaskType } from 'agency-prompt-creator';
-import { createPrompt, substituteTemplate, buildTemplateContext as buildPromptCreatorContext } from 'agency-prompt-creator';
+import type { SpecialistTemplate, TaskType, ExtractedIntent, SpecialistSelection, DocumentationReference } from 'agency-prompt-creator';
+import {
+  createPrompt,
+  substituteTemplate,
+  buildTemplateContext as buildPromptCreatorContext,
+  buildIntentExtractionPrompt,
+  parseIntentResponse,
+  INTENT_EXTRACTION_TOOL,
+  buildComponentSelectionPrompt,
+  parseComponentSelectionResponse,
+  COMPONENT_SELECTION_TOOL,
+  substituteWithLLM,
+  SUBSTITUTION_TOOL
+} from 'agency-prompt-creator';
 import {
   buildPromptSelectionPrompt,
   parsePromptSelectionResponse,
@@ -36,6 +48,24 @@ interface LLMConfig {
  * Telemetry data for LLM operations
  */
 interface LLMTelemetry {
+  intent_extraction?: {
+    intent: ExtractedIntent;
+    duration_ms: number;
+    model: string;
+    cache_hit: boolean;
+  };
+  component_selection?: {
+    selection: SpecialistSelection;
+    duration_ms: number;
+    model: string;
+    cache_hit: boolean;
+  };
+  substitution?: {
+    spawner_duration_ms: number;
+    task_duration_ms: number;
+    model: string;
+  };
+  // Legacy fields (for backward compatibility if needed)
   llm_prompt_selection?: {
     enabled: boolean;
     selected_prompt_id: string;
@@ -246,71 +276,123 @@ export class SpecialistAdapter implements AgentAdapter {
   }
 
   /**
-   * Send a request with specialist prompt transformation
+   * Send a request with specialist prompt transformation (NEW 3-STEP WORKFLOW)
    *
-   * This method:
-   * 1. Extracts the user prompt from the request
-   * 2. Uses LLM-powered selection/extraction if enabled, or falls back to static
-   * 3. Replaces/enhances the system message with the transformed prompt
-   * 4. Delegates to the underlying adapter
+   * This method implements the new 3-step workflow:
+   * - Step 3a: Extract intent using LLM
+   * - Step 3b: Select components using LLM (spawner prompt, task prompt, docs)
+   * - Step 3c: Create system prompt via LLM substitution + concatenation
+   * - Step 3d: Submit original user prompt + system prompt
    *
    * @param request - Agent request with messages, tools, etc.
    * @returns Agent response from underlying adapter
    */
   async send(request: AgentRequest): Promise<AgentResponse> {
     try {
-      // Extract user prompt (last user message)
-      const userMessage = this.extractUserPrompt(request);
+      // Check validation mode - passthrough if pre-exported prompts
+      if (this.isValidationMode(request)) {
+        console.log('[SpecialistAdapter] Validation mode: using pre-exported system prompt');
+        return this.underlyingAdapter.send(request);
+      }
 
-      if (!userMessage) {
+      // Extract user prompt - NEVER modified
+      const userPrompt = this.extractUserPrompt(request);
+      if (!userPrompt) {
         throw new Error('No user message found in request');
       }
 
-      console.log('[SpecialistAdapter] Processing request with user prompt:', userMessage.substring(0, 100) + '...');
+      console.log('[SpecialistAdapter] ========================================');
+      console.log('[SpecialistAdapter] Original user prompt:', userPrompt.substring(0, 200));
+      console.log('[SpecialistAdapter] ========================================');
 
-      let finalPrompt: string;
+      // ========================================================================
+      // STEP 3a: Extract Intent
+      // ========================================================================
+      console.log('[SpecialistAdapter] Step 3a: Extracting intent...');
+      const intentStart = Date.now();
+      const intent = await this.extractIntentWithLLM(userPrompt);
+      const intentDuration = Date.now() - intentStart;
 
-      // Use LLM-powered approach if enabled
-      if (this.llmConfig.enabled) {
-        console.log('[SpecialistAdapter] Using LLM-powered prompt selection');
-        try {
-          finalPrompt = await this.createPromptWithLLM(userMessage, this.getModelName(), request);
-        } catch (error) {
-          if (this.llmConfig.fallbackToStatic) {
-            console.warn('[SpecialistAdapter] LLM selection failed, falling back to static:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('[SpecialistAdapter] Step 3a - Extracted intent:');
+      console.log('  Intent:', intent.intent);
+      console.log('  Primary goal:', intent.primaryGoal);
+      console.log('  Keywords:', intent.keywords.join(', '));
+      if (intent.framework) console.log('  Framework:', intent.framework);
+      if (intent.components) console.log('  Components:', intent.components.join(', '));
+      if (intent.packageManager) console.log('  Package manager:', intent.packageManager);
+      if (intent.features) console.log('  Features:', intent.features.join(', '));
+      console.log('  Duration:', intentDuration, 'ms');
 
-            // Fallback to static approach
-            const result = createPrompt(this.template, {
-              userPrompt: userMessage,
-              model: this.getModelName(),
-              context: this.buildTemplateContext(request)
-            });
-            finalPrompt = result.prompt;
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        // Use static approach
-        const result = createPrompt(this.template, {
-          userPrompt: userMessage,
-          model: this.getModelName(),
-          context: this.buildTemplateContext(request)
-        });
-        finalPrompt = result.prompt;
+      // ========================================================================
+      // STEP 3b: Select Specialist Components
+      // ========================================================================
+      console.log('[SpecialistAdapter] Step 3b: Selecting specialist components...');
+      const selectionStart = Date.now();
+      const selection = await this.selectComponentsWithLLM(userPrompt, intent);
+      const selectionDuration = Date.now() - selectionStart;
+
+      console.log('[SpecialistAdapter] Step 3b - Selected components:');
+      console.log('  Spawner prompt ID:', selection.spawnerPromptId);
+      console.log('  Task prompt ID:', selection.taskPromptId);
+      console.log('  Relevant tags:', selection.relevantTags.join(', '));
+      console.log('  Relevant tech stack:', selection.relevantTechStack.join(', '));
+      console.log('  Documentation count:', selection.documentation.length);
+      if (selection.documentation.length > 0) {
+        console.log('  Documentation URLs:');
+        selection.documentation.forEach(doc => console.log('    -', doc.url));
       }
+      console.log('  Reasoning:', selection.reasoning);
+      console.log('  Duration:', selectionDuration, 'ms');
 
-      // Create modified request with transformed system prompt
-      const transformedMessages = this.injectSystemPrompt(request.messages, finalPrompt);
+      // ========================================================================
+      // STEP 3c: Create System Prompt
+      // ========================================================================
+      console.log('[SpecialistAdapter] Step 3c: Creating system prompt...');
+      const systemPrompt = await this.createSystemPrompt(userPrompt, intent, selection);
+
+      console.log('[SpecialistAdapter] Step 3c - System prompt created:');
+      console.log('  Length:', systemPrompt.length, 'characters');
+      console.log('  Contains CRITICAL marker:', systemPrompt.includes('⚠️ CRITICAL'));
+      console.log('  Contains documentation URLs:', systemPrompt.includes('http'));
+      console.log('  Preview (first 300 chars):', systemPrompt.substring(0, 300));
+
+      // ========================================================================
+      // STEP 3d: Submit to LLM
+      // ========================================================================
+      console.log('[SpecialistAdapter] Step 3d: Submitting to LLM...');
+      console.log('  User prompt (ORIGINAL, UNCHANGED):', userPrompt.substring(0, 100));
+      console.log('  System prompt length:', systemPrompt.length);
+
+      // Build request with:
+      // - System prompt (from 3c)
+      // - Original user prompt (UNCHANGED)
+      const transformedMessages = this.injectSystemPrompt(request.messages, systemPrompt);
       const modifiedRequest: AgentRequest = {
         ...request,
         messages: transformedMessages
       };
 
-      // Store transformed messages for logging/debugging
+      // Store for telemetry/debugging
       this.lastTransformedMessages = transformedMessages;
+      this.llmTelemetry = {
+        intent_extraction: {
+          intent,
+          duration_ms: intentDuration,
+          model: this.llmConfig.extractionModel,
+          cache_hit: false // TODO: track cache hits
+        },
+        component_selection: {
+          selection,
+          duration_ms: selectionDuration,
+          model: this.llmConfig.selectionModel,
+          cache_hit: false // TODO: track cache hits
+        }
+      };
 
-      // Delegate to underlying adapter
+      console.log('[SpecialistAdapter] ========================================');
+      console.log('[SpecialistAdapter] Delegating to underlying adapter...');
+      console.log('[SpecialistAdapter] ========================================');
+
       return this.underlyingAdapter.send(modifiedRequest);
     } catch (error) {
       // Re-throw with more context about specialist adapter
@@ -406,7 +488,256 @@ export class SpecialistAdapter implements AgentAdapter {
   }
 
   // =========================================================================
-  // LLM-POWERED PROMPT SELECTION AND VARIABLE EXTRACTION
+  // NEW 3-STEP WORKFLOW METHODS
+  // =========================================================================
+
+  /**
+   * Check if we're in validation mode (pre-exported prompts)
+   */
+  private isValidationMode(request: AgentRequest): boolean {
+    const systemMessage = request.messages.find(m => m.role === 'system');
+
+    return (
+      systemMessage !== undefined &&
+      systemMessage.content.includes('⚠️ CRITICAL: Required Documentation Reading') &&
+      process.env.SPECIALIST_VALIDATION_MODE === 'true'
+    );
+  }
+
+  /**
+   * Step 3a: Extract intent using LLM
+   */
+  private async extractIntentWithLLM(userPrompt: string): Promise<ExtractedIntent> {
+    if (!this.llmClient) {
+      throw new Error('LLM client not initialized');
+    }
+
+    const cacheKey = createCacheKey(userPrompt + ':intent');
+    const cached = this.llmCache.get(cacheKey);
+    if (cached) {
+      console.log('[SpecialistAdapter] Using cached intent extraction');
+      return cached as ExtractedIntent;
+    }
+
+    const prompt = buildIntentExtractionPrompt(userPrompt);
+
+    try {
+      const response = await Promise.race([
+        this.llmClient.chat.completions.create({
+          model: this.llmConfig.extractionModel,
+          messages: [{ role: 'user', content: prompt }],
+          tools: [INTENT_EXTRACTION_TOOL as any],
+          tool_choice: { type: 'function', function: { name: 'extract_intent' } } as any,
+          temperature: 0.1
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Intent extraction timeout')), this.llmConfig.timeoutMs)
+        )
+      ]);
+
+      const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+      if (!toolCall) {
+        throw new Error('No tool call in intent extraction response');
+      }
+
+      const intent = parseIntentResponse(toolCall.function.arguments);
+      this.llmCache.set(cacheKey, intent);
+      return intent;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Intent extraction failed: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Step 3b: Select specialist components using LLM
+   */
+  private async selectComponentsWithLLM(
+    userPrompt: string,
+    intent: ExtractedIntent
+  ): Promise<SpecialistSelection> {
+    if (!this.llmClient) {
+      throw new Error('LLM client not initialized');
+    }
+
+    const cacheKey = createCacheKey(userPrompt + ':selection');
+    const cached = this.llmCache.get(cacheKey);
+    if (cached) {
+      console.log('[SpecialistAdapter] Using cached component selection');
+      return cached as SpecialistSelection;
+    }
+
+    const prompt = buildComponentSelectionPrompt(userPrompt, intent, this.template);
+
+    try {
+      const response = await Promise.race([
+        this.llmClient.chat.completions.create({
+          model: this.llmConfig.selectionModel,
+          messages: [{ role: 'user', content: prompt }],
+          tools: [COMPONENT_SELECTION_TOOL as any],
+          tool_choice: { type: 'function', function: { name: 'select_specialist_components' } } as any,
+          temperature: 0.1
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Component selection timeout')), this.llmConfig.timeoutMs)
+        )
+      ]);
+
+      const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+      if (!toolCall) {
+        throw new Error('No tool call in component selection response');
+      }
+
+      const selection = parseComponentSelectionResponse(toolCall.function.arguments, this.template);
+      this.llmCache.set(cacheKey, selection);
+      return selection;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Component selection failed: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Step 3c: Create system prompt via LLM substitution + concatenation
+   */
+  private async createSystemPrompt(
+    userPrompt: string,
+    intent: ExtractedIntent,
+    selection: SpecialistSelection
+  ): Promise<string> {
+    // 1. Get spawner prompt content
+    const spawnerPromptContent = this.getPromptById(selection.spawnerPromptId);
+    if (!spawnerPromptContent) {
+      throw new Error(`Spawner prompt not found: ${selection.spawnerPromptId}`);
+    }
+
+    // 2. Get task prompt content
+    const taskPromptContent = this.getPromptById(selection.taskPromptId);
+    if (!taskPromptContent) {
+      throw new Error(`Task prompt not found: ${selection.taskPromptId}`);
+    }
+
+    // 3. Build context for substitution
+    const context = {
+      name: this.template.name,
+      version: this.template.version,
+      specialistName: this.template.name,
+      framework: intent.framework,
+      packageManager: intent.packageManager,
+      techStack: selection.relevantTechStack.join(', '),
+      tags: selection.relevantTags.join(', '),
+      components: intent.components?.join(', '),
+      features: intent.features?.join(', '),
+      ...selection
+    };
+
+    // 4. LLM-based substitution on spawner prompt
+    const spawnerStart = Date.now();
+    const substitutedSpawner = await substituteWithLLM(
+      this.llmClient!,
+      this.llmConfig.extractionModel,
+      spawnerPromptContent,
+      userPrompt,
+      intent,
+      context
+    );
+    const spawnerDuration = Date.now() - spawnerStart;
+
+    console.log('[SpecialistAdapter] Step 3c - Spawner prompt substituted:');
+    console.log('  Original length:', spawnerPromptContent.length);
+    console.log('  Substituted length:', substitutedSpawner.length);
+    console.log('  Duration:', spawnerDuration, 'ms');
+
+    // 5. LLM-based substitution on task prompt
+    const taskStart = Date.now();
+    const substitutedTask = await substituteWithLLM(
+      this.llmClient!,
+      this.llmConfig.extractionModel,
+      taskPromptContent,
+      userPrompt,
+      intent,
+      context
+    );
+    const taskDuration = Date.now() - taskStart;
+
+    console.log('[SpecialistAdapter] Step 3c - Task prompt substituted:');
+    console.log('  Original length:', taskPromptContent.length);
+    console.log('  Substituted length:', substitutedTask.length);
+    console.log('  Duration:', taskDuration, 'ms');
+
+    // Store substitution telemetry
+    if (this.llmTelemetry.substitution) {
+      this.llmTelemetry.substitution.spawner_duration_ms = spawnerDuration;
+      this.llmTelemetry.substitution.task_duration_ms = taskDuration;
+    } else {
+      this.llmTelemetry.substitution = {
+        spawner_duration_ms: spawnerDuration,
+        task_duration_ms: taskDuration,
+        model: this.llmConfig.extractionModel
+      };
+    }
+
+    // 6. Format documentation section with CRITICAL marker
+    const docSection = this.formatDocumentationSection(selection.documentation);
+
+    console.log('[SpecialistAdapter] Step 3c - Documentation section formatted:');
+    console.log('  Documentation section length:', docSection.length);
+    console.log('  Has CRITICAL marker:', docSection.includes('⚠️ CRITICAL'));
+
+    // 7. String concatenation ONLY - no interpretation
+    const systemPrompt = [
+      substitutedSpawner,
+      '',
+      substitutedTask,
+      '',
+      docSection
+    ].join('\n');
+
+    return systemPrompt;
+  }
+
+  /**
+   * Format documentation section with CRITICAL marker
+   */
+  private formatDocumentationSection(docs: DocumentationReference[]): string {
+    if (docs.length === 0) {
+      return '';
+    }
+
+    let section = '\n## ⚠️ CRITICAL: Required Documentation Reading\n\n';
+    section += '**YOU MUST START BY USING THE WEB FETCH TOOL TO READ THESE DOCUMENTATION PAGES BEFORE PROCEEDING WITH ANY IMPLEMENTATION.**\n\n';
+    section += 'These documentation pages contain essential patterns and configurations that you must follow exactly.\n\n';
+
+    for (const doc of docs) {
+      section += `### ${doc.title}\n\n`;
+      section += `**📄 Documentation URL**: ${doc.url}\n`;
+      section += `**YOU MUST READ THIS PAGE FIRST**\n\n`;
+      section += `**Summary**: ${doc.summary}\n\n`;
+
+      if (doc.keyConcepts.length > 0) {
+        section += `**Key Concepts**: ${doc.keyConcepts.join(', ')}\n\n`;
+      }
+
+      if (doc.codePatterns.length > 0) {
+        section += '**Code Patterns from Documentation**:\n';
+        for (const pattern of doc.codePatterns) {
+          section += `- \`${pattern}\`\n`;
+        }
+        section += '\n';
+      }
+
+      section += '---\n\n';
+    }
+
+    return section;
+  }
+
+  // =========================================================================
+  // LLM-POWERED PROMPT SELECTION AND VARIABLE EXTRACTION (LEGACY)
   // =========================================================================
 
   /**
