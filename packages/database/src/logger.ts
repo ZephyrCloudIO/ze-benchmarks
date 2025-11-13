@@ -1,8 +1,19 @@
 import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
+import { config } from 'dotenv';
 import { SCHEMA } from './schema';
+
+// Load environment variables from .env file in project root
+// This matches the pattern used in other packages (harness, agent-adapters)
+config({ path: resolve(process.cwd(), '.env') });
+
+// Debug: Log relevant environment variables
+if (process.env.ZE_BENCHMARKS_DB) {
+  console.log(`[env] ZE_BENCHMARKS_DB=${process.env.ZE_BENCHMARKS_DB}`);
+}
+
 
 export interface RunStatistics {
   totalRuns: number;

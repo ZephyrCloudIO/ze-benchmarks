@@ -1,4 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+
+// Load environment variables from .env file in project root
+// This matches the pattern used in other packages (harness, agent-adapters)
+config({ path: resolve(process.cwd(), '.env') });
 
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
@@ -13,6 +19,11 @@ export class BenchmarkLogger {
   private pendingTelemetry: any = null;
 
   constructor() {
+    // Debug: Log relevant environment variables
+    console.log('[env] Worker Logger - Environment variables:');
+    console.log(`  ZE_BENCHMARKS_WORKER_URL=${process.env.ZE_BENCHMARKS_WORKER_URL || '(not set)'}`);
+    console.log(`  ZE_BENCHMARKS_API_KEY=${process.env.ZE_BENCHMARKS_API_KEY ? '***set***' : '(not set)'}`);
+    
     this.workerUrl = process.env.ZE_BENCHMARKS_WORKER_URL || null;
     this.apiKey = process.env.ZE_BENCHMARKS_API_KEY || 'dev-local-key';
 
@@ -35,7 +46,7 @@ export class BenchmarkLogger {
   startRun(suite: string, scenario: string, tier: string, agent: string, model?: string, batchId?: string): string {
     const runId = uuidv4();
     this.currentRunId = runId;
-    this.currentBatchId = batchId;
+    this.currentBatchId = batchId || null;
 
     this.pendingRun = {
       runId,

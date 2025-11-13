@@ -27,6 +27,11 @@ export class OpenRouterAdapter implements AgentAdapter {
   private pricingCache: Map<string, ModelPricing> = new Map();
   
   constructor(apiKey = process.env.OPENROUTER_API_KEY!, model?: string) {
+    // Debug: Log relevant environment variables
+    console.log('[env] OpenRouter Adapter - Environment variables:');
+    console.log(`  OPENROUTER_API_KEY=${process.env.OPENROUTER_API_KEY ? '***set***' : '(not set)'}`);
+    console.log(`  OPENROUTER_MODEL=${process.env.OPENROUTER_MODEL || '(not set)'}`);
+    
     if (!apiKey) {
       throw new Error(
         "Missing OPENROUTER_API_KEY environment variable. " +

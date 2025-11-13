@@ -17,6 +17,7 @@ import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
 import { BenchmarkLogger } from '@ze/database';
 import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel, text } from '@clack/prompts';
+import { spawn } from 'node:child_process';
 import chalk from 'chalk';
 import figlet from 'figlet';
 import { startDevServer, getServerUrl, stopDevServer } from './dev-server.ts';
@@ -25,6 +26,29 @@ import { OpenRouterAPI } from './lib/openrouter-api.ts';
 // ============================================================================
 // DYNAMIC MODEL LOADING
 // ============================================================================
+// Check if environment variables loaded and print them for debugging
+if (process.env && Object.keys(process.env).length > 0) {
+  console.log(chalk.gray('[env] Loaded environment variables:'));
+  // Print only custom/project-specific env variables for safety
+  const allowedPrefixes = [
+    'ZE_BENCHMARKS_',
+    'OPENAI_',
+    'ANTHROPIC_',
+    'OPENROUTER_',
+    'NODE_ENV'
+  ];
+  const shownEnv = Object.entries(process.env)
+    .filter(([key, _]) =>
+      allowedPrefixes.some(prefix => key.startsWith(prefix)) ||
+      key === 'NODE_ENV'
+    )
+    .sort(([a], [b]) => a.localeCompare(b));
+  for (const [key, value] of shownEnv) {
+    console.log(chalk.gray(`  ${key}=${value ?? ''}`));
+  }
+} else {
+  console.log(chalk.yellow('[env] Warning: No environment variables found.'));
+}
 
 async function getAvailableAgents(): Promise<Array<{value: string, label: string}>> {
   const agents = [
@@ -191,7 +215,7 @@ function displayRunInfo(run: { status: string; suite: string; scenario: string; 
     ? chalk.green('✓')
     : run.status === 'failed'
     ? chalk.red('✗')
-    : run.status === 'incomplete'
+    : run.status === 'running'
     ? chalk.yellow('◐')
     : chalk.blue('○');
   
@@ -1053,6 +1077,40 @@ async function executeMultipleBenchmarks(
 		}
 	});
 	
+	// Auto-sync to D1 if enabled
+	if (process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
+		console.log('\n' + chalk.blue('Syncing to D1...'));
+		try {
+			const workerDir = join(process.cwd(), 'worker');
+			
+			// Run sync script asynchronously (don't block)
+			const syncProcess = spawn('pnpm', ['sync'], {
+				cwd: workerDir,
+				stdio: 'inherit',
+				shell: true,
+				env: { ...process.env }
+			});
+			
+			// Don't wait for sync to complete - let it run in background
+			syncProcess.on('error', (error) => {
+				console.error(chalk.red(`\n⚠️  Sync process failed to start: ${error.message}`));
+				console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+			});
+			
+			syncProcess.on('exit', (code) => {
+				if (code === 0) {
+					console.log(chalk.green('\n✓ Sync completed successfully'));
+				} else {
+					console.error(chalk.yellow(`\n⚠️  Sync exited with code ${code}`));
+					console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+				}
+			});
+		} catch (error: any) {
+			console.error(chalk.red(`\n⚠️  Auto-sync failed: ${error.message}`));
+			console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+		}
+	}
+	
 	// Note: Database is now created directly in public/ directory
 	
 	// Get comprehensive batch analytics
@@ -1884,7 +1942,7 @@ async function runInteractiveBatchStats() {
                       ? chalk.green('✓')
                       : run.status === 'failed'
                       ? chalk.red('✗')
-                      : run.status === 'incomplete'
+                      : run.status === 'running'
                       ? chalk.yellow('◐')
                       : chalk.blue('○');
 					console.log(`  ${rankDisplay} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)} ${chalk.cyan(run.agent)} ${chalk.yellow(run.weightedScore?.toFixed(4) || 'N/A')}`);
@@ -2131,6 +2189,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	const logger = BenchmarkLogger.getInstance();
 	const runId = logger.startRun(suite, scenario, tier, agent, model, batchId);
 	const startTime = Date.now();
+	
+	// Store runId for potential sync later
+	const currentRunId = runId;
 
 	// Timeout watchdog based on scenario timeout_minutes (default 60)
 	let timeoutId: NodeJS.Timeout | null = null;
@@ -2148,7 +2209,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
 		timeoutId = setTimeout(() => {
 			try {
-				logger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
+				logger.failRun(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'unknown');
 				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
 			} catch {}
 		}, timeoutMs);
@@ -2422,6 +2483,40 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		isSuccessful,
 		successMetric
 	);
+
+	// Auto-sync to D1 if enabled and not in batch mode (batches sync after completion)
+	if (!batchId && process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
+		console.log(chalk.blue('\nSyncing to D1...'));
+		try {
+			const workerDir = join(process.cwd(), 'worker');
+			
+			// Run sync script asynchronously (don't block)
+			const syncProcess = spawn('pnpm', ['sync'], {
+				cwd: workerDir,
+				stdio: 'inherit',
+				shell: true,
+				env: { ...process.env }
+			});
+			
+			// Don't wait for sync to complete - let it run in background
+			syncProcess.on('error', (error) => {
+				console.error(chalk.red(`\n⚠️  Sync process failed to start: ${error.message}`));
+				console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+			});
+			
+			syncProcess.on('exit', (code) => {
+				if (code === 0) {
+					console.log(chalk.green('\n✓ Sync completed successfully'));
+				} else {
+					console.error(chalk.yellow(`\n⚠️  Sync exited with code ${code}`));
+					console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+				}
+			});
+		} catch (error: any) {
+			console.error(chalk.red(`\n⚠️  Auto-sync failed: ${error.message}`));
+			console.error(chalk.gray('   Results are still saved locally. You can sync manually with: cd worker && pnpm sync'));
+		}
+	}
 
 	// Stage 6: Results
 	if (progress) updateProgress(progress, 6, 'Preparing results');
@@ -2916,9 +3011,11 @@ process.on('SIGINT', () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
-        // Mark current run incomplete if any
-        (logger as any).markRunIncomplete?.('Interrupted by user (SIGINT)', 'signal');
-        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+        // Mark current run as failed if any
+        if ((logger as any).currentRunId) {
+            logger.failRun('Interrupted by user (SIGINT)', 'unknown');
+            console.log(chalk.yellow('⚠ Current run marked as failed'));
+        }
     } catch {}
     stopDevServer();
     process.exit(0);
@@ -2928,8 +3025,11 @@ process.on('SIGTERM', () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
-        (logger as any).markRunIncomplete?.('Interrupted by system (SIGTERM)', 'signal');
-        console.log(chalk.yellow('⚠ Current run marked as incomplete'));
+        // Mark current run as failed if any
+        if ((logger as any).currentRunId) {
+            logger.failRun('Interrupted by system (SIGTERM)', 'unknown');
+            console.log(chalk.yellow('⚠ Current run marked as failed'));
+        }
     } catch {}
     stopDevServer();
     process.exit(0);

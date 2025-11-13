@@ -28,6 +28,10 @@ export class AnthropicAdapter implements AgentAdapter {
   private readonly DEFAULT_MODEL = "claude-3-5-sonnet-20241022";
   
   constructor(apiKey = process.env.ANTHROPIC_API_KEY!) {
+    // Debug: Log relevant environment variables
+    console.log('[env] Anthropic Adapter - Environment variables:');
+    console.log(`  ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? '***set***' : '(not set)'}`);
+    
     if (!apiKey) {
       throw new Error(
         "Missing ANTHROPIC_API_KEY environment variable. " +
