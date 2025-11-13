@@ -1,7 +1,7 @@
 /**
  * LLM-powered prompt selection and variable extraction utilities
  *
- * This module provides utilities for using an LLM (grok-beta) to:
+ * This module provides utilities for using an LLM (anthropic/claude-3.5-haiku) to:
  * 1. Analyze user intent and select the best matching template prompt
  * 2. Extract mustache template variables via structured tool calling
  */
