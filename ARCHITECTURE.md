@@ -18,70 +18,69 @@
 
 ## Overview
 
-The ze-benchmarks system is a comprehensive benchmark harness and reporting platform for evaluating AI agent performance. The system uses a file-based architecture with local SQLite database for simplicity and ease of use.
+The ze-benchmarks system is a comprehensive benchmark harness and reporting platform for evaluating AI agent performance. The system uses a **API-driven architecture** with Cloudflare Workers and D1 database, providing a scalable, globally-distributed platform for running and analyzing benchmarks.
 
 ### Key Design Principles
 
-- **Simplicity**: Direct file-based storage with SQLite
-- **Local-First**: All data stored locally, no external dependencies required
-- **Type Safety**: End-to-end TypeScript
-- **Developer Experience**: Simple setup, no server required
-- **Optional Cloud Sync**: Worker API available for syncing to Cloudflare D1 when needed
+- **API-First**: All data flows through RESTful Worker API
+- **Globally Distributed**: Edge deployment via Cloudflare Workers
+- **Type Safety**: End-to-end TypeScript across CLI, Worker, and Frontend
+- **Developer Experience**: Simple local development with wrangler
+- **Cloud-Native**: D1 database for serverless SQLite at scale
+- **Multi-Environment**: Support for local, dev, staging, and production environments
 
 ---
 
 ## Current Architecture
 
-### File-Based Architecture
+### API-Driven Architecture
 
 ```mermaid
 graph TB
     subgraph "Benchmark Execution"
-        A[CLI Harness]
-        B[BenchmarkLogger]
+        CLI[CLI Harness<br/>packages/harness]
+        LOGGER[WorkerClient<br/>packages/worker-client]
     end
 
-    subgraph "Local Storage"
-        C[(SQLite Database<br/>benchmarks.db)]
+    subgraph "Cloudflare Edge"
+        WORKER[Worker API<br/>apps/worker]
+        D1[(D1 Database)]
     end
 
     subgraph "Frontend"
-        D[React App]
-        E[sql.js WASM]
+        REACT[React App<br/>apps/benchmark-report]
+        APICLIENT[API Client<br/>TanStack Query]
     end
 
-    subgraph "Optional: Cloud Sync"
-        F[Worker API]
-        G[(D1 Database)]
-        H[Sync Script]
+    subgraph "CI/CD"
+        GHA[GitHub Actions]
+        DEPLOY[Auto Deploy]
     end
 
-    A -->|writes| B
-    B -->|writes| C
-    C -->|served as static file| D
-    D -->|loads with| E
-    E -->|queries| C
-    
-    H -.->|optional sync| F
-    F -.->|stores| G
+    CLI -->|HTTP POST| LOGGER
+    LOGGER -->|POST /api/results| WORKER
+    WORKER -->|INSERT| D1
 
-    style C fill:#9cf,stroke:#333,stroke-width:3px
-    style E fill:#9f9,stroke:#333,stroke-width:2px
-    style F fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style G fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    REACT -->|HTTP GET| APICLIENT
+    APICLIENT -->|GET /api/runs| WORKER
+    WORKER -->|SELECT| D1
+
+    GHA -->|push to main| DEPLOY
+    DEPLOY -->|wrangler deploy| WORKER
+
+    style WORKER fill:#f96,stroke:#333,stroke-width:3px
+    style D1 fill:#9cf,stroke:#333,stroke-width:3px
+    style LOGGER fill:#fc9,stroke:#333,stroke-width:2px
+    style APICLIENT fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
 **Current Architecture Benefits:**
-- **Simple Setup**: No server required, works entirely locally
-- **Fast Development**: Direct file access, no network latency
-- **Self-Contained**: All data in one SQLite file
-- **Easy Backup**: Just copy the database file
-- **Optional Cloud Sync**: Worker available for syncing to D1 when needed
-
-**Optional Cloudflare Worker:**
-- Available for syncing local SQLite data to Cloudflare D1
-- Manual sync via `pnpm sync` command
-- Useful for sharing data across environments or CI/CD
+- **API-First**: All data flows through RESTful Worker API
+- **Real-Time Updates**: Frontend fetches latest data from Worker
+- **Globally Distributed**: Edge deployment via Cloudflare Workers
+- **Auto-Scaling**: Workers scale automatically with traffic
+- **Multi-Environment**: Local, dev, staging, and production environments
+- **Type-Safe**: End-to-end TypeScript with shared types
 
 ---
 
@@ -92,40 +91,42 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Benchmark Execution"
-        CLI[Benchmark CLI]
-        LOGGER[BenchmarkLogger]
+        CLI[Benchmark CLI<br/>packages/harness]
+        LOGGER[WorkerClient<br/>packages/worker-client]
     end
 
-    subgraph "Local Storage"
-        SQLITE[(SQLite Database<br/>benchmark-report/public/benchmarks.db)]
+    subgraph "Cloudflare Infrastructure"
+        WORKER[Worker API<br/>apps/worker<br/>itty-router + Drizzle]
+        D1[(D1 Database<br/>SQLite-compatible<br/>serverless)]
     end
 
     subgraph "Frontend Application"
-        REACT[React App]
-        SQLJS[sql.js WASM]
+        REACT[React App<br/>apps/benchmark-report<br/>TanStack Router]
+        APICLIENT[API Client<br/>TanStack Query]
         RSBUILD[Rsbuild Dev Server]
     end
 
-    subgraph "Optional: Cloudflare Worker"
-        WORKER[Cloudflare Worker]
-        D1[(D1 Database)]
-        SYNC[Sync Script]
+    subgraph "Deployment"
+        GHA[GitHub Actions]
+        WRANGLER[wrangler deploy]
     end
 
-    CLI -->|writes| LOGGER
-    LOGGER -->|writes| SQLITE
-    SQLITE -->|served as static file| REACT
-    REACT -->|queries via| SQLJS
-    SQLJS -->|reads| SQLITE
-    RSBUILD -->|serves| REACT
-    
-    SYNC -.->|optional| WORKER
-    WORKER -.->|stores| D1
+    CLI -->|uses| LOGGER
+    LOGGER -->|POST /api/results| WORKER
+    WORKER -->|Drizzle ORM| D1
 
-    style SQLITE fill:#9cf,stroke:#333,stroke-width:3px
-    style SQLJS fill:#9f9,stroke:#333,stroke-width:2px
-    style WORKER fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style D1 fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    RSBUILD -->|serves| REACT
+    REACT -->|uses| APICLIENT
+    APICLIENT -->|GET /api/runs| WORKER
+    WORKER -->|SELECT queries| D1
+
+    GHA -->|triggers| WRANGLER
+    WRANGLER -->|deploys| WORKER
+
+    style WORKER fill:#f96,stroke:#333,stroke-width:3px
+    style D1 fill:#9cf,stroke:#333,stroke-width:3px
+    style APICLIENT fill:#9f9,stroke:#333,stroke-width:2px
+    style LOGGER fill:#fc9,stroke:#333,stroke-width:2px
 ```
 
 ### Architecture Layers
@@ -133,25 +134,36 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Presentation Layer"
-        A1[Dashboard UI]
-        A2[Charts & Visualizations]
-        A3[Data Tables]
+        A1[Dashboard UI<br/>React Components]
+        A2[Charts & Visualizations<br/>Recharts]
+        A3[Data Tables<br/>TanStack Table]
     end
 
-    subgraph "Data Access Layer"
-        B1[Database Context]
-        B2[sql.js WASM]
-        B3[SQL Queries]
+    subgraph "API Client Layer"
+        B1[API Client<br/>TanStack Query]
+        B2[HTTP Requests<br/>fetch API]
+        B3[Type Definitions<br/>TypeScript]
+    end
+
+    subgraph "API Layer (Worker)"
+        C1[Router<br/>itty-router]
+        C2[Middleware<br/>CORS, Auth]
+        C3[Handlers<br/>runs, batches, stats]
+    end
+
+    subgraph "Data Layer (Worker)"
+        D1[Drizzle ORM]
+        D2[SQL Query Builder]
+        D3[Field Converters]
     end
 
     subgraph "Persistence Layer"
-        C1[(SQLite Database)]
-        C2[File System]
+        E1[(D1 Database<br/>Cloudflare)]
     end
 
     subgraph "Benchmark Execution"
-        D1[CLI Harness]
-        D2[BenchmarkLogger]
+        F1[CLI Harness]
+        F2[WorkerClient]
     end
 
     A1 --> B1
@@ -159,14 +171,22 @@ graph TB
     A3 --> B1
     B1 --> B2
     B2 --> B3
-    B3 --> C1
-    C1 --> C2
-    
-    D1 --> D2
-    D2 --> C1
+    B3 -->|HTTP| C1
 
-    style B2 fill:#9f9,stroke:#333,stroke-width:2px
-    style C1 fill:#9cf,stroke:#333,stroke-width:3px
+    C1 --> C2
+    C2 --> C3
+    C3 --> D1
+    D1 --> D2
+    D2 --> D3
+    D3 --> E1
+
+    F1 --> F2
+    F2 -->|HTTP POST| C1
+
+    style B1 fill:#9f9,stroke:#333,stroke-width:2px
+    style C1 fill:#f96,stroke:#333,stroke-width:2px
+    style D1 fill:#fc9,stroke:#333,stroke-width:2px
+    style E1 fill:#9cf,stroke:#333,stroke-width:3px
 ```
 
 ---
@@ -178,32 +198,36 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant CLI as Benchmark CLI
-    participant Logger as BenchmarkLogger
-    participant SQLite as SQLite Database
+    participant WC as WorkerClient
+    participant Worker as Cloudflare Worker
+    participant D1 as D1 Database
     participant Frontend as React Frontend
-    participant SQLJS as sql.js WASM
+    participant API as API Client
 
-    CLI->>Logger: startRun(suite, scenario, tier, agent)
-    Logger->>Logger: Store in memory
-    Note over Logger: Collects evaluations<br/>& telemetry
-    CLI->>Logger: logEvaluation(...)
-    CLI->>Logger: logTelemetry(...)
-    CLI->>Logger: completeRun(scores, metadata)
+    CLI->>WC: startRun(suite, scenario, tier, agent)
+    WC->>WC: Store run context
+    Note over WC: Collects evaluations<br/>& telemetry
+    CLI->>WC: logEvaluation(...)
+    CLI->>WC: logTelemetry(...)
+    CLI->>WC: completeRun(scores, metadata)
 
-    Logger->>SQLite: INSERT INTO benchmark_runs
-    Logger->>SQLite: INSERT INTO evaluation_results
-    Logger->>SQLite: INSERT INTO run_telemetry
-    SQLite-->>Logger: Success
-    Logger-->>CLI: Run logged
+    WC->>Worker: POST /api/results
+    Note over WC,Worker: JSON payload with<br/>run, evaluations, telemetry
+    Worker->>Worker: Validate & authenticate
+    Worker->>D1: INSERT INTO benchmark_runs
+    Worker->>D1: INSERT INTO evaluation_results
+    Worker->>D1: INSERT INTO run_telemetry
+    D1-->>Worker: Success
+    Worker-->>WC: 201 Created
+    WC-->>CLI: Run logged
 
     Note over Frontend: User opens dashboard
-    Frontend->>SQLJS: initSqlJs()
-    SQLJS->>SQLite: Load database file
-    SQLite-->>SQLJS: Database loaded
-    Frontend->>SQLJS: SELECT * FROM benchmark_runs
-    SQLJS->>SQLite: Execute query
-    SQLite-->>SQLJS: Results
-    SQLJS-->>Frontend: Rendered in UI
+    Frontend->>API: getDashboardStats()
+    API->>Worker: GET /api/stats
+    Worker->>D1: SELECT aggregates
+    D1-->>Worker: Stats data
+    Worker-->>API: JSON response
+    API-->>Frontend: Rendered in UI
 ```
 
 ### Local Development Data Flow
@@ -212,102 +236,132 @@ sequenceDiagram
 graph TB
     subgraph "Terminal: CLI"
         C[pnpm bench]
-        L[BenchmarkLogger]
+        WC[WorkerClient]
     end
 
-    subgraph "File System"
-        DB[(benchmark-report/public/benchmarks.db)]
+    subgraph "Local Worker"
+        WORKER[wrangler dev<br/>localhost:8787]
+        D1[(Local D1)]
     end
 
     subgraph "Frontend Dev Server"
         RS[Rsbuild Dev Server<br/>localhost:3000]
         REACT[React App]
-        SQLJS[sql.js WASM]
+        API[API Client]
     end
 
-    C -->|executes| L
-    L -->|writes| DB
+    C -->|executes| WC
+    WC -->|POST /api/results| WORKER
+    WORKER -->|writes| D1
     RS -->|serves| REACT
-    REACT -->|loads| SQLJS
-    SQLJS -->|reads| DB
+    REACT -->|uses| API
+    API -->|GET /api/runs| WORKER
 
-    style DB fill:#9cf,stroke:#333,stroke-width:3px
-    style SQLJS fill:#9f9,stroke:#333,stroke-width:2px
+    style WORKER fill:#f96,stroke:#333,stroke-width:3px
+    style D1 fill:#9cf,stroke:#333,stroke-width:3px
+    style API fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
-### Optional Cloud Sync Flow
+### Multi-Environment Deployment Flow
 
 ```mermaid
-graph LR
-    subgraph "Local"
-        DB[(Local SQLite)]
-        SYNC[Sync Script<br/>pnpm sync]
+graph TB
+    subgraph "Development"
+        DEVWORKER[Worker: bench-api-dev<br/>bench-api-dev.zephyr-cloud.io]
+        DEVD1[(D1: ze-benchmarks-dev)]
     end
 
-    subgraph "Cloudflare"
-        WORKER[Worker API]
-        D1[(D1 Database)]
+    subgraph "Staging"
+        STGWORKER[Worker: bench-api-stg<br/>bench-api-stg.zephyr-cloud.io]
+        STGD1[(D1: ze-benchmarks-staging)]
     end
 
-    SYNC -->|reads| DB
-    SYNC -->|POST /api/results| WORKER
-    WORKER -->|stores| D1
+    subgraph "Production"
+        PRODWORKER[Worker: bench-api-prod<br/>bench-api.zephyr-cloud.io]
+        PRODD1[(D1: ze-benchmarks-prod)]
+    end
 
-    style SYNC fill:#fc9,stroke:#333,stroke-width:2px
-    style WORKER fill:#f96,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style D1 fill:#9cf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph "Triggers"
+        MAINPUSH[Push to main]
+        PRERELEASE[Pre-release]
+        RELEASE[Release]
+    end
+
+    MAINPUSH -->|GitHub Actions| DEVWORKER
+    PRERELEASE -->|GitHub Actions| STGWORKER
+    RELEASE -->|GitHub Actions| PRODWORKER
+
+    DEVWORKER --> DEVD1
+    STGWORKER --> STGD1
+    PRODWORKER --> PRODD1
+
+    style DEVWORKER fill:#f96,stroke:#333,stroke-width:2px
+    style STGWORKER fill:#f96,stroke:#333,stroke-width:2px
+    style PRODWORKER fill:#f96,stroke:#333,stroke-width:3px
+    style PRODD1 fill:#9cf,stroke:#333,stroke-width:3px
 ```
 
 ---
 
 ## Component Details
 
-### 1. CLI Benchmark Logger
+### 1. CLI Worker Client
 
-**Location**: `packages/database/src/logger.ts`
+**Location**: `packages/worker-client/src/logger.ts`
 
 ```mermaid
 stateDiagram-v2
     [*] --> Initialized: getInstance()
     Initialized --> RunActive: startRun()
-    RunActive --> CollectingData: logEvaluation()
-    RunActive --> CollectingData: logTelemetry()
-    CollectingData --> CollectingData: More evaluations
-    CollectingData --> Writing: completeRun() or failRun()
-    Writing --> Written: Write to SQLite
-    Written --> [*]: clearPendingData()
+    RunActive --> CollectingData: Build payload
+    CollectingData --> CollectingData: Add evaluations/telemetry
+    CollectingData --> Submitting: completeRun()
+    Submitting --> POSTRequest: HTTP POST /api/results
+    POSTRequest --> Success: 201 Created
+    POSTRequest --> Error: 4xx/5xx
+    Success --> [*]
+    Error --> [*]
 
-    note right of Writing
-        Direct SQLite writes
-        using better-sqlite3
+    note right of POSTRequest
+        Sends JSON to Worker API
+        with Bearer auth token
     end note
 ```
 
 **Key Features**:
-- Singleton pattern for global access
+- Drop-in replacement for local BenchmarkLogger
 - In-memory accumulation of run data
-- Direct SQLite writes using `better-sqlite3`
-- Automatic database initialization
-- Type-safe database operations
+- HTTP POST to Worker API
+- Bearer token authentication
+- Automatic retry on failure
+- Type-safe API payloads
 
 **Key Files**:
-- `logger.ts`: Main BenchmarkLogger class
-- `schema.ts`: Database schema definitions
+- `logger.ts`: BenchmarkLogger class (Worker-based)
+- `client.ts`: WorkerClient for HTTP requests
+- `types.ts`: TypeScript type definitions
 
-### 2. Database Layer (SQLite)
+### 2. Cloudflare Worker API
 
-**Schema**: `packages/database/src/schema.ts`
+**Location**: `apps/worker/src/`
 
-The database uses SQLite with `better-sqlite3` for CLI operations and `sql.js` WASM for browser access.
+The Worker API is built with itty-router and Drizzle ORM, deployed to Cloudflare's global edge network.
 
-**Tables**:
+**Key Components**:
+1. **Router** (`index.ts`): Request routing with itty-router
+2. **Middleware**: CORS, authentication, error handling
+3. **API Handlers**:
+   - `api/runs.ts`: Benchmark run endpoints
+   - `api/batches.ts`: Batch management endpoints
+   - `api/stats.ts`: Statistics and aggregations
+   - `api/submit.ts`: Data ingestion endpoints
+4. **Database**: Drizzle ORM with D1
+
+**Database Schema** (`src/db/schema.ts`):
 1. `batch_runs`: Batch-level aggregations
 2. `benchmark_runs`: Individual benchmark run records
 3. `evaluation_results`: Evaluator scores for each run
 4. `run_telemetry`: Token usage, cost, duration metrics
-
-**Database Location**:
-- `benchmark-report/public/benchmarks.db` - Served as static file to frontend
 
 **Indexes** (for query performance):
 - Suite + Scenario combination
@@ -316,87 +370,92 @@ The database uses SQLite with `better-sqlite3` for CLI operations and `sql.js` W
 - Batch ID relationships
 - Success flag filtering
 
+**Environments**:
+- **Local**: `http://localhost:8787` (wrangler dev)
+- **Development**: `https://bench-api-dev.zephyr-cloud.io`
+- **Staging**: `https://bench-api-stg.zephyr-cloud.io`
+- **Production**: `https://bench-api.zephyr-cloud.io`
+
 ### 3. Frontend Architecture
 
-**Location**: `benchmark-report/src/`
+**Location**: `apps/benchmark-report/src/`
 
 ```mermaid
 graph TB
     subgraph "React Application"
-        A[App Entry]
-        B[Router]
+        A[App Entry<br/>main.tsx]
+        B[TanStack Router]
     end
 
-    subgraph "Database Context"
-        C[DatabaseProvider]
-        D[useDatabase Hook]
-    end
-
-    subgraph "Data Access Layer"
-        E[sql.js WASM]
-        F[SQL Queries]
-        G[Database Utils]
+    subgraph "API Layer"
+        C[API Client<br/>lib/api-client.ts]
+        D[TanStack Query]
     end
 
     subgraph "UI Components"
-        H1[Dashboard]
-        H2[Charts]
-        H3[Tables]
+        H1[Dashboard<br/>routes/index.tsx]
+        H2[Charts<br/>Recharts]
+        H3[Tables<br/>shadcn/ui]
         H4[Stats Cards]
     end
 
-    subgraph "Static Assets"
-        I[(SQLite Database File)]
+    subgraph "Worker API"
+        W[Cloudflare Worker]
     end
 
     A --> B
-    A --> C
-    C --> D
     B --> H1
     H1 --> D
     H2 --> D
     H3 --> D
     H4 --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> I
+    D --> C
+    C -->|HTTP GET| W
 
     style C fill:#9f9,stroke:#333,stroke-width:2px
-    style E fill:#9f9,stroke:#333,stroke-width:2px
-    style I fill:#9cf,stroke:#333,stroke-width:3px
+    style D fill:#9f9,stroke:#333,stroke-width:2px
+    style W fill:#f96,stroke:#333,stroke-width:3px
 ```
 
 **Key Files**:
-- `DatabaseProvider.tsx`: Context provider for database access
-- `lib/database.ts`: Database initialization and query utilities
-- `routes/index.tsx`: Dashboard with direct SQL queries
-- `scripts/copy-wasm.js`: Script to copy sql.js WASM to public directory
+- `lib/api-client.ts`: API client with TypeScript types
+- `routes/*.tsx`: Page components using TanStack Router
+- `components/ui/*`: Reusable UI components (shadcn/ui)
+- `rsbuild.config.ts`: Rsbuild configuration
 
 **Data Access Strategy**:
-- Direct SQL queries via sql.js WASM
-- Database loaded once on app initialization
-- Manual refresh capability via `refreshDatabase()`
-- Client-side aggregations for complex stats
-- No network requests required
+- HTTP requests via API Client
+- TanStack Query for caching and state management
+- Automatic background refetching
+- Optimistic updates
+- Manual refresh capability
+- Real-time data from Worker API
 
-### 4. Optional: Cloudflare Worker API
+### 4. Deployment Pipeline
 
-**Location**: `worker/src/`
+**GitHub Actions Workflows**:
 
-The Worker API is optional and used only for syncing local SQLite data to Cloudflare D1.
+1. **deploy-worker-dev.yml**: Auto-deploy to development
+   - Trigger: Push to `main` branch
+   - Target: Development environment (`bench-api-dev.zephyr-cloud.io`)
+   - Runs migrations automatically
+   - Fast feedback loop for testing
 
-**Key Features**:
-- Manual sync via `pnpm sync` command
-- Reads from local SQLite database
-- Posts to Worker API endpoints
-- Useful for sharing data across environments or CI/CD
+2. **deploy-worker-release.yml**: Deploy to staging/production
+   - Trigger: GitHub releases (pre-release → staging, release → production)
+   - Target: Staging (`bench-api-stg.zephyr-cloud.io`) or Production (`bench-api.zephyr-cloud.io`)
+   - Runs migrations automatically
+   - Manual approval gates (GitHub environments)
 
-**Sync Script**: `worker/scripts/sync.ts`
-- Reads from `benchmark-report/public/benchmarks.db`
-- Transforms data to match Worker API format
-- Posts to `/api/results` and `/api/results/batch`
-- Supports `--dry-run`, `--limit`, and `--force` options
+**Deployment Steps**:
+1. Build worker dependencies (`pnpm build`)
+2. Deploy worker (`wrangler deploy --env <environment>`)
+3. Apply D1 migrations (`wrangler d1 migrations apply`)
+4. Verify deployment (health check)
+
+**Required Secrets**:
+- `CLOUDFLARE_API_TOKEN`: API token for Cloudflare
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID
 
 ---
 
