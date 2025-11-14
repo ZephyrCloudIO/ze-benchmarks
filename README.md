@@ -7,27 +7,28 @@ Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real s
 ## How the System Works
 
 ### Architecture Overview
-The system consists of four main components:
+The system consists of five main components:
 
 1. **Harness** (`packages/harness/`) - CLI interface and execution engine
 2. **Agent Adapters** (`packages/agent-adapters/`) - Integration with different AI providers
 3. **Evaluators** (`packages/evaluators/`) - Automated testing and evaluation logic
-4. **Database** (`packages/database/`) - SQLite storage for results and metadata
+4. **Worker API** (`apps/worker/`) - Cloudflare Worker with D1 database for data storage
+5. **Web Dashboard** (`apps/benchmark-report/`) - React-based UI for viewing results
 
 ### Execution Flow
 1. **CLI** scans available suites and scenarios
 2. **Agent** receives prompt and workspace context
 3. **Agent** performs the requested task (e.g., update dependencies)
 4. **Evaluators** test the result (build, lint, tests, etc.)
-5. **Database** stores results with detailed metadata
-6. **Web Dashboard** displays results in real-time
+5. **Worker API** stores results in Cloudflare D1 database
+6. **Web Dashboard** fetches and displays results from Worker API
 
 ### Current Working Features
 - **Interactive CLI**: Dynamic suite/scenario loading with progress tracking
 - **Multi-Agent Support**: Echo, Anthropic Claude, OpenRouter, Claude Code
 - **Dynamic Tier System**: Automatic L0-L3 and Lx difficulty scanning
 - **Batch Execution**: Run multiple agent/tier combinations
-- **Real-time Database**: SQLite with timestamp-based auto-refresh
+- **Worker-Based Storage**: All data stored in Cloudflare D1 via Worker API
 - **Web Dashboard**: React-based results viewer at `localhost:3000`
 - **Comprehensive Evaluators**: Build, lint, typecheck, dependency analysis
 - **Failure Detection**: Detailed error logging and categorization
@@ -40,37 +41,68 @@ The system consists of four main components:
 git clone https://github.com/your-org/ze-benchmarks.git
 cd ze-benchmarks
 pnpm install
-
+pnpm build
 ```
 
 ### 2. Environment Setup (`.env`)
 ```bash
+# Copy example environment file
+cp .env.example .env
+
 # Edit .env and add your API keys
 # Required for Anthropic Claude
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-# Optional for OpenRouter models  
+# Optional for OpenRouter models
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Worker configuration (already set for local development)
+ZE_BENCHMARKS_WORKER_URL=http://localhost:8787
+ZE_BENCHMARKS_API_KEY=dev-local-key
 ```
 
 **Get API Keys:**
 - **Anthropic Claude**: https://console.anthropic.com/settings/keys
 - **OpenRouter**: https://openrouter.ai/keys
 
-### 3. Run Your First Benchmark
+### 3. Initialize D1 Database (First Time Only)
 ```bash
-# Start interactive CLI
-pnpm cli
-
-# Or run a specific benchmark
-pnpm bench update-deps nx-pnpm-monorepo L1 anthropic
+cd apps/worker
+pnpm db:push:local
+cd ..
 ```
 
-### 4. View Results
+### 4. Start the Worker (Required!)
+**⚠️ The worker MUST be running for benchmarks to work**
+
 ```bash
-# Start web dashboard
-pnpm dev
+# Terminal 1: Start worker
+cd apps/worker && pnpm dev
+
+# Worker will be available at http://localhost:8787
+```
+
+### 5. Run Your First Benchmark
+```bash
+# Terminal 2: Run a benchmark
+pnpm bench test-suite test-scenario L0 echo
+
+# Or use interactive CLI
+pnpm cli
+```
+
+### 6. View Results
+```bash
+# Terminal 3: Start web dashboard
+pnpm dev:dashboard
+
 # Open http://localhost:3000
+```
+
+### Easy Mode: Start Everything at Once
+```bash
+# One command to start worker + dashboard
+./start-dev.sh
 ```
 
 ## Understanding Suites and Scenarios
@@ -141,7 +173,7 @@ ze-benchmarks/
 │   │   ├── prompts/          # L0-L3 and Lx prompts
 │   │   └── scenarios/        # Scenario configs and fixtures
 │   └── test-suite/           # Basic test scenarios
-├── benchmark-report/         # Web dashboard (React + Rsbuild)
+├── apps/benchmark-report/         # Web dashboard (React + Rsbuild)
 │   └── public/               # Database and static assets
 └── docs/                     # Comprehensive documentation
     ├── ADDING-BENCHMARKS.md  # Guide for creating benchmarks
@@ -226,25 +258,35 @@ cp .env.example .env
 ### Optional Variables
 - **`CLAUDE_MODEL`**: Override default Claude model (default: `claude-3-5-sonnet-20241022`)
 - **`LLM_JUDGE_MODEL`**: Override LLM Judge model (default: `anthropic/claude-3.5-sonnet`)
-- **`ZE_BENCHMARKS_DB`**: Override database path (default: `benchmark-report/public/benchmarks.db`)
+- **`ZE_BENCHMARKS_DB`**: Override database path (default: `apps/benchmark-report/public/benchmarks.db`)
 - **`DEBUG`**: Enable debug logging (default: `false`)
 - **`PORT`**: Web dashboard port (default: `3000`)
 
-## Database and Results
+## Data Storage and Results
 
-### Database Location
-- **Primary Database**: `benchmark-report/public/benchmarks.db`
-- **Auto-refresh**: Timestamp-based polling every 5 seconds
-- **Version Tracking**: `benchmark-report/public/db-version.json`
+### Worker API Architecture
+- **Storage**: Cloudflare D1 (SQLite) via Worker API
+- **API Endpoint**: `http://localhost:8787` (local development)
+- **Authentication**: Bearer token authentication for write operations
+- **Real-time**: All data fetched fresh on each request
+
+### API Endpoints
+- `GET /api/runs` - List all benchmark runs
+- `GET /api/runs/:id` - Get run details with evaluations and telemetry
+- `GET /api/batches` - List all batches
+- `GET /api/batches/:id` - Get batch details with runs
+- `GET /api/stats` - Get global statistics
+- `POST /api/results` - Submit benchmark run (authenticated)
+- `POST /api/results/batch` - Submit batch (authenticated)
 
 ### Result Storage
 - **Runs**: Individual benchmark executions with detailed metadata
-- **Batches**: Groups of runs with aggregate statistics  
+- **Batches**: Groups of runs with aggregate statistics
 - **Evaluations**: Detailed evaluator results and scores
-- **Failures**: Categorized error logging (workspace, prompt, agent, evaluation)
+- **Telemetry**: Tool calls, tokens, costs, duration
 
 ### Web Dashboard Features
-- **Real-time Updates**: Automatic refresh when database changes
+- **Real-time Updates**: Fetches data directly from Worker API
 - **Interactive Charts**: Performance visualization with proper 0-1 scoring
 - **Batch Analytics**: Comprehensive batch-level statistics
 - **Run Details**: Individual run analysis and debugging

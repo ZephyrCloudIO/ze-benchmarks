@@ -1,0 +1,79 @@
+# Zephyr Benchmarks Worker Configuration
+# Supports multiple environments: development (local), staging, production
+
+name = "ze-benchmarks-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Default configuration (development/local)
+[[ d1_databases ]]
+binding = "DB"
+database_name = "ze-benchmarks"
+database_id = "local-db-id" # Local development database
+migrations_dir = "drizzle"
+
+[vars]
+ENVIRONMENT = "development"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173"
+
+# Production Environment
+# Domain: bench-api.zephyr-cloud.io
+[env.production]
+name = "ze-benchmarks-api-prod"
+routes = [
+  { pattern = "bench-api.zephyr-cloud.io", custom_domain = true }
+]
+
+[env.production.d1_databases]
+binding = "DB"
+database_name = "ze-benchmarks-prod"
+database_id = "YOUR_PRODUCTION_DATABASE_ID" # Replace with actual production D1 database ID
+migrations_dir = "drizzle"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+ALLOWED_ORIGINS = "https://bench.zephyr-cloud.io,https://app.zephyr-cloud.io"
+
+# Staging Environment
+# Domain: bench-api-stg.zephyr-cloud.io
+[env.staging]
+name = "ze-benchmarks-api-stg"
+routes = [
+  { pattern = "bench-api-stg.zephyr-cloud.io", custom_domain = true }
+]
+
+[env.staging.d1_databases]
+binding = "DB"
+database_name = "ze-benchmarks-staging"
+database_id = "YOUR_STAGING_DATABASE_ID" # Replace with actual staging D1 database ID
+migrations_dir = "drizzle"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+ALLOWED_ORIGINS = "https://bench-stg.zephyr-cloud.io,http://localhost:3000"
+
+# Development Environment (remote testing)
+# Domain: bench-api-dev.zephyr-cloud.io
+[env.dev]
+name = "ze-benchmarks-api-dev"
+routes = [
+  { pattern = "bench-api-dev.zephyr-cloud.io", custom_domain = true }
+]
+
+[env.dev.d1_databases]
+binding = "DB"
+database_name = "ze-benchmarks-dev"
+database_id = "YOUR_DEV_DATABASE_ID" # Replace with actual dev D1 database ID
+migrations_dir = "drizzle"
+
+[env.dev.vars]
+ENVIRONMENT = "dev"
+ALLOWED_ORIGINS = "https://bench-dev.zephyr-cloud.io,http://localhost:3000"
+
+# For production secrets (use wrangler secret put):
+# Production:
+#   wrangler secret put API_SECRET_KEY --env production
+# Staging:
+#   wrangler secret put API_SECRET_KEY --env staging
+# Dev:
+#   wrangler secret put API_SECRET_KEY --env dev

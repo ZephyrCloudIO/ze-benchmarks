@@ -15,7 +15,7 @@ import { buildDiffArtifacts } from './runtime/diff.ts';
 import { Oracle } from './runtime/oracle.ts';
 import { createAskUserToolDefinition, createAskUserHandler } from './runtime/ask-user-tool.ts';
 import { getAllWorkspaceTools, createWorkspaceToolHandlers } from './runtime/workspace-tools.ts';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { intro, outro, spinner, log, select, confirm, multiselect, isCancel, cancel, text } from '@clack/prompts';
 import { spawn } from 'node:child_process';
 import chalk from 'chalk';

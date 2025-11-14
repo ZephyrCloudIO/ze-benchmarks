@@ -3,15 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/harness run build",
+    "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/worker-client run build && pnpm --filter @ze/harness run build",
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
-    "dev": "mprocs",
-    "dev:worker": "cd worker && pnpm dev",
-    "dev:frontend": "cd benchmark-report && pnpm dev",
+    "build:worker-client": "pnpm --filter @ze/worker-client run build",
+    "dev": "echo '⚠️  Start worker and dashboard separately:' && echo '  Terminal 1: pnpm dev:worker' && echo '  Terminal 2: pnpm dev:dashboard'",
+    "dev:worker": "cd apps/worker && pnpm dev",
+    "dev:dashboard": "cd apps/benchmark-report && pnpm dev",
     "bench": "tsx packages/harness/src/cli.ts",
     "harness": "tsx packages/harness/src/cli.ts",
-    "start:report": "pnpm --filter benchmark-report run dev"
+    "cli": "tsx packages/harness/src/cli.ts"
   },
   "engines": {
     "node": ">=18"
