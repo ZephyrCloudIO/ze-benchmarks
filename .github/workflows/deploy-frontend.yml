@@ -41,6 +41,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages and frontend
-        run: pnpm build
+        run: pnpm dash:build
         env:
           ZE_SECRET_TOKEN: ${{ secrets.ZE_SECRET_TOKEN }}
+          ZE_PUBLIC_APP_HOST: https://bench-api-dev.zephyr-cloud.io
