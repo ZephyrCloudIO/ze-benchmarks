@@ -1,6 +1,6 @@
 // API Client for interacting with the Cloudflare Worker backend
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const API_BASE_URL = import.meta.env.ZE_PUBLIC_API_URL || 'http://localhost:8787';
 
 // Type definitions matching the database schema
 export interface BenchmarkRun {
