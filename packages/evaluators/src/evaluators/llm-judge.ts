@@ -40,6 +40,10 @@ export class LLMJudgeEvaluator implements Evaluator {
 
     // Initialize OpenAI client
     const apiKey = process.env.OPENROUTER_API_KEY;
+    
+    // Debug: Log environment variable
+    console.log(`[env] LLM Judge Evaluator - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
+    
     if (!apiKey) {
       return {
         name: this.meta.name,

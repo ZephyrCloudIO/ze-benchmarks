@@ -45,8 +45,13 @@ export async function runEvaluators(
 }
 
 function shouldEnableLLMJudge(scenario: any): boolean {
-	return scenario.llm_judge?.enabled && 
-	       !!process.env.OPENROUTER_API_KEY;
+	const hasApiKey = !!process.env.OPENROUTER_API_KEY;
+	const isEnabled = scenario.llm_judge?.enabled;
+	
+	// Debug: Log environment variable check
+	console.log(`[env] LLM Judge check - OPENROUTER_API_KEY=${hasApiKey ? '***set***' : '(not set)'}, scenario.enabled=${isEnabled}`);
+	
+	return isEnabled && hasApiKey;
 }
 
 export * from './types.ts';

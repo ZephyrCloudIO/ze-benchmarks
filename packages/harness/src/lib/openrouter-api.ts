@@ -23,6 +23,9 @@ export class OpenRouterAPI {
   private CACHE_TTL = 3600000; // 1 hour
 
   constructor(apiKey: string) {
+    // Debug: Log environment variable
+    console.log(`[env] OpenRouterAPI - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
+    
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey
@@ -36,10 +39,14 @@ export class OpenRouterAPI {
     }
 
     try {
+      // Debug: Log environment variable usage
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      console.log(`[env] OpenRouterAPI.getModelsWithToolSupport - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
+      
       // Fetch models from OpenRouter API
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
+          'Authorization': `Bearer ${apiKey}`
         }
       });
 

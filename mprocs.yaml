@@ -1,0 +1,10 @@
+procs:
+  worker:
+    cmd: [cd worker && pnpm dev]
+    stop: SIGTERM
+    autostart: true
+
+  dashboard:
+    cmd: [cd benchmark-report && pnpm dev]
+    stop: SIGTERM
+    autostart: true
