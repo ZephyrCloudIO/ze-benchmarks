@@ -17,9 +17,8 @@ export default defineConfig({
       '@db': resolve(__dirname, '../results')
     },
   },
-  output: {
-    // WASM file is copied via postinstall script to public directory
-    // This ensures it's always available at /sql-wasm.wasm
+  html: {
+    template: './src/index.html',
   },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 3000,

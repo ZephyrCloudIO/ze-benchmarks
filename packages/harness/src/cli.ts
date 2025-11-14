@@ -952,7 +952,7 @@ async function executeMultipleBenchmarks(
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
-	const batchId = logger.startBatch();
+	const batchId = await logger.startBatch();
 	
 	// Calculate total combinations
 	const combinations: Array<{

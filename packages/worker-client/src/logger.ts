@@ -342,8 +342,17 @@ export class BenchmarkLogger {
   /**
    * Start a new batch
    */
-  startBatch(): string {
+  async startBatch(): Promise<string> {
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create the batch in the database immediately
+    await this.upsertBatch({
+      batchId,
+      createdAt: Date.now(),
+      totalRuns: 0,
+      successfulRuns: 0,
+    });
+
     console.log(`[BenchmarkLogger] Batch started: ${batchId}`);
     return batchId;
   }
