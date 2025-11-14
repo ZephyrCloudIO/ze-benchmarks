@@ -21,7 +21,7 @@ ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173"
 [env.local]
 name = "ze-benchmarks-api-local"
 
-[env.local.d1_databases]
+[[env.local.d1_databases]]
 binding = "DB"
 database_name = "ze-benchmarks-local"
 database_id = "local-db-id"
@@ -39,10 +39,10 @@ routes = [
   { pattern = "bench-api.zephyr-cloud.io", custom_domain = true }
 ]
 
-[env.production.d1_databases]
+[[env.production.d1_databases]]
 binding = "DB"
 database_name = "ze-benchmarks-prod"
-database_id = "YOUR_PRODUCTION_DATABASE_ID" # Replace with actual production D1 database ID
+database_id = "6ed134b1-8502-4c33-9a5a-b831c699f212"
 migrations_dir = "drizzle"
 
 [env.production.vars]
@@ -57,10 +57,10 @@ routes = [
   { pattern = "bench-api-stg.zephyr-cloud.io", custom_domain = true }
 ]
 
-[env.staging.d1_databases]
+[[env.staging.d1_databases]]
 binding = "DB"
 database_name = "ze-benchmarks-staging"
-database_id = "YOUR_STAGING_DATABASE_ID" # Replace with actual staging D1 database ID
+database_id = "24393920-d9a3-4260-8bf7-1b97a29db508"
 migrations_dir = "drizzle"
 
 [env.staging.vars]
@@ -75,10 +75,10 @@ routes = [
   { pattern = "bench-api-dev.zephyr-cloud.io", custom_domain = true }
 ]
 
-[env.dev.d1_databases]
+[[env.dev.d1_databases]]
 binding = "DB"
 database_name = "ze-benchmarks-dev"
-database_id = "YOUR_DEV_DATABASE_ID" # Replace with actual dev D1 database ID
+database_id = "4fa3c3a8-42ca-445b-af46-90f04b112516"
 migrations_dir = "drizzle"
 
 [env.dev.vars]
