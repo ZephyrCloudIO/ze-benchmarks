@@ -44,7 +44,8 @@ if (process.env && Object.keys(process.env).length > 0) {
     )
     .sort(([a], [b]) => a.localeCompare(b));
   for (const [key, value] of shownEnv) {
-    console.log(chalk.gray(`  ${key}=${value ?? ''}`));
+    const displayValue = value ? '***set***' : '(empty)';
+    console.log(chalk.gray(`  ${key}=${displayValue}`));
   }
 } else {
   console.log(chalk.yellow('[env] Warning: No environment variables found.'));
@@ -1076,32 +1077,24 @@ async function executeMultipleBenchmarks(
 			duration
 		}
 	});
-	
+
 	// Auto-sync to D1 if enabled
 	if (process.env.ZE_BENCHMARKS_AUTO_SYNC === 'true') {
 		console.log(chalk.blue('Syncing to D1...'));
 		try {
 			const workerDir = join(process.cwd(), 'worker');
-			
-			// Run sync script silently in background
+
+			// Run sync script silently in background (detached)
 			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
 				cwd: workerDir,
-				stdio: 'pipe',
+				stdio: 'ignore',
 				shell: true,
+				detached: true,
 				env: { ...process.env }
 			});
-			
-			// Don't wait for sync to complete - let it run in background
-			syncProcess.on('error', (error) => {
-				// Silent failure - don't interrupt CLI flow
-			});
-			
-			syncProcess.on('exit', (code) => {
-				if (code === 0) {
-					// Silent success - sync completed
-				}
-				// Silent failure - don't interrupt CLI flow
-			});
+
+			// Unreference so parent can exit without waiting
+			syncProcess.unref();
 		} catch (error: any) {
 			// Silent failure - don't interrupt CLI flow
 		}
@@ -2203,9 +2196,9 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		// Start timeout watchdog after loading scenario config
 		const scenarioTimeoutMin = Number(scenarioCfg.timeout_minutes || 60);
 		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
-		timeoutId = setTimeout(() => {
+		timeoutId = setTimeout(async () => {
 			try {
-				logger.failRun(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'unknown');
+				await logger.failRun(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'unknown');
 				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
 			} catch {}
 		}, timeoutMs);
@@ -2215,7 +2208,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 		// Early failure check: prompt missing for non-echo agents
 		if (!promptContent && agent !== 'echo') {
-			logger.failRun('Prompt file not found', 'prompt');
+			await logger.failRun('Prompt file not found', 'prompt');
 			if (!quiet) console.log(chalk.red('✗ Prompt file not found'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
 			return;
@@ -2227,7 +2220,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 		// Early failure check: workspace preparation failed
 		if (!workspacePrep) {
-			logger.failRun('Workspace preparation failed', 'workspace');
+			await logger.failRun('Workspace preparation failed', 'workspace');
 			if (!quiet) console.log(chalk.red('✗ Workspace preparation failed'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`));
 			return;
@@ -2404,7 +2397,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 			// Telemetry is shown in final results
 			
 		} catch (error) {
-			logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
+			await logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) console.log(chalk.red('✗ Agent execution failed'));
 			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 			return; // Early exit - don't continue to evaluation
@@ -2468,7 +2461,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 	// Calculate success based on validation commands and evaluator scores
 	const { isSuccessful, successMetric } = calculateSuccess(commandLog, result.scores || {}, scenarioCfg);
 	
-	logger.completeRun(
+	await logger.completeRun(
 		totalScore,
 		result.totals?.weighted,
 		{
@@ -2485,26 +2478,18 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		console.log(chalk.blue('Syncing to D1...'));
 		try {
 			const workerDir = join(process.cwd(), 'worker');
-			
-			// Run sync script silently in background
+
+			// Run sync script silently in background (detached)
 			const syncProcess = spawn('pnpm', ['sync', '--quiet'], {
 				cwd: workerDir,
-				stdio: 'pipe',
+				stdio: 'ignore',
 				shell: true,
+				detached: true,
 				env: { ...process.env }
 			});
-			
-			// Don't wait for sync to complete - let it run in background
-			syncProcess.on('error', (error) => {
-				// Silent failure - don't interrupt CLI flow
-			});
-			
-			syncProcess.on('exit', (code) => {
-				if (code === 0) {
-					// Silent success - sync completed
-				}
-				// Silent failure - don't interrupt CLI flow
-			});
+
+			// Unreference so parent can exit without waiting
+			syncProcess.unref();
 		} catch (error: any) {
 			// Silent failure - don't interrupt CLI flow
 		}
@@ -2607,7 +2592,7 @@ async function executeBenchmark(suite: string, scenario: string, tier: string, a
 		
 	} catch (error) {
 		// Catch-all for unexpected errors
-		logger.failRun(error instanceof Error ? error.message : String(error), 'unknown');
+		await logger.failRun(error instanceof Error ? error.message : String(error), 'unknown');
 		if (!quiet) console.log(chalk.red('✗ Unexpected error'));
 		if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 	} finally {
@@ -2999,13 +2984,13 @@ process.on('exit', () => {
 	stopDevServer();
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
         // Mark current run as failed if any
         if ((logger as any).currentRunId) {
-            logger.failRun('Interrupted by user (SIGINT)', 'unknown');
+            await logger.failRun('Interrupted by user (SIGINT)', 'unknown');
             console.log(chalk.yellow('⚠ Current run marked as failed'));
         }
     } catch {}
@@ -3013,13 +2998,13 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     console.log('\nShutting down...');
     try {
         const logger = BenchmarkLogger.getInstance();
         // Mark current run as failed if any
         if ((logger as any).currentRunId) {
-            logger.failRun('Interrupted by system (SIGTERM)', 'unknown');
+            await logger.failRun('Interrupted by system (SIGTERM)', 'unknown');
             console.log(chalk.yellow('⚠ Current run marked as failed'));
         }
     } catch {}
@@ -3039,17 +3024,17 @@ process.on('unhandledRejection', (reason, promise) => {
 	process.exit(1);
 });
 
-run().catch((err) => {
+run().catch(async (err) => {
 	console.log(`\n${chalk.red('✗')} Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
-	
+
 	// Try to log the error to database if logger is available
 	try {
 		const logger = BenchmarkLogger.getInstance();
-		logger.failRun(String(err));
+		await logger.failRun(String(err));
 	} catch (logErr) {
 		console.log(`${chalk.yellow('⚠')} Failed to log error to database: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
 	}
-	
+
 	stopDevServer();
 	process.exit(1);
 });

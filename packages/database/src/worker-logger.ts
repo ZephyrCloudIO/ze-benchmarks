@@ -68,7 +68,7 @@ export class BenchmarkLogger {
     return runId;
   }
 
-  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number) {
+  async completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number) {
     if (!this.currentRunId) throw new Error('No active run');
 
     this.pendingRun = {
@@ -83,10 +83,10 @@ export class BenchmarkLogger {
     };
 
     // Submit to Worker API
-    this.submitToWorker();
+    await this.submitToWorker();
   }
 
-  failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'unknown') {
+  async failRun(error: string, errorType?: 'workspace' | 'prompt' | 'agent' | 'evaluation' | 'unknown') {
     if (!this.currentRunId) throw new Error('No active run');
 
     this.pendingRun = {
@@ -97,7 +97,7 @@ export class BenchmarkLogger {
     };
 
     // Submit to Worker API
-    this.submitToWorker();
+    await this.submitToWorker();
   }
 
   logEvaluation(evaluatorName: string, score: number, maxScore: number, details?: string) {
