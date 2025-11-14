@@ -44,3 +44,4 @@ jobs:
         run: pnpm dash:build
         env:
           ZE_SECRET_TOKEN: ${{ secrets.ZE_SECRET_TOKEN }}
+          ZE_PUBLIC_APP_HOST: https://bench-api-dev.zephyr-cloud.io
