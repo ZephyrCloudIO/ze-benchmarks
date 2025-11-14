@@ -12,8 +12,8 @@ export async function getGlobalStats(request: Request, env: Env): Promise<Respon
       .select({
         totalRuns: sql<number>`COUNT(*)`,
         successfulRuns: sql<number>`COUNT(CASE WHEN is_successful = 1 THEN 1 END)`,
-        avgScore: sql<number>`AVG(CASE WHEN is_successful = 1 THEN total_score END)`,
-        avgWeightedScore: sql<number>`AVG(CASE WHEN is_successful = 1 THEN weighted_score END)`
+        avgScore: sql<number>`AVG(total_score)`,
+        avgWeightedScore: sql<number>`AVG(weighted_score)`
       })
       .from(schema.benchmarkRuns)
       .where(eq(schema.benchmarkRuns.status, 'completed'))
