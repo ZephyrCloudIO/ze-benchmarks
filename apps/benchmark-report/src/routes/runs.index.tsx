@@ -1,92 +1,32 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/runs/')({
   component: RunsPage,
 })
 
-interface Run {
-  runId: string;
-  batchId: string | null;
-  suite: string;
-  scenario: string;
-  tier: string;
-  agent: string;
-  model: string;
-  status: string;
-  weightedScore: number | null;
-  startedAt: string;
-  completedAt: string | null;
-  metadata: string | null;
-}
-
 function RunsPage() {
-  const { db, isLoading, error, refreshDatabase, isRefreshing } = useDatabase();
-  const [runs, setRuns] = useState<Run[]>([]);
   const [filter, setFilter] = useState<'all' | 'completed' | 'failed'>('all');
 
-  useEffect(() => {
-    if (!db) return;
+  const { data: runs = [], isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: ['runs', filter],
+    queryFn: () => apiClient.listRuns({
+      limit: 100,
+      status: filter === 'all' ? undefined : filter
+    }),
+  });
 
-    try {
-      let query = `
-        SELECT
-          run_id,
-          batchId,
-          suite,
-          scenario,
-          tier,
-          agent,
-          model,
-          status,
-          weighted_score,
-          started_at,
-          completed_at,
-          metadata
-        FROM benchmark_runs
-      `;
-
-      if (filter === 'completed') {
-        query += " WHERE status = 'completed'";
-      } else if (filter === 'failed') {
-        query += " WHERE status = 'failed'";
-      }
-
-      query += ' ORDER BY started_at DESC LIMIT 100';
-
-      const result = db.exec(query);
-
-      if (result[0]) {
-        const runsData = result[0].values.map((row) => ({
-          runId: row[0] as string,
-          batchId: row[1] as string | null,
-          suite: row[2] as string,
-          scenario: row[3] as string,
-          tier: row[4] as string,
-          agent: row[5] as string,
-          model: row[6] as string,
-          status: row[7] as string,
-          weightedScore: row[8] as number | null,
-          startedAt: row[9] as string,
-          completedAt: row[10] as string | null,
-          metadata: row[11] as string | null,
-        }));
-        setRuns(runsData);
-      } else {
-        setRuns([]);
-      }
-    } catch (err) {
-      console.error('Failed to fetch runs:', err);
-      setRuns([]);
-    }
-  }, [db, filter]);
+  const handleRefresh = async () => {
+    await refetch();
+  };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading database...</div>;
+    return <div className="flex items-center justify-center h-64">Loading runs...</div>;
   }
 
   if (error) {
@@ -102,14 +42,14 @@ function RunsPage() {
             Browse and search all benchmark runs
           </p>
         </div>
-        <Button 
-          onClick={refreshDatabase} 
-          disabled={isRefreshing}
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefetching}
           variant="outline"
           size="sm"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+          {isRefetching ? 'Refreshing...' : 'Refresh Data'}
         </Button>
       </div>
 

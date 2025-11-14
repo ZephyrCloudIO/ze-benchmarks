@@ -8,7 +8,6 @@
     "dev": "rsbuild dev --open",
     "preview": "rsbuild preview"
   },
-
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -38,6 +37,7 @@
     "@tanstack/router-plugin": "^1.133.25",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zephyr-rsbuild-plugin": "^0.1.1"
   }
 }

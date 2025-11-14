@@ -7,20 +7,20 @@
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
     "build:worker-client": "pnpm --filter @ze/worker-client run build",
-    "dev": "echo '⚠️  Start worker and dashboard separately:' && echo '  Terminal 1: pnpm dev:worker' && echo '  Terminal 2: pnpm dev:dashboard'",
-    "dev:worker": "pnpm --filter ze-benchmarks-worker run dev",
-    "dev:dashboard": "pnpm --filter benchmark-report run dev",
-    "bench": "tsx packages/harness/src/cli.ts",
     "harness": "tsx packages/harness/src/cli.ts",
     "cli": "tsx packages/harness/src/cli.ts",
-    "db:migrate": "pnpm --filter ze-benchmarks-worker run db:migrate:local",
-    "db:sync": "pnpm --filter ze-benchmarks-worker run db:sync-from-prod",
-    "deploy:dev": "pnpm --filter ze-benchmarks-worker run deploy:dev",
-    "deploy:staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
-    "deploy:production": "pnpm --filter ze-benchmarks-worker run deploy:production"
+    "bench": "tsx packages/harness/src/cli.ts",
+    "dash:build": "pnpm --filter benchmark-report run build",
+    "dash:dev": "pnpm --filter benchmark-report run dev",
+    "worker:dev": "pnpm --filter ze-benchmarks-worker run dev",
+    "worker:migrate": "pnpm --filter ze-benchmarks-worker run db:migrate:local",
+    "worker:sync": "pnpm --filter ze-benchmarks-worker run db:sync-from-prod",
+    "worker:deploy-dev": "pnpm --filter ze-benchmarks-worker run deploy:dev",
+    "worker:deploy-staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
+    "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=24"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",

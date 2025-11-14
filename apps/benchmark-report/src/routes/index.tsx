@@ -4,165 +4,57 @@ import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { RefreshCw } from 'lucide-react'
 import { safeScore } from '@/lib/chart-utils'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
 })
 
 function Dashboard() {
-  const { db, isLoading: dbLoading, error, refreshDatabase, isRefreshing } = useDatabase();
-  const [stats, setStats] = useState<any>(null);
-  const [topPerformers, setTopPerformers] = useState<any[]>([]);
-  const [recentRuns, setRecentRuns] = useState<any[]>([]);
-  const [scoreDistribution, setScoreDistribution] = useState<any[]>([]);
-  const [recentBatches, setRecentBatches] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: () => apiClient.getDashboardStats(),
+  });
 
-  useEffect(() => {
-    if (!db) return;
+  const { data: topPerformers = [], isLoading: performersLoading, refetch: refetchPerformers } = useQuery({
+    queryKey: ['topPerformers'],
+    queryFn: () => apiClient.getTopPerformers(5),
+  });
 
-    try {
-      // Get global stats
-      const statsResult = db.exec(`
-        SELECT 
-          COUNT(*) as totalRuns,
-          COUNT(CASE WHEN status = 'completed' AND is_successful = 1 THEN 1 END) as successfulRuns,
-          AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN weighted_score END) as avgScore,
-          AVG(CASE WHEN status = 'completed' AND is_successful = 1 THEN 
-            (SELECT cost_usd FROM run_telemetry WHERE run_telemetry.run_id = benchmark_runs.run_id LIMIT 1)
-          END) as avgCost
-        FROM benchmark_runs
-      `);
-      
-      if (statsResult[0]) {
-        const row = statsResult[0].values[0];
-        const totalRuns = row[0] as number;
-        const successfulRuns = row[1] as number;
-        setStats({
-          totalRuns,
-          successfulRuns,
-          successRate: totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0,
-          avgScore: row[2] || 0,
-          avgCost: row[3] || 0,
-        });
-      }
+  const { data: recentRuns = [], isLoading: runsLoading, refetch: refetchRuns } = useQuery({
+    queryKey: ['recentRuns'],
+    queryFn: () => apiClient.listRuns({ limit: 15 }),
+  });
 
-      // Get top performers
-      const performersResult = db.exec(`
-        SELECT 
-          agent,
-          model,
-          AVG(weighted_score) as avgScore,
-          COUNT(*) as runCount,
-          AVG((SELECT cost_usd FROM run_telemetry WHERE run_telemetry.run_id = benchmark_runs.run_id LIMIT 1)) as avgCost
-        FROM benchmark_runs
-        WHERE status = 'completed' AND is_successful = 1 AND weighted_score IS NOT NULL
-        GROUP BY agent, model
-        ORDER BY avgScore DESC
-        LIMIT 5
-      `);
-      
-      if (performersResult[0]) {
-        setTopPerformers(performersResult[0].values.map(row => ({
-          agent: row[0],
-          model: row[1],
-          avgScore: row[2] || 0,
-          runCount: row[3],
-          avgCost: row[4] || 0,
-        })));
-      }
+  const { data: scoreDistribution = [], isLoading: distributionLoading, refetch: refetchDistribution } = useQuery({
+    queryKey: ['scoreDistribution'],
+    queryFn: () => apiClient.getScoreDistribution(),
+  });
 
-      // Get recent runs
-      const runsResult = db.exec(`
-        SELECT 
-          run_id, batchId, suite, scenario, tier, agent, model, status,
-          weighted_score, started_at
-        FROM benchmark_runs
-        ORDER BY started_at DESC
-        LIMIT 15
-      `);
-      
-      if (runsResult[0]) {
-        setRecentRuns(runsResult[0].values.map(row => ({
-          runId: row[0],
-          batchId: row[1],
-          suite: row[2],
-          scenario: row[3],
-          tier: row[4],
-          agent: row[5],
-          model: row[6],
-          status: row[7],
-          weightedScore: row[8],
-          startedAt: row[9],
-        })));
-      }
+  const { data: recentBatches = [], isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
+    queryKey: ['recentBatches'],
+    queryFn: () => apiClient.listBatches(5),
+  });
 
-      // Get score distribution
-      const distResult = db.exec(`
-        SELECT 
-          CASE 
-            WHEN weighted_score < 2 THEN '0-2'
-            WHEN weighted_score < 4 THEN '2-4'
-            WHEN weighted_score < 6 THEN '4-6'
-            WHEN weighted_score < 8 THEN '6-8'
-            WHEN weighted_score < 10 THEN '8-10'
-            ELSE '10+'
-          END as range,
-          COUNT(*) as count
-        FROM benchmark_runs
-        WHERE status = 'completed' AND is_successful = 1 AND weighted_score IS NOT NULL
-        GROUP BY range
-        ORDER BY range
-      `);
-      
-      if (distResult[0]) {
-        setScoreDistribution(distResult[0].values.map(row => ({
-          range: row[0],
-          count: row[1],
-        })));
-      }
-
-      // Get recent batches
-      const batchesResult = db.exec(`
-        SELECT 
-          batchId, createdAt, completedAt, totalRuns, successfulRuns,
-          avgScore, avgWeightedScore
-        FROM batch_runs
-        ORDER BY createdAt DESC
-        LIMIT 5
-      `);
-      
-      if (batchesResult[0]) {
-        setRecentBatches(batchesResult[0].values.map(row => ({
-          batchId: row[0],
-          createdAt: row[1],
-          completedAt: row[2],
-          totalRuns: row[3],
-          successfulRuns: row[4],
-          avgScore: row[5],
-          avgWeightedScore: row[6],
-        })));
-      }
-
-      setIsLoading(false);
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-      setIsLoading(false);
-    }
-  }, [db]);
+  const isLoading = statsLoading || performersLoading || runsLoading || distributionLoading || batchesLoading;
 
   const handleRefresh = async () => {
-    await refreshDatabase();
+    await Promise.all([
+      refetchStats(),
+      refetchPerformers(),
+      refetchRuns(),
+      refetchDistribution(),
+      refetchBatches(),
+    ]);
   };
 
-  if (dbLoading || isLoading) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-64">Loading data...</div>;
   }
 
-  if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+  if (statsError) {
+    return <div className="flex items-center justify-center h-64 text-red-600">Error: {statsError.message}</div>;
   }
 
   return (

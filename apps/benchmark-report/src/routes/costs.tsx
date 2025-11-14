@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useQuery } from '@tanstack/react-query'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart'
 import { Pie, PieChart, Cell, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
@@ -8,152 +8,31 @@ export const Route = createFileRoute('/costs')({
   component: CostsPage,
 })
 
-interface CostStats {
-  totalCost: number;
-  avgCost: number;
-  totalRuns: number;
-}
-
-interface AgentCostEfficiency {
-  agent: string;
-  model: string;
-  avgCost: number;
-  avgScore: number;
-  totalRuns: number;
-  scorePerDollar: number;
-}
-
-interface CostBreakdown {
-  name: string;
-  value: number;
-}
-
-interface TokenUsage {
-  agent: string;
-  model: string;
-  avgTokensIn: number;
-  avgTokensOut: number;
-  totalTokens: number;
-}
-
 function CostsPage() {
-  const { db, isLoading, error } = useDatabase();
-  const [costStats, setCostStats] = useState<CostStats | null>(null);
-  const [costEfficiency, setCostEfficiency] = useState<AgentCostEfficiency[]>([]);
-  const [costBreakdown, setCostBreakdown] = useState<CostBreakdown[]>([]);
-  const [tokenUsage, setTokenUsage] = useState<TokenUsage[]>([]);
+  const { data: costStats, isLoading: loadingCostStats } = useQuery({
+    queryKey: ['cost-stats'],
+    queryFn: () => apiClient.getCostStats(),
+  })
 
-  useEffect(() => {
-    if (!db) return;
+  const { data: costEfficiency, isLoading: loadingEfficiency } = useQuery({
+    queryKey: ['cost-efficiency'],
+    queryFn: () => apiClient.getCostEfficiency(),
+  })
 
-    try {
-      // Query overall cost statistics
-      const costStatsResult = db.exec(`
-        SELECT
-          SUM(rt.cost_usd) as total_cost,
-          AVG(rt.cost_usd) as avg_cost,
-          COUNT(*) as total_runs
-        FROM run_telemetry rt
-        WHERE rt.cost_usd IS NOT NULL
-      `);
+  const { data: costBreakdown, isLoading: loadingBreakdown } = useQuery({
+    queryKey: ['cost-breakdown'],
+    queryFn: () => apiClient.getCostBreakdown(),
+  })
 
-      if (costStatsResult[0]) {
-        const row = costStatsResult[0].values[0];
-        setCostStats({
-          totalCost: row[0] as number || 0,
-          avgCost: row[1] as number || 0,
-          totalRuns: row[2] as number || 0,
-        });
-      }
+  const { data: tokenUsage, isLoading: loadingTokens } = useQuery({
+    queryKey: ['token-usage'],
+    queryFn: () => apiClient.getTokenUsage(),
+  })
 
-      // Query cost efficiency by agent/model
-      const efficiencyResult = db.exec(`
-        SELECT
-          br.agent,
-          br.model,
-          AVG(rt.cost_usd) as avg_cost,
-          AVG(br.weighted_score) as avg_score,
-          COUNT(*) as total_runs,
-          CASE
-            WHEN AVG(rt.cost_usd) > 0 THEN AVG(br.weighted_score) / AVG(rt.cost_usd)
-            ELSE 0
-          END as score_per_dollar
-        FROM benchmark_runs br
-        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
-        WHERE br.weighted_score IS NOT NULL AND rt.cost_usd IS NOT NULL
-        GROUP BY br.agent, br.model
-        ORDER BY score_per_dollar DESC
-      `);
-
-      if (efficiencyResult[0]) {
-        const efficiency = efficiencyResult[0].values.map((row) => ({
-          agent: row[0] as string,
-          model: row[1] as string,
-          avgCost: row[2] as number,
-          avgScore: row[3] as number,
-          totalRuns: row[4] as number,
-          scorePerDollar: row[5] as number,
-        }));
-        setCostEfficiency(efficiency);
-      }
-
-      // Query cost breakdown by agent
-      const breakdownResult = db.exec(`
-        SELECT
-          br.agent,
-          SUM(rt.cost_usd) as total_cost
-        FROM benchmark_runs br
-        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
-        WHERE rt.cost_usd IS NOT NULL
-        GROUP BY br.agent
-        ORDER BY total_cost DESC
-      `);
-
-      if (breakdownResult[0]) {
-        const breakdown = breakdownResult[0].values.map((row) => ({
-          name: row[0] as string,
-          value: row[1] as number,
-        }));
-        setCostBreakdown(breakdown);
-      }
-
-      // Query token usage
-      const tokenResult = db.exec(`
-        SELECT
-          br.agent,
-          br.model,
-          AVG(rt.tokens_in) as avg_tokens_in,
-          AVG(rt.tokens_out) as avg_tokens_out,
-          AVG(rt.tokens_in + rt.tokens_out) as total_tokens
-        FROM benchmark_runs br
-        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
-        WHERE rt.tokens_in IS NOT NULL
-        GROUP BY br.agent, br.model
-        ORDER BY total_tokens DESC
-        LIMIT 10
-      `);
-
-      if (tokenResult[0]) {
-        const tokens = tokenResult[0].values.map((row) => ({
-          agent: row[0] as string,
-          model: row[1] as string,
-          avgTokensIn: row[2] as number || 0,
-          avgTokensOut: row[3] as number || 0,
-          totalTokens: row[4] as number || 0,
-        }));
-        setTokenUsage(tokens);
-      }
-    } catch (err) {
-      console.error('Failed to fetch cost stats:', err);
-    }
-  }, [db]);
+  const isLoading = loadingCostStats || loadingEfficiency || loadingBreakdown || loadingTokens
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading database...</div>;
-  }
-
-  if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64">Loading cost data...</div>
   }
 
   return (
@@ -191,7 +70,7 @@ function CostsPage() {
         <p className="text-sm text-muted-foreground mb-4">
           Total cost distribution across different agents
         </p>
-        {costBreakdown.length > 0 ? (
+        {costBreakdown && costBreakdown.length > 0 ? (
           <ChartContainer
             config={{
               value: {
@@ -230,7 +109,7 @@ function CostsPage() {
         <p className="text-sm text-muted-foreground mb-4">
           Average input and output tokens per run (top 10)
         </p>
-        {tokenUsage.length > 0 ? (
+        {tokenUsage && tokenUsage.length > 0 ? (
           <ChartContainer
             config={{
               avgTokensIn: {
@@ -268,7 +147,7 @@ function CostsPage() {
           Agent/model combinations ranked by score per dollar (higher is better)
         </p>
         <div className="space-y-3">
-          {costEfficiency.map((item, idx) => (
+          {costEfficiency?.map((item, idx) => (
             <div key={idx} className="flex items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
                 {idx + 1}

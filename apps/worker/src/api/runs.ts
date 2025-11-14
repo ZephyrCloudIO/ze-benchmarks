@@ -3,6 +3,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import type { Env } from '../types';
 import { jsonResponse } from '../utils/response';
 import * as schema from '../db/schema';
+import { convertBenchmarkRunFields, convertEvaluationFields, convertTelemetryFields } from '../utils/field-converters';
 
 export async function listRuns(request: Request, env: Env): Promise<Response> {
   try {
@@ -29,7 +30,10 @@ export async function listRuns(request: Request, env: Env): Promise<Response> {
       .orderBy(desc(schema.benchmarkRuns.startedAt))
       .limit(limit);
 
-    return jsonResponse(runs);
+    // Convert field names from snake_case to camelCase
+    const convertedRuns = runs.map(convertBenchmarkRunFields);
+
+    return jsonResponse(convertedRuns);
   } catch (err: any) {
     console.error('Failed to list runs:', err);
     return jsonResponse({ error: 'Failed to list runs', details: err.message }, 500);
@@ -69,9 +73,9 @@ export async function getRunDetails(request: Request, env: Env): Promise<Respons
       .get();
 
     return jsonResponse({
-      run,
-      evaluations,
-      telemetry
+      run: convertBenchmarkRunFields(run),
+      evaluations: evaluations.map(convertEvaluationFields),
+      telemetry: convertTelemetryFields(telemetry)
     });
   } catch (err: any) {
     console.error('Failed to get run details:', err);
@@ -92,7 +96,10 @@ export async function getRunEvaluations(request: Request, env: Env): Promise<Res
       .where(eq(schema.evaluationResults.runId, runId))
       .orderBy(schema.evaluationResults.createdAt);
 
-    return jsonResponse(evaluations);
+    // Convert field names from snake_case to camelCase
+    const convertedEvaluations = evaluations.map(convertEvaluationFields);
+
+    return jsonResponse(convertedEvaluations);
   } catch (err: any) {
     console.error('Failed to get evaluations:', err);
     return jsonResponse({ error: 'Failed to get evaluations', details: err.message }, 500);
@@ -112,7 +119,8 @@ export async function getRunTelemetry(request: Request, env: Env): Promise<Respo
       .where(eq(schema.runTelemetry.runId, runId))
       .get();
 
-    return jsonResponse(telemetry || null);
+    // Convert field names from snake_case to camelCase
+    return jsonResponse(convertTelemetryFields(telemetry));
   } catch (err: any) {
     console.error('Failed to get telemetry:', err);
     return jsonResponse({ error: 'Failed to get telemetry', details: err.message }, 500);

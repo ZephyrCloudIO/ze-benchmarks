@@ -3,6 +3,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import type { Env } from '../types';
 import { jsonResponse } from '../utils/response';
 import * as schema from '../db/schema';
+import { convertBenchmarkRunFields } from '../utils/field-converters';
 
 export async function listBatches(request: Request, env: Env): Promise<Response> {
   try {
@@ -17,6 +18,7 @@ export async function listBatches(request: Request, env: Env): Promise<Response>
       .orderBy(desc(schema.batchRuns.createdAt))
       .limit(limit);
 
+    // Batch fields are already in camelCase, no conversion needed
     return jsonResponse(batches);
   } catch (err: any) {
     console.error('Failed to list batches:', err);
@@ -51,7 +53,10 @@ export async function getBatchDetails(request: Request, env: Env): Promise<Respo
       .where(eq(schema.benchmarkRuns.batchId, batchId))
       .orderBy(schema.benchmarkRuns.startedAt);
 
-    return jsonResponse({ ...batch, runs });
+    // Convert run fields from snake_case to camelCase
+    const convertedRuns = runs.map(convertBenchmarkRunFields);
+
+    return jsonResponse({ ...batch, runs: convertedRuns });
   } catch (err: any) {
     console.error('Failed to get batch details:', err);
     return jsonResponse({ error: 'Failed to get batch details', details: err.message }, 500);

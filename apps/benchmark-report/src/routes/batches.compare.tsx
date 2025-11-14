@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useQuery } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -18,100 +19,42 @@ export const Route = createFileRoute('/batches/compare')({
   },
 })
 
-interface BatchComparison {
-  batchId: string
-  createdAt: number
-  completedAt: number | null
-  totalRuns: number
-  successfulRuns: number
-  avgScore: number
-  avgWeightedScore: number
-  duration: number | null
-}
-
 function BatchComparePage() {
   const { ids } = Route.useSearch()
   const navigate = useNavigate()
-  const { db, isLoading, error } = useDatabase()
-  
-  const [batches, setBatches] = useState<BatchComparison[]>([])
-  const [availableBatches, setAvailableBatches] = useState<{id: string, label: string}[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>(ids || [])
 
   // Fetch available batches for selection
-  useEffect(() => {
-    if (!db) return
-
-    try {
-      const result = db.exec(`
-        SELECT batchId, createdAt, totalRuns, avgWeightedScore
-        FROM batch_runs
-        WHERE completedAt IS NOT NULL
-        ORDER BY createdAt DESC
-        LIMIT 20
-      `)
-
-      if (result[0]) {
-        const options = result[0].values.map((row) => ({
-          id: row[0] as string,
-          label: `${(row[0] as string).substring(0, 8)}... - ${row[2]} runs - ${row[3] ? (row[3] as number).toFixed(2) : 'N/A'}/10`,
+  const { data: availableBatches } = useQuery({
+    queryKey: ['batches-for-comparison', 20],
+    queryFn: async () => {
+      const batches = await apiClient.listBatches(20)
+      return batches
+        .filter(b => b.completedAt !== null && b.completedAt !== undefined)
+        .map(b => ({
+          id: b.batchId,
+          label: `${b.batchId.substring(0, 8)}... - ${b.totalRuns} runs - ${b.avgWeightedScore ? b.avgWeightedScore.toFixed(2) : 'N/A'}/10`,
         }))
-        setAvailableBatches(options)
-      }
-    } catch (err) {
-      console.error('Failed to fetch available batches:', err)
-    }
-  }, [db])
+    },
+  })
 
-  // Fetch comparison data
-  useEffect(() => {
-    if (!db || selectedIds.length < 2) {
-      setBatches([])
-      return
-    }
+  // Fetch selected batches
+  const { data: batchesData, isLoading, error } = useQuery({
+    queryKey: ['batch-comparison', selectedIds],
+    queryFn: async () => {
+      if (selectedIds.length < 2) return []
 
-    try {
-      // sql.js uses string interpolation for queries
-      const safeQuery = `
-        SELECT
-          batchId,
-          createdAt,
-          completedAt,
-          totalRuns,
-          successfulRuns,
-          avgScore,
-          avgWeightedScore
-        FROM batch_runs
-        WHERE batchId IN (${selectedIds.map(id => `'${id}'`).join(',')})
-        ORDER BY avgWeightedScore DESC
-      `
+      const batchPromises = selectedIds.map(id => apiClient.getBatchDetails(id))
+      return await Promise.all(batchPromises)
+    },
+    enabled: selectedIds.length >= 2,
+  })
 
-      const result = db.exec(safeQuery)
-
-      if (result[0]) {
-        const batchData = result[0].values.map((row) => {
-          const createdAt = row[1] as number
-          const completedAt = row[2] as number | null
-          return {
-            batchId: row[0] as string,
-            createdAt,
-            completedAt,
-            totalRuns: row[3] as number,
-            successfulRuns: row[4] as number,
-            avgScore: row[5] as number,
-            avgWeightedScore: row[6] as number,
-            duration: completedAt ? completedAt - createdAt : null,
-          }
-        })
-        setBatches(batchData)
-      } else {
-        setBatches([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch batch comparison:', err)
-      setBatches([])
-    }
-  }, [db, selectedIds])
+  // Sort batches by avgWeightedScore
+  const batches = useMemo(() => {
+    if (!batchesData) return []
+    return [...batchesData].sort((a, b) => (b.avgWeightedScore || 0) - (a.avgWeightedScore || 0))
+  }, [batchesData])
 
   const handleAddBatch = (batchId: string) => {
     if (selectedIds.length >= 5) {
@@ -143,7 +86,7 @@ function BatchComparePage() {
   }
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>
+    return <div className="flex items-center justify-center h-64">Loading batch comparison...</div>
   }
 
   if (error) {
@@ -165,7 +108,7 @@ function BatchComparePage() {
       {/* Batch Selection */}
       <Card className="p-6">
         <h2 className="text-xl font-bold mb-4">Select Batches to Compare (2-5)</h2>
-        
+
         {/* Selected Batches */}
         {selectedIds.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
@@ -196,7 +139,7 @@ function BatchComparePage() {
           >
             <option value="">Select a batch to add...</option>
             {availableBatches
-              .filter(b => !selectedIds.includes(b.id))
+              ?.filter(b => !selectedIds.includes(b.id))
               .map((batch) => (
                 <option key={batch.id} value={batch.id}>
                   {batch.label}
@@ -239,12 +182,12 @@ function BatchComparePage() {
                       </td>
                     ))}
                   </tr>
-                  
+
                   <tr className="border-b hover:bg-accent">
                     <td className="p-2 font-medium">Success Rate</td>
                     {batches.map((batch, idx) => {
-                      const rate = batch.totalRuns > 0 
-                        ? (batch.successfulRuns / batch.totalRuns) * 100 
+                      const rate = batch.totalRuns > 0
+                        ? (batch.successfulRuns / batch.totalRuns) * 100
                         : 0
                       return (
                         <td key={batch.batchId} className="text-center p-2">
@@ -256,30 +199,35 @@ function BatchComparePage() {
                       )
                     })}
                   </tr>
-                  
+
                   <tr className="border-b hover:bg-accent">
                     <td className="p-2 font-medium">Average Score</td>
                     {batches.map((batch, idx) => (
                       <td key={batch.batchId} className="text-center p-2">
                         <div className="flex items-center justify-center gap-2">
                           <span className="font-bold">
-                            {batch.avgWeightedScore.toFixed(2)}
+                            {(batch.avgWeightedScore || 0).toFixed(2)}
                           </span>
-                          {idx > 0 && getDeltaIndicator(batch.avgWeightedScore, batches[0].avgWeightedScore)}
+                          {idx > 0 && getDeltaIndicator(batch.avgWeightedScore || 0, batches[0].avgWeightedScore || 0)}
                         </div>
                       </td>
                     ))}
                   </tr>
-                  
+
                   <tr className="border-b hover:bg-accent">
                     <td className="p-2 font-medium">Duration</td>
-                    {batches.map((batch) => (
-                      <td key={batch.batchId} className="text-center p-2">
-                        {batch.duration ? `${(batch.duration / 1000).toFixed(0)}s` : 'N/A'}
-                      </td>
-                    ))}
+                    {batches.map((batch) => {
+                      const duration = batch.completedAt && batch.createdAt
+                        ? (batch.completedAt - batch.createdAt) / 1000
+                        : null
+                      return (
+                        <td key={batch.batchId} className="text-center p-2">
+                          {duration ? `${duration.toFixed(0)}s` : 'N/A'}
+                        </td>
+                      )
+                    })}
                   </tr>
-                  
+
                   <tr className="border-b hover:bg-accent">
                     <td className="p-2 font-medium">Created</td>
                     {batches.map((batch) => (
@@ -311,21 +259,21 @@ function BatchComparePage() {
                     name: 'Average Score',
                     ...batches.reduce((acc, batch, idx) => ({
                       ...acc,
-                      [`batch${idx}`]: safeScore(batch.avgWeightedScore),
+                      [`batch${idx}`]: safeScore(batch.avgWeightedScore || 0),
                     }), {}),
                   }]}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
+                  <XAxis
+                    dataKey="name"
                     label={{ value: 'Metric', position: 'insideBottom', offset: -5 }}
                   />
-                  <YAxis 
-                    domain={[0, 1]} 
+                  <YAxis
+                    domain={[0, 1]}
                     tickFormatter={scoreTickFormatter}
                     label={{ value: 'Score (0-10)', angle: -90, position: 'insideLeft' }}
                   />
-                  <ChartTooltip 
+                  <ChartTooltip
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       return (
@@ -371,7 +319,7 @@ function BatchComparePage() {
                 </div>
                 <div className="text-right">
                   <p className="text-3xl font-bold text-green-600">
-                    {bestBatch.avgWeightedScore.toFixed(2)}/10
+                    {(bestBatch.avgWeightedScore || 0).toFixed(2)}/10
                   </p>
                   <Button asChild size="sm" variant="outline" className="mt-2">
                     <Link to="/batches/$batchId" params={{ batchId: bestBatch.batchId }}>

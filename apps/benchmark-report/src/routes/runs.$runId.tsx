@@ -1,137 +1,38 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/runs/$runId')({
   component: RunDetailsPage,
 })
 
-interface RunDetails {
-  runId: string;
-  batchId: string | null;
-  suite: string;
-  scenario: string;
-  tier: string;
-  agent: string;
-  model: string;
-  status: string;
-  startedAt: string;
-  completedAt: string | null;
-  totalScore: number | null;
-  weightedScore: number | null;
-}
-
-interface Telemetry {
-  toolCalls: number | null;
-  tokensIn: number | null;
-  tokensOut: number | null;
-  costUsd: number | null;
-  durationMs: number | null;
-  workspaceDir: string | null;
-}
-
-interface EvaluationResult {
-  evaluatorName: string;
-  score: number;
-  maxScore: number;
-  details: string | null;
-}
-
 function RunDetailsPage() {
   const { runId } = Route.useParams();
-  const { db, isLoading, error } = useDatabase();
-  const [runDetails, setRunDetails] = useState<RunDetails | null>(null);
-  const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
-  const [evaluations, setEvaluations] = useState<EvaluationResult[]>([]);
 
-  useEffect(() => {
-    if (!db) return;
-
-    try {
-      // Query run details
-      const runResult = db.exec(`
-        SELECT
-          run_id, batchId, suite, scenario, tier, agent, model, status,
-          started_at, completed_at, total_score, weighted_score
-        FROM benchmark_runs
-        WHERE run_id = ?
-      `, [runId]);
-
-      if (runResult[0] && runResult[0].values.length > 0) {
-        const row = runResult[0].values[0];
-        setRunDetails({
-          runId: row[0] as string,
-          batchId: row[1] as string | null,
-          suite: row[2] as string,
-          scenario: row[3] as string,
-          tier: row[4] as string,
-          agent: row[5] as string,
-          model: row[6] as string,
-          status: row[7] as string,
-          startedAt: row[8] as string,
-          completedAt: row[9] as string | null,
-          totalScore: row[10] as number | null,
-          weightedScore: row[11] as number | null,
-        });
-      }
-
-      // Query telemetry
-      const telemetryResult = db.exec(`
-        SELECT
-          tool_calls, tokens_in, tokens_out, cost_usd, duration_ms, workspace_dir
-        FROM run_telemetry
-        WHERE run_id = ?
-      `, [runId]);
-
-      if (telemetryResult[0] && telemetryResult[0].values.length > 0) {
-        const row = telemetryResult[0].values[0];
-        setTelemetry({
-          toolCalls: row[0] as number | null,
-          tokensIn: row[1] as number | null,
-          tokensOut: row[2] as number | null,
-          costUsd: row[3] as number | null,
-          durationMs: row[4] as number | null,
-          workspaceDir: row[5] as string | null,
-        });
-      }
-
-      // Query evaluation results
-      const evaluationResult = db.exec(`
-        SELECT evaluator_name, score, max_score, details
-        FROM evaluation_results
-        WHERE run_id = ?
-        ORDER BY evaluator_name
-      `, [runId]);
-
-      if (evaluationResult[0]) {
-        const evaluationData = evaluationResult[0].values.map((row:any) => ({
-          evaluatorName: row[0] as string,
-          score: row[1] as number,
-          maxScore: row[2] as number,
-          details: row[3] as string | null,
-        }));
-        setEvaluations(evaluationData);
-      }
-    } catch (err) {
-      console.error('Failed to fetch run details:', err);
-    }
-  }, [db, runId]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['runDetails', runId],
+    queryFn: () => apiClient.getRunDetails(runId),
+  });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading database...</div>;
+    return <div className="flex items-center justify-center h-64">Loading run details...</div>;
   }
 
   if (error) {
     return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
   }
 
-  if (!runDetails) {
+  if (!data?.run) {
     return <div className="flex items-center justify-center h-64 text-muted-foreground">Run not found</div>;
   }
+
+  const runDetails = data.run;
+  const telemetry = data.telemetry;
+  const evaluations = data.evaluations;
 
   const getScoreColor = (score: number, maxScore: number) => {
     const percentage = (score / maxScore) * 100;

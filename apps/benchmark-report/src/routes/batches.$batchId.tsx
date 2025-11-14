@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -10,6 +10,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts'
 import { Copy, Download, RefreshCw } from 'lucide-react'
 import { scoreTickFormatter, formatTooltipScore, safeScore } from '@/lib/chart-utils'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/batches/$batchId')({
   component: BatchDetailsPage,
@@ -82,232 +83,269 @@ interface FailedRun {
 
 function BatchDetailsPage() {
   const { batchId } = Route.useParams()
-  const { db, isLoading, error, refreshDatabase, isRefreshing } = useDatabase()
-  
-  const [batchDetails, setBatchDetails] = useState<BatchDetails | null>(null)
-  const [suiteBreakdown, setSuiteBreakdown] = useState<SuiteBreakdown[]>([])
-  const [agentPerformance, setAgentPerformance] = useState<AgentPerformance[]>([])
-  const [tierDistribution, setTierDistribution] = useState<TierDistribution[]>([])
-  const [evaluatorBreakdown, setEvaluatorBreakdown] = useState<EvaluatorBreakdown[]>([])
-  const [runs, setRuns] = useState<Run[]>([])
-  const [failedRuns, setFailedRuns] = useState<FailedRun[]>([])
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (!db) return
+  // Fetch batch details with runs
+  const { data: batchData, isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: ['batch', batchId],
+    queryFn: () => apiClient.getBatchDetails(batchId),
+  })
 
-    try {
-      // Fetch batch details
-      const batchResult = db.exec(`
-        SELECT
-          batchId,
-          createdAt,
-          completedAt,
-          totalRuns,
-          successfulRuns,
-          avgScore,
-          avgWeightedScore
-        FROM batch_runs
-        WHERE batchId = '${batchId}'
-      `)
+  // Compute batch details with duration
+  const batchDetails = useMemo<BatchDetails | null>(() => {
+    if (!batchData) return null
 
-      if (batchResult[0] && batchResult[0].values[0]) {
-        const row = batchResult[0].values[0]
-        const createdAt = row[1] as number
-        const completedAt = row[2] as number | null
-        setBatchDetails({
-          batchId: row[0] as string,
-          createdAt,
-          completedAt,
-          totalRuns: row[3] as number,
-          successfulRuns: row[4] as number,
-          avgScore: row[5] as number,
-          avgWeightedScore: row[6] as number,
-          duration: completedAt ? completedAt - createdAt : Date.now() - createdAt,
+    const createdAt = batchData.createdAt
+    const completedAt = batchData.completedAt || null
+    const duration = completedAt ? completedAt - createdAt : Date.now() - createdAt
+
+    return {
+      batchId: batchData.batchId,
+      createdAt,
+      completedAt,
+      totalRuns: batchData.totalRuns,
+      successfulRuns: batchData.successfulRuns,
+      avgScore: batchData.avgScore || 0,
+      avgWeightedScore: batchData.avgWeightedScore || 0,
+      duration,
+    }
+  }, [batchData])
+
+  // Compute suite breakdown from batch runs
+  const suiteBreakdown = useMemo<SuiteBreakdown[]>(() => {
+    if (!batchData?.runs) return []
+
+    const grouped = new Map<string, {
+      suite: string
+      scenario: string
+      runs: number
+      successfulRuns: number
+      scores: number[]
+      weightedScores: number[]
+    }>()
+
+    for (const run of batchData.runs) {
+      const key = `${run.suite}::${run.scenario}`
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          suite: run.suite,
+          scenario: run.scenario,
+          runs: 0,
+          successfulRuns: 0,
+          scores: [],
+          weightedScores: [],
         })
       }
 
-      // Fetch suite breakdown
-      const suiteResult = db.exec(`
-        SELECT
-          suite,
-          scenario,
-          COUNT(*) as runs,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-          AVG(CASE WHEN status = 'completed' THEN total_score END) as avgScore,
-          AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
-        FROM benchmark_runs
-        WHERE batchId = '${batchId}'
-        GROUP BY suite, scenario
-        ORDER BY suite, scenario
-      `)
+      const group = grouped.get(key)!
+      group.runs++
 
-      if (suiteResult[0]) {
-        setSuiteBreakdown(
-          suiteResult[0].values.map((row) => ({
-            suite: row[0] as string,
-            scenario: row[1] as string,
-            runs: row[2] as number,
-            successfulRuns: row[3] as number,
-            avgScore: row[4] as number,
-            avgWeightedScore: row[5] as number,
-          }))
-        )
+      if (run.status === 'completed') {
+        group.successfulRuns++
+        if (run.totalScore !== null && run.totalScore !== undefined) {
+          group.scores.push(run.totalScore)
+        }
+        if (run.weightedScore !== null && run.weightedScore !== undefined) {
+          group.weightedScores.push(run.weightedScore)
+        }
       }
-
-      // Fetch agent performance
-      const agentResult = db.exec(`
-        SELECT
-          agent,
-          model,
-          COUNT(*) as runs,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-          AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore,
-          MIN(CASE WHEN status = 'completed' THEN weighted_score END) as minScore,
-          MAX(CASE WHEN status = 'completed' THEN weighted_score END) as maxScore
-        FROM benchmark_runs
-        WHERE batchId = '${batchId}'
-        GROUP BY agent, model
-        ORDER BY avgWeightedScore DESC
-      `)
-
-      if (agentResult[0]) {
-        setAgentPerformance(
-          agentResult[0].values.map((row) => ({
-            agent: row[0] as string,
-            model: row[1] as string | null,
-            runs: row[2] as number,
-            successfulRuns: row[3] as number,
-            avgWeightedScore: row[4] as number,
-            minScore: row[5] as number,
-            maxScore: row[6] as number,
-          }))
-        )
-      }
-
-      // Fetch tier distribution
-      const tierResult = db.exec(`
-        SELECT
-          tier,
-          COUNT(*) as runs,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as successfulRuns,
-          AVG(CASE WHEN status = 'completed' THEN weighted_score END) as avgWeightedScore
-        FROM benchmark_runs
-        WHERE batchId = '${batchId}'
-        GROUP BY tier
-        ORDER BY tier
-      `)
-
-      if (tierResult[0]) {
-        setTierDistribution(
-          tierResult[0].values.map((row) => ({
-            tier: row[0] as string,
-            runs: row[1] as number,
-            successfulRuns: row[2] as number,
-            avgWeightedScore: row[3] as number,
-          }))
-        )
-      }
-
-      // Fetch evaluator breakdown
-      const evaluatorResult = db.exec(`
-        SELECT
-          er.evaluator_name as evaluatorName,
-          AVG(er.score) as avgScore,
-          MAX(er.max_score) as maxScore,
-          COUNT(*) as count
-        FROM evaluation_results er
-        JOIN benchmark_runs br ON er.run_id = br.run_id
-        WHERE br.batchId = '${batchId}' AND br.status = 'completed'
-        GROUP BY er.evaluator_name
-        ORDER BY avgScore DESC
-      `)
-
-      if (evaluatorResult[0]) {
-        setEvaluatorBreakdown(
-          evaluatorResult[0].values.map((row) => ({
-            evaluatorName: row[0] as string,
-            avgScore: row[1] as number,
-            maxScore: row[2] as number,
-            count: row[3] as number,
-          }))
-        )
-      }
-
-      // Fetch all runs
-      const runsResult = db.exec(`
-        SELECT
-          run_id,
-          suite,
-          scenario,
-          tier,
-          agent,
-          model,
-          status,
-          weighted_score
-        FROM benchmark_runs
-        WHERE batchId = '${batchId}'
-        ORDER BY started_at
-      `)
-
-      if (runsResult[0]) {
-        setRuns(
-          runsResult[0].values.map((row) => ({
-            runId: row[0] as string,
-            suite: row[1] as string,
-            scenario: row[2] as string,
-            tier: row[3] as string,
-            agent: row[4] as string,
-            model: row[5] as string,
-            status: row[6] as string,
-            weightedScore: row[7] as number | null,
-          }))
-        )
-      }
-
-      // Fetch failed runs
-      const failedResult = db.exec(`
-        SELECT
-          run_id,
-          suite,
-          scenario,
-          tier,
-          agent,
-          model,
-          metadata
-        FROM benchmark_runs
-        WHERE batchId = '${batchId}' AND status = 'failed'
-        ORDER BY started_at
-      `)
-
-      if (failedResult[0]) {
-        setFailedRuns(
-          failedResult[0].values.map((row) => {
-            let error = null
-            try {
-              const metadata = row[6] as string
-              if (metadata) {
-                const parsed = JSON.parse(metadata)
-                error = parsed.error
-              }
-            } catch {}
-            
-            return {
-              runId: row[0] as string,
-              suite: row[1] as string,
-              scenario: row[2] as string,
-              tier: row[3] as string,
-              agent: row[4] as string,
-              model: row[5] as string,
-              error,
-            }
-          })
-        )
-      }
-    } catch (err) {
-      console.error('Failed to fetch batch details:', err)
     }
-  }, [db, batchId])
+
+    return Array.from(grouped.values()).map(g => ({
+      suite: g.suite,
+      scenario: g.scenario,
+      runs: g.runs,
+      successfulRuns: g.successfulRuns,
+      avgScore: g.scores.length > 0 ? g.scores.reduce((a, b) => a + b, 0) / g.scores.length : 0,
+      avgWeightedScore: g.weightedScores.length > 0 ? g.weightedScores.reduce((a, b) => a + b, 0) / g.weightedScores.length : 0,
+    })).sort((a, b) => {
+      const suiteCompare = a.suite.localeCompare(b.suite)
+      if (suiteCompare !== 0) return suiteCompare
+      return a.scenario.localeCompare(b.scenario)
+    })
+  }, [batchData?.runs])
+
+  // Compute agent performance from batch runs
+  const agentPerformance = useMemo<AgentPerformance[]>(() => {
+    if (!batchData?.runs) return []
+
+    const grouped = new Map<string, {
+      agent: string
+      model: string | null
+      runs: number
+      successfulRuns: number
+      weightedScores: number[]
+    }>()
+
+    for (const run of batchData.runs) {
+      const key = `${run.agent}::${run.model || 'default'}`
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          agent: run.agent,
+          model: run.model || null,
+          runs: 0,
+          successfulRuns: 0,
+          weightedScores: [],
+        })
+      }
+
+      const group = grouped.get(key)!
+      group.runs++
+
+      if (run.status === 'completed') {
+        group.successfulRuns++
+        if (run.weightedScore !== null && run.weightedScore !== undefined) {
+          group.weightedScores.push(run.weightedScore)
+        }
+      }
+    }
+
+    return Array.from(grouped.values()).map(g => ({
+      agent: g.agent,
+      model: g.model,
+      runs: g.runs,
+      successfulRuns: g.successfulRuns,
+      avgWeightedScore: g.weightedScores.length > 0 ? g.weightedScores.reduce((a, b) => a + b, 0) / g.weightedScores.length : 0,
+      minScore: g.weightedScores.length > 0 ? Math.min(...g.weightedScores) : 0,
+      maxScore: g.weightedScores.length > 0 ? Math.max(...g.weightedScores) : 0,
+    })).sort((a, b) => b.avgWeightedScore - a.avgWeightedScore)
+  }, [batchData?.runs])
+
+  // Compute tier distribution from batch runs
+  const tierDistribution = useMemo<TierDistribution[]>(() => {
+    if (!batchData?.runs) return []
+
+    const grouped = new Map<string, {
+      tier: string
+      runs: number
+      successfulRuns: number
+      weightedScores: number[]
+    }>()
+
+    for (const run of batchData.runs) {
+      if (!grouped.has(run.tier)) {
+        grouped.set(run.tier, {
+          tier: run.tier,
+          runs: 0,
+          successfulRuns: 0,
+          weightedScores: [],
+        })
+      }
+
+      const group = grouped.get(run.tier)!
+      group.runs++
+
+      if (run.status === 'completed') {
+        group.successfulRuns++
+        if (run.weightedScore !== null && run.weightedScore !== undefined) {
+          group.weightedScores.push(run.weightedScore)
+        }
+      }
+    }
+
+    return Array.from(grouped.values()).map(g => ({
+      tier: g.tier,
+      runs: g.runs,
+      successfulRuns: g.successfulRuns,
+      avgWeightedScore: g.weightedScores.length > 0 ? g.weightedScores.reduce((a, b) => a + b, 0) / g.weightedScores.length : 0,
+    })).sort((a, b) => a.tier.localeCompare(b.tier))
+  }, [batchData?.runs])
+
+  // Compute all runs list from batch runs
+  const runs = useMemo<Run[]>(() => {
+    if (!batchData?.runs) return []
+
+    return batchData.runs.map(run => ({
+      runId: run.runId,
+      suite: run.suite,
+      scenario: run.scenario,
+      tier: run.tier,
+      agent: run.agent,
+      model: run.model || 'default',
+      status: run.status,
+      weightedScore: run.weightedScore,
+    }))
+  }, [batchData?.runs])
+
+  // Compute failed runs from batch runs
+  const failedRuns = useMemo<FailedRun[]>(() => {
+    if (!batchData?.runs) return []
+
+    return batchData.runs
+      .filter(run => run.status === 'failed')
+      .map(run => {
+        let error = null
+        try {
+          if (run.metadata) {
+            const parsed = JSON.parse(run.metadata)
+            error = parsed.error
+          }
+        } catch {}
+
+        return {
+          runId: run.runId,
+          suite: run.suite,
+          scenario: run.scenario,
+          tier: run.tier,
+          agent: run.agent,
+          model: run.model || 'default',
+          error,
+        }
+      })
+  }, [batchData?.runs])
+
+  // Fetch evaluations for completed runs separately
+  const completedRunIds = useMemo(() => {
+    if (!batchData?.runs) return []
+    return batchData.runs
+      .filter(run => run.status === 'completed')
+      .map(run => run.runId)
+  }, [batchData?.runs])
+
+  const { data: evaluationsData } = useQuery({
+    queryKey: ['batch-evaluations', batchId, completedRunIds],
+    queryFn: async () => {
+      if (completedRunIds.length === 0) return []
+
+      // Fetch evaluations for all completed runs
+      const evaluationPromises = completedRunIds.map(runId =>
+        apiClient.getRunEvaluations(runId).catch(() => [])
+      )
+      const allEvaluations = (await Promise.all(evaluationPromises)).flat()
+      return allEvaluations
+    },
+    enabled: completedRunIds.length > 0,
+  })
+
+  // Compute evaluator breakdown from evaluations
+  const evaluatorBreakdown = useMemo<EvaluatorBreakdown[]>(() => {
+    if (!evaluationsData || evaluationsData.length === 0) return []
+
+    const grouped = new Map<string, {
+      scores: number[]
+      maxScores: number[]
+    }>()
+
+    for (const evaluation of evaluationsData) {
+      if (!grouped.has(evaluation.evaluatorName)) {
+        grouped.set(evaluation.evaluatorName, {
+          scores: [],
+          maxScores: [],
+        })
+      }
+
+      const group = grouped.get(evaluation.evaluatorName)!
+      group.scores.push(evaluation.score)
+      group.maxScores.push(evaluation.maxScore)
+    }
+
+    return Array.from(grouped.entries()).map(([evaluatorName, data]) => ({
+      evaluatorName,
+      avgScore: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+      maxScore: Math.max(...data.maxScores),
+      count: data.scores.length,
+    })).sort((a, b) => b.avgScore - a.avgScore)
+  }, [evaluationsData])
 
   const copyBatchId = () => {
     navigator.clipboard.writeText(batchId)
@@ -331,6 +369,12 @@ function BatchDetailsPage() {
     a.href = url
     a.download = `batch-${batchId.substring(0, 8)}.json`
     a.click()
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score >= 9) return 'text-green-600'
+    if (score >= 7) return 'text-yellow-600'
+    return 'text-red-600'
   }
 
   if (isLoading || !batchDetails) {
@@ -358,12 +402,6 @@ function BatchDetailsPage() {
     ? (batchDetails.successfulRuns / batchDetails.totalRuns) * 100
     : 0
 
-  const getScoreColor = (score: number) => {
-    if (score >= 9) return 'text-green-600'
-    if (score >= 7) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
   const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
 
   return (
@@ -377,14 +415,14 @@ function BatchDetailsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={refreshDatabase} 
-            disabled={isRefreshing}
-            variant="outline" 
+          <Button
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            variant="outline"
             size="sm"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+            {isRefetching ? 'Refreshing...' : 'Refresh Data'}
           </Button>
           <Button variant="outline" size="sm" onClick={copyBatchId}>
             <Copy className="h-4 w-4 mr-2" />
@@ -406,12 +444,12 @@ function BatchDetailsPage() {
               {batchDetails.completedAt ? 'Completed' : 'Running'}
             </Badge>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground mb-1">Total Runs</p>
             <p className="text-2xl font-bold">{batchDetails.totalRuns}</p>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground mb-1">Success Rate</p>
             <div className="flex items-center gap-2">
@@ -419,26 +457,26 @@ function BatchDetailsPage() {
               <p className="text-lg font-semibold">{successRate.toFixed(1)}%</p>
             </div>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground mb-1">Average Score</p>
             <p className={`text-2xl font-bold ${getScoreColor(batchDetails.avgWeightedScore)}`}>
               {batchDetails.avgWeightedScore.toFixed(2)}/10
             </p>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground mb-1">Duration</p>
             <p className="text-lg font-semibold">
               {(batchDetails.duration / 1000).toFixed(2)}s
             </p>
           </div>
-          
+
           <div>
             <p className="text-sm text-muted-foreground mb-1">Created</p>
             <p className="text-sm">{new Date(batchDetails.createdAt).toLocaleString()}</p>
           </div>
-          
+
           {batchDetails.completedAt && (
             <div>
               <p className="text-sm text-muted-foreground mb-1">Completed</p>
@@ -456,7 +494,7 @@ function BatchDetailsPage() {
             {suiteBreakdown.map((suite) => {
               const rate = suite.runs > 0 ? (suite.successfulRuns / suite.runs) * 100 : 0
               const scoreColor = getScoreColor(suite.avgWeightedScore)
-              
+
               return (
                 <div
                   key={`${suite.suite}-${suite.scenario}`}
@@ -486,7 +524,7 @@ function BatchDetailsPage() {
       {/* Agent Performance */}
       <Card className="p-6">
         <h2 className="text-2xl font-bold mb-4">Agent Performance</h2>
-        
+
         {agentPerformance.length > 0 ? (
           <>
             {/* Bar Chart */}
@@ -505,16 +543,16 @@ function BatchDetailsPage() {
                 score: safeScore(a.avgWeightedScore),
               }))}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   label={{ value: 'Agent', position: 'insideBottom', offset: -5 }}
                 />
-                <YAxis 
-                  domain={[0, 1]} 
+                <YAxis
+                  domain={[0, 1]}
                   tickFormatter={scoreTickFormatter}
                   label={{ value: 'Score (0-10)', angle: -90, position: 'insideLeft' }}
                 />
-                <ChartTooltip 
+                <ChartTooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     return (
@@ -539,7 +577,7 @@ function BatchDetailsPage() {
             {agentPerformance.map((agent, index) => {
               const rankDisplay = index < 3 ? `#${index + 1}` : `${index + 1}.`
               const scoreColor = getScoreColor(agent.avgWeightedScore)
-              
+
               return (
                 <div key={`${agent.agent}-${agent.model}`} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
@@ -577,7 +615,7 @@ function BatchDetailsPage() {
         {tierDistribution.length > 0 && (
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">Tier Distribution</h2>
-            
+
             {/* Pie Chart */}
             <div className="h-40 mb-4">
               <ChartContainer
@@ -633,7 +671,7 @@ function BatchDetailsPage() {
               {evaluatorBreakdown.map((evaluator) => {
                 const percentage = (evaluator.avgScore / evaluator.maxScore) * 100
                 const color = percentage >= 90 ? 'text-green-600' : percentage >= 70 ? 'text-yellow-600' : 'text-red-600'
-                
+
                 return (
                   <div key={evaluator.evaluatorName} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -744,8 +782,8 @@ function BatchDetailsPage() {
                   </td>
                   <td className="p-2">
                     <Badge variant={
-                      run.status === 'completed' ? 'default' : 
-                      run.status === 'failed' ? 'destructive' : 
+                      run.status === 'completed' ? 'default' :
+                      run.status === 'failed' ? 'destructive' :
                       'secondary'
                     }>
                       {run.status}

@@ -3,9 +3,10 @@ import { pluginReact } from '@rsbuild/plugin-react';
 import { tanstackRouter } from '@tanstack/router-plugin/rspack';
 import { pluginNodePolyfill } from "@rsbuild/plugin-node-polyfill";
 import { resolve } from 'path';
+import { withZephyr } from "zephyr-rsbuild-plugin"
 
 export default defineConfig({
-  plugins: [pluginNodePolyfill(), pluginReact()],
+  plugins: [pluginNodePolyfill(), pluginReact(), withZephyr()],
   resolve: {
     alias: {
       '@': './src',

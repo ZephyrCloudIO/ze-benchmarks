@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { useQuery } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -12,95 +13,52 @@ export const Route = createFileRoute('/batches/')({
   component: BatchesPage,
 })
 
-interface Batch {
-  batchId: string
-  createdAt: number
-  completedAt: number | null
-  totalRuns: number
-  successfulRuns: number
-  avgScore: number | null
-  avgWeightedScore: number | null
-  metadata: string | null
-}
-
 type FilterStatus = 'all' | 'completed' | 'running'
 type SortBy = 'newest' | 'oldest' | 'highest' | 'lowest'
 
 function BatchesPage() {
-  const { db, isLoading, error, refreshDatabase, isRefreshing } = useDatabase()
-  const [batches, setBatches] = useState<Batch[]>([])
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 50
 
-  useEffect(() => {
-    if (!db) return
+  const { data: batchesData, isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: ['batches', 100],
+    queryFn: () => apiClient.listBatches(100),
+  })
 
-    try {
-      let query = `
-        SELECT
-          batchId,
-          createdAt,
-          completedAt,
-          totalRuns,
-          successfulRuns,
-          avgScore,
-          avgWeightedScore,
-          metadata
-        FROM batch_runs
-      `
+  // Filter and sort batches
+  const batches = useMemo(() => {
+    if (!batchesData) return []
 
-      const whereClauses: string[] = []
-      
-      if (filter === 'completed') {
-        whereClauses.push("completedAt IS NOT NULL")
-      } else if (filter === 'running') {
-        whereClauses.push("completedAt IS NULL")
-      }
+    let filtered = [...batchesData]
 
-      if (searchTerm) {
-        whereClauses.push(`batchId LIKE '%${searchTerm}%'`)
-      }
-
-      if (whereClauses.length > 0) {
-        query += ' WHERE ' + whereClauses.join(' AND ')
-      }
-
-      // Add sorting
-      if (sortBy === 'newest') {
-        query += ' ORDER BY createdAt DESC'
-      } else if (sortBy === 'oldest') {
-        query += ' ORDER BY createdAt ASC'
-      } else if (sortBy === 'highest') {
-        query += ' ORDER BY avgWeightedScore DESC'
-      } else if (sortBy === 'lowest') {
-        query += ' ORDER BY avgWeightedScore ASC'
-      }
-
-      const result = db.exec(query)
-
-      if (result[0]) {
-        const batchesData = result[0].values.map((row) => ({
-          batchId: row[0] as string,
-          createdAt: row[1] as number,
-          completedAt: row[2] as number | null,
-          totalRuns: row[3] as number,
-          successfulRuns: row[4] as number,
-          avgScore: row[5] as number | null,
-          avgWeightedScore: row[6] as number | null,
-          metadata: row[7] as string | null,
-        }))
-        setBatches(batchesData)
-      } else {
-        setBatches([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch batches:', err)
-      setBatches([])
+    // Apply status filter
+    if (filter === 'completed') {
+      filtered = filtered.filter(b => b.completedAt !== null && b.completedAt !== undefined)
+    } else if (filter === 'running') {
+      filtered = filtered.filter(b => b.completedAt === null || b.completedAt === undefined)
     }
-  }, [db, filter, sortBy, searchTerm])
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(b => b.batchId.toLowerCase().includes(searchTerm.toLowerCase()))
+    }
+
+    // Apply sorting
+    if (sortBy === 'newest') {
+      filtered.sort((a, b) => b.createdAt - a.createdAt)
+    } else if (sortBy === 'oldest') {
+      filtered.sort((a, b) => a.createdAt - b.createdAt)
+    } else if (sortBy === 'highest') {
+      filtered.sort((a, b) => (b.avgWeightedScore || 0) - (a.avgWeightedScore || 0))
+    } else if (sortBy === 'lowest') {
+      filtered.sort((a, b) => (a.avgWeightedScore || 0) - (b.avgWeightedScore || 0))
+    }
+
+    return filtered
+  }, [batchesData, filter, sortBy, searchTerm])
 
   if (isLoading) {
     return (
@@ -131,14 +89,14 @@ function BatchesPage() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedBatches = batches.slice(startIndex, startIndex + itemsPerPage)
 
-  const getScoreColor = (score: number | null) => {
+  const getScoreColor = (score: number | null | undefined) => {
     if (!score) return 'text-gray-500'
     if (score >= 9) return 'text-green-600'
     if (score >= 7) return 'text-yellow-600'
     return 'text-red-600'
   }
 
-  const formatDuration = (createdAt: number, completedAt: number | null) => {
+  const formatDuration = (createdAt: number, completedAt: number | null | undefined) => {
     if (!completedAt) return 'Running...'
     const duration = (completedAt - createdAt) / 1000
     if (duration < 60) return `${duration.toFixed(0)}s`
@@ -156,14 +114,14 @@ function BatchesPage() {
             View and manage benchmark batch runs
           </p>
         </div>
-        <Button 
-          onClick={refreshDatabase} 
-          disabled={isRefreshing}
+        <Button
+          onClick={() => refetch()}
+          disabled={isRefetching}
           variant="outline"
           size="sm"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+          {isRefetching ? 'Refreshing...' : 'Refresh Data'}
         </Button>
       </div>
 
@@ -241,8 +199,8 @@ function BatchesPage() {
       ) : (
         <div className="space-y-4">
           {paginatedBatches.map((batch) => {
-            const successRate = batch.totalRuns > 0 
-              ? (batch.successfulRuns / batch.totalRuns) * 100 
+            const successRate = batch.totalRuns > 0
+              ? (batch.successfulRuns / batch.totalRuns) * 100
               : 0
             const duration = formatDuration(batch.createdAt, batch.completedAt)
             const scoreColor = getScoreColor(batch.avgWeightedScore)
@@ -264,11 +222,11 @@ function BatchesPage() {
                         {batch.completedAt ? 'Completed' : 'Running'}
                       </Badge>
                     </div>
-                    
+
                     <p className="text-sm text-muted-foreground">
                       Created {new Date(batch.createdAt).toLocaleString()}
                     </p>
-                    
+
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">
                         {batch.successfulRuns}/{batch.totalRuns} runs
@@ -291,7 +249,7 @@ function BatchesPage() {
                         {batch.avgWeightedScore?.toFixed(2) || 'N/A'}
                       </p>
                     </div>
-                    
+
                     <div className="text-center">
                       <p className="text-sm text-muted-foreground mb-1">Duration</p>
                       <p className="text-lg font-semibold">{duration}</p>

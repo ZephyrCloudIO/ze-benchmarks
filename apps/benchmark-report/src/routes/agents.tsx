@@ -1,92 +1,40 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useDatabase } from '@/DatabaseProvider'
-import { useEffect, useState } from 'react'
-
+import { apiClient } from '@/lib/api-client'
+import { useQuery } from '@tanstack/react-query'
 
 export const Route = createFileRoute('/agents')({
   component: AgentsPage,
 })
 
-interface AgentStats {
-  agent: string;
-  model: string;
-  avgScore: number;
-  successRate: number;
-  avgCost: number;
-  avgDuration: number;
-  totalRuns: number;
-}
-
-interface AgentModelHeatmap {
-  agent: string;
-  models: { [key: string]: number };
-}
-
 function AgentsPage() {
-  const { db, isLoading, error } = useDatabase();
-  const [agentStats, setAgentStats] = useState<AgentStats[]>([]);
-  const [heatmapData, setHeatmapData] = useState<AgentModelHeatmap[]>([]);
-
-  useEffect(() => {
-    if (!db) return;
-
-    try {
-      // Query agent/model performance statistics
-      const result = db.exec(`
-        SELECT
-          br.agent,
-          br.model,
-          AVG(br.weighted_score) as avg_score,
-          CAST(SUM(CASE WHEN br.status = 'completed' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as success_rate,
-          AVG(rt.cost_usd) as avg_cost,
-          AVG(rt.duration_ms) as avg_duration,
-          COUNT(*) as total_runs
-        FROM benchmark_runs br
-        LEFT JOIN run_telemetry rt ON br.run_id = rt.run_id
-        WHERE br.weighted_score IS NOT NULL
-        GROUP BY br.agent, br.model
-        ORDER BY avg_score DESC
-      `);
-
-      if (result[0]) {
-        const stats = result[0].values.map((row) => ({
-          agent: row[0] as string,
-          model: row[1] as string,
-          avgScore: row[2] as number,
-          successRate: row[3] as number,
-          avgCost: row[4] as number || 0,
-          avgDuration: row[5] as number || 0,
-          totalRuns: row[6] as number,
-        }));
-        setAgentStats(stats);
-
-        // Process data for heatmap
-        const agentModelMap: { [agent: string]: { [model: string]: number } } = {};
-        stats.forEach(stat => {
-          if (!agentModelMap[stat.agent]) {
-            agentModelMap[stat.agent] = {};
-          }
-          agentModelMap[stat.agent][stat.model || 'unknown'] = stat.avgScore;
-        });
-
-        const heatmap = Object.keys(agentModelMap).map(agent => ({
-          agent,
-          models: agentModelMap[agent],
-        }));
-        setHeatmapData(heatmap);
-      }
-    } catch (err) {
-      console.error('Failed to fetch agent stats:', err);
-    }
-  }, [db]);
+  const { data: agentStats, isLoading, error } = useQuery({
+    queryKey: ['agent-performance-stats'],
+    queryFn: () => apiClient.getAgentPerformanceStats(),
+  })
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-64">Loading database...</div>;
+    return <div className="flex items-center justify-center h-64">Loading agent performance data...</div>
   }
 
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>;
+    return <div className="flex items-center justify-center h-64 text-red-600">Error: {error.message}</div>
   }
+
+  // Process data for heatmap
+  const agentModelMap: { [agent: string]: { [model: string]: number } } = {}
+  if (agentStats) {
+    for (const stat of agentStats) {
+      if (!agentModelMap[stat.agent]) {
+        agentModelMap[stat.agent] = {}
+      }
+      agentModelMap[stat.agent][stat.model || 'unknown'] = stat.avgScore
+    }
+  }
+
+  const heatmapData = Object.keys(agentModelMap).map(agent => ({
+    agent,
+    models: agentModelMap[agent],
+  }))
 
   return (
     <div className="space-y-8">
@@ -99,7 +47,7 @@ function AgentsPage() {
 
       {/* Agent Comparison Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {agentStats.map((stat, idx) => (
+        {agentStats?.map((stat, idx) => (
           <div key={idx} className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="mb-4">
               <h3 className="text-lg font-semibold">
@@ -166,10 +114,10 @@ function AgentsPage() {
       <div className="rounded-lg border bg-card p-6">
         <h2 className="text-2xl font-semibold mb-4">Model Performance Rankings</h2>
         <div className="space-y-3">
-          {agentStats.map((stat, idx) => (
+          {agentStats?.map((stat, idx) => (
             <div key={idx} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
-                {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
+                {idx + 1}
               </div>
               <div className="flex-1">
                 <div className="font-medium">

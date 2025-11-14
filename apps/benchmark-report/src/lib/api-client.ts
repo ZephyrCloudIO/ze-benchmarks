@@ -284,6 +284,451 @@ export class ApiClient {
 
     return distribution.reverse(); // Return in ascending order
   }
+
+  // Agent performance stats with detailed metrics
+  async getAgentPerformanceStats(): Promise<Array<{
+    agent: string;
+    model: string;
+    avgScore: number;
+    successRate: number;
+    avgCost: number;
+    avgDuration: number;
+    totalRuns: number;
+  }>> {
+    const runs = await this.listRuns({ limit: 10000, status: 'completed' });
+
+    // Group by agent + model
+    const grouped = new Map<string, {
+      agent: string;
+      model: string;
+      scores: number[];
+      successCount: number;
+      totalCount: number;
+      runIds: string[];
+    }>();
+
+    for (const run of runs) {
+      const key = `${run.agent}::${run.model || 'no-model'}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          agent: run.agent,
+          model: run.model || '',
+          scores: [],
+          successCount: 0,
+          totalCount: 0,
+          runIds: [],
+        });
+      }
+
+      const group = grouped.get(key)!;
+      group.totalCount++;
+      group.runIds.push(run.runId);
+
+      if (run.isSuccessful) {
+        group.successCount++;
+      }
+
+      if (run.weightedScore !== null && run.weightedScore !== undefined) {
+        group.scores.push(run.weightedScore);
+      }
+    }
+
+    // Fetch telemetry for cost and duration data (sample for performance)
+    const sampleSize = 50;
+    const telemetryPromises: Promise<{ runId: string; telemetry: RunTelemetry | null }>[] = [];
+
+    for (const group of grouped.values()) {
+      const sampleIds = group.runIds.slice(0, Math.min(sampleSize, group.runIds.length));
+      for (const runId of sampleIds) {
+        telemetryPromises.push(
+          this.getRunTelemetry(runId).then(t => ({ runId, telemetry: t }))
+        );
+      }
+    }
+
+    const telemetries = await Promise.all(telemetryPromises);
+    const telemetryMap = new Map(telemetries.map(t => [t.runId, t.telemetry]));
+
+    // Calculate stats
+    const stats = Array.from(grouped.entries()).map(([key, group]) => {
+      const avgScore = group.scores.length > 0
+        ? group.scores.reduce((a, b) => a + b, 0) / group.scores.length
+        : 0;
+
+      const successRate = (group.successCount / group.totalCount) * 100;
+
+      // Calculate cost and duration from sampled telemetry
+      const groupTelemetries = group.runIds
+        .map(id => telemetryMap.get(id))
+        .filter((t): t is RunTelemetry => t !== null && t !== undefined);
+
+      const avgCost = groupTelemetries.length > 0
+        ? groupTelemetries.reduce((sum, t) => sum + (t.costUsd || 0), 0) / groupTelemetries.length
+        : 0;
+
+      const avgDuration = groupTelemetries.length > 0
+        ? groupTelemetries.reduce((sum, t) => sum + (t.durationMs || 0), 0) / groupTelemetries.length
+        : 0;
+
+      return {
+        agent: group.agent,
+        model: group.model,
+        avgScore,
+        successRate,
+        avgCost,
+        avgDuration,
+        totalRuns: group.totalCount,
+      };
+    });
+
+    return stats.sort((a, b) => b.avgScore - a.avgScore);
+  }
+
+  // Suite and scenario statistics
+  async getSuiteStats(): Promise<Array<{
+    suite: string;
+    totalRuns: number;
+    successRate: number;
+    avgScore: number;
+    uniqueScenarios: number;
+  }>> {
+    const runs = await this.listRuns({ limit: 10000 });
+
+    const grouped = new Map<string, {
+      suite: string;
+      totalCount: number;
+      successCount: number;
+      scores: number[];
+      scenarios: Set<string>;
+    }>();
+
+    for (const run of runs) {
+      if (!grouped.has(run.suite)) {
+        grouped.set(run.suite, {
+          suite: run.suite,
+          totalCount: 0,
+          successCount: 0,
+          scores: [],
+          scenarios: new Set(),
+        });
+      }
+
+      const group = grouped.get(run.suite)!;
+      group.totalCount++;
+      group.scenarios.add(run.scenario);
+
+      if (run.status === 'completed') {
+        group.successCount++;
+      }
+
+      if (run.weightedScore !== null && run.weightedScore !== undefined) {
+        group.scores.push(run.weightedScore);
+      }
+    }
+
+    return Array.from(grouped.values())
+      .map(g => ({
+        suite: g.suite,
+        totalRuns: g.totalCount,
+        successRate: (g.successCount / g.totalCount) * 100,
+        avgScore: g.scores.length > 0 ? g.scores.reduce((a, b) => a + b, 0) / g.scores.length : 0,
+        uniqueScenarios: g.scenarios.size,
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore);
+  }
+
+  async getScenarioStats(): Promise<Array<{
+    suite: string;
+    scenario: string;
+    tier: string;
+    totalRuns: number;
+    successRate: number;
+    avgScore: number;
+    minScore: number;
+    maxScore: number;
+  }>> {
+    const runs = await this.listRuns({ limit: 10000 });
+
+    const grouped = new Map<string, {
+      suite: string;
+      scenario: string;
+      tier: string;
+      totalCount: number;
+      successCount: number;
+      scores: number[];
+    }>();
+
+    for (const run of runs) {
+      const key = `${run.suite}::${run.scenario}::${run.tier}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          suite: run.suite,
+          scenario: run.scenario,
+          tier: run.tier,
+          totalCount: 0,
+          successCount: 0,
+          scores: [],
+        });
+      }
+
+      const group = grouped.get(key)!;
+      group.totalCount++;
+
+      if (run.status === 'completed') {
+        group.successCount++;
+      }
+
+      if (run.weightedScore !== null && run.weightedScore !== undefined) {
+        group.scores.push(run.weightedScore);
+      }
+    }
+
+    return Array.from(grouped.values())
+      .map(g => ({
+        suite: g.suite,
+        scenario: g.scenario,
+        tier: g.tier,
+        totalRuns: g.totalCount,
+        successRate: (g.successCount / g.totalCount) * 100,
+        avgScore: g.scores.length > 0 ? g.scores.reduce((a, b) => a + b, 0) / g.scores.length : 0,
+        minScore: g.scores.length > 0 ? Math.min(...g.scores) : 0,
+        maxScore: g.scores.length > 0 ? Math.max(...g.scores) : 0,
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 50);
+  }
+
+  // Evaluator statistics
+  async getEvaluatorStats(): Promise<Array<{
+    evaluatorName: string;
+    avgScore: number;
+    passRate: number;
+    totalEvaluations: number;
+    avgMaxScore: number;
+    minScore: number;
+    maxScore: number;
+  }>> {
+    // Get a sample of runs to fetch evaluations from
+    const runs = await this.listRuns({ limit: 1000, status: 'completed' });
+
+    // Fetch evaluations for all runs
+    const evaluationPromises = runs.map(run =>
+      this.getRunEvaluations(run.runId).catch(() => [])
+    );
+    const allEvaluations = (await Promise.all(evaluationPromises)).flat();
+
+    // Group by evaluator name
+    const grouped = new Map<string, {
+      scores: number[];
+      maxScores: number[];
+      passCount: number;
+    }>();
+
+    for (const evaluation of allEvaluations) {
+      if (!grouped.has(evaluation.evaluatorName)) {
+        grouped.set(evaluation.evaluatorName, {
+          scores: [],
+          maxScores: [],
+          passCount: 0,
+        });
+      }
+
+      const group = grouped.get(evaluation.evaluatorName)!;
+      group.scores.push(evaluation.score);
+      group.maxScores.push(evaluation.maxScore);
+
+      if (evaluation.score >= evaluation.maxScore) {
+        group.passCount++;
+      }
+    }
+
+    return Array.from(grouped.entries())
+      .map(([evaluatorName, data]) => ({
+        evaluatorName,
+        avgScore: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+        passRate: (data.passCount / data.scores.length) * 100,
+        totalEvaluations: data.scores.length,
+        avgMaxScore: data.maxScores.reduce((a, b) => a + b, 0) / data.maxScores.length,
+        minScore: Math.min(...data.scores),
+        maxScore: Math.max(...data.scores),
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore);
+  }
+
+  // Cost analysis
+  async getCostStats(): Promise<{
+    totalCost: number;
+    avgCost: number;
+    totalRuns: number;
+  }> {
+    const runs = await this.listRuns({ limit: 1000, status: 'completed' });
+
+    const telemetryPromises = runs.map(run => this.getRunTelemetry(run.runId));
+    const telemetries = await Promise.all(telemetryPromises);
+
+    const validTelemetries = telemetries.filter(
+      (t): t is RunTelemetry => t !== null && t.costUsd !== null && t.costUsd !== undefined
+    );
+
+    const totalCost = validTelemetries.reduce((sum, t) => sum + (t.costUsd || 0), 0);
+    const avgCost = validTelemetries.length > 0 ? totalCost / validTelemetries.length : 0;
+
+    return {
+      totalCost,
+      avgCost,
+      totalRuns: validTelemetries.length,
+    };
+  }
+
+  async getCostEfficiency(): Promise<Array<{
+    agent: string;
+    model: string;
+    avgCost: number;
+    avgScore: number;
+    totalRuns: number;
+    scorePerDollar: number;
+  }>> {
+    const runs = await this.listRuns({ limit: 2000, status: 'completed' });
+
+    // Group by agent + model
+    const grouped = new Map<string, {
+      agent: string;
+      model: string;
+      scores: number[];
+      runIds: string[];
+    }>();
+
+    for (const run of runs) {
+      if (run.weightedScore === null || run.weightedScore === undefined) continue;
+
+      const key = `${run.agent}::${run.model || 'no-model'}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          agent: run.agent,
+          model: run.model || '',
+          scores: [],
+          runIds: [],
+        });
+      }
+
+      const group = grouped.get(key)!;
+      group.scores.push(run.weightedScore);
+      group.runIds.push(run.runId);
+    }
+
+    // Fetch telemetry for cost data (sample for performance)
+    const telemetryPromises: Promise<{ runId: string; cost: number }>[] = [];
+    for (const group of grouped.values()) {
+      const sampleIds = group.runIds.slice(0, Math.min(50, group.runIds.length));
+      for (const runId of sampleIds) {
+        telemetryPromises.push(
+          this.getRunTelemetry(runId).then(t => ({ runId, cost: t?.costUsd || 0 }))
+        );
+      }
+    }
+
+    const costs = await Promise.all(telemetryPromises);
+    const costMap = new Map(costs.map(c => [c.runId, c.cost]));
+
+    // Calculate efficiency
+    const efficiency = Array.from(grouped.entries()).map(([key, group]) => {
+      const groupCosts = group.runIds
+        .map(id => costMap.get(id))
+        .filter((c): c is number => c !== undefined && c > 0);
+
+      const avgCost = groupCosts.length > 0
+        ? groupCosts.reduce((a, b) => a + b, 0) / groupCosts.length
+        : 0;
+
+      const avgScore = group.scores.reduce((a, b) => a + b, 0) / group.scores.length;
+      const scorePerDollar = avgCost > 0 ? avgScore / avgCost : 0;
+
+      return {
+        agent: group.agent,
+        model: group.model,
+        avgCost,
+        avgScore,
+        totalRuns: group.scores.length,
+        scorePerDollar,
+      };
+    });
+
+    return efficiency.sort((a, b) => b.scorePerDollar - a.scorePerDollar);
+  }
+
+  async getCostBreakdown(): Promise<Array<{ name: string; value: number }>> {
+    const runs = await this.listRuns({ limit: 2000, status: 'completed' });
+
+    const grouped = new Map<string, number>();
+
+    const telemetryPromises = runs.map(async run => {
+      const telemetry = await this.getRunTelemetry(run.runId);
+      return { agent: run.agent, cost: telemetry?.costUsd || 0 };
+    });
+
+    const results = await Promise.all(telemetryPromises);
+
+    for (const { agent, cost } of results) {
+      grouped.set(agent, (grouped.get(agent) || 0) + cost);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }
+
+  async getTokenUsage(): Promise<Array<{
+    agent: string;
+    model: string;
+    avgTokensIn: number;
+    avgTokensOut: number;
+    totalTokens: number;
+  }>> {
+    const runs = await this.listRuns({ limit: 1000, status: 'completed' });
+
+    const grouped = new Map<string, {
+      agent: string;
+      model: string;
+      tokensIn: number[];
+      tokensOut: number[];
+    }>();
+
+    const telemetryPromises = runs.map(async run => {
+      const telemetry = await this.getRunTelemetry(run.runId);
+      return { run, telemetry };
+    });
+
+    const results = await Promise.all(telemetryPromises);
+
+    for (const { run, telemetry } of results) {
+      if (!telemetry) continue;
+
+      const key = `${run.agent}::${run.model || 'no-model'}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          agent: run.agent,
+          model: run.model || '',
+          tokensIn: [],
+          tokensOut: [],
+        });
+      }
+
+      const group = grouped.get(key)!;
+      if (telemetry.tokensIn) group.tokensIn.push(telemetry.tokensIn);
+      if (telemetry.tokensOut) group.tokensOut.push(telemetry.tokensOut);
+    }
+
+    return Array.from(grouped.values())
+      .map(g => ({
+        agent: g.agent,
+        model: g.model,
+        avgTokensIn: g.tokensIn.length > 0 ? g.tokensIn.reduce((a, b) => a + b, 0) / g.tokensIn.length : 0,
+        avgTokensOut: g.tokensOut.length > 0 ? g.tokensOut.reduce((a, b) => a + b, 0) / g.tokensOut.length : 0,
+        totalTokens: (g.tokensIn.reduce((a, b) => a + b, 0) + g.tokensOut.reduce((a, b) => a + b, 0)) / Math.max(g.tokensIn.length, g.tokensOut.length, 1),
+      }))
+      .sort((a, b) => b.totalTokens - a.totalTokens)
+      .slice(0, 10);
+  }
 }
 
 // Export a singleton instance
