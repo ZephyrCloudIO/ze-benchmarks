@@ -19,6 +19,16 @@ import type {
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
   private client: WorkerClient;
+  private currentRun: {
+    runId: string;
+    batchId?: string;
+    suite: string;
+    scenario: string;
+    tier: string;
+    agent: string;
+    model?: string;
+    startedAt: string;
+  } | null = null;
 
   private constructor() {
     this.client = getWorkerClient();
@@ -40,22 +50,63 @@ export class BenchmarkLogger {
 
   /**
    * Start a new benchmark run
+   * Supports both old and new signatures for backwards compatibility
    */
-  async startRun(data: {
-    runId: string;
-    batchId?: string;
-    suite: string;
-    scenario: string;
-    tier: string;
-    agent: string;
-    model?: string;
-    startedAt: string;
-    metadata?: Record<string, any>;
-  }): Promise<void> {
-    // Submit initial run with 'running' status
-    // Note: Worker API doesn't support 'running' status yet, so we'll just store locally for now
-    // When run completes, we'll submit with 'completed' or 'failed'
-    console.log(`[BenchmarkLogger] Run started: ${data.runId}`);
+  startRun(
+    suiteOrData: string | {
+      runId: string;
+      batchId?: string;
+      suite: string;
+      scenario: string;
+      tier: string;
+      agent: string;
+      model?: string;
+      startedAt: string;
+      metadata?: Record<string, any>;
+    },
+    scenario?: string,
+    tier?: string,
+    agent?: string,
+    model?: string,
+    batchId?: string
+  ): string {
+    let runId: string;
+    let runData: {
+      runId: string;
+      batchId?: string;
+      suite: string;
+      scenario: string;
+      tier: string;
+      agent: string;
+      model?: string;
+      startedAt: string;
+    };
+
+    // Check if using old signature: startRun(suite, scenario, tier, agent, model, batchId)
+    if (typeof suiteOrData === 'string') {
+      // Old signature - generate runId and create run data
+      runId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      runData = {
+        runId,
+        batchId,
+        suite: suiteOrData,
+        scenario: scenario!,
+        tier: tier!,
+        agent: agent!,
+        model,
+        startedAt: new Date().toISOString(),
+      };
+    } else {
+      // New signature - use provided data object
+      runId = suiteOrData.runId;
+      runData = suiteOrData;
+    }
+
+    // Store run context for backwards-compatible methods
+    this.currentRun = runData;
+    console.log(`[BenchmarkLogger] Run started: ${runId}`);
+
+    return runId;
   }
 
   /**
@@ -72,48 +123,87 @@ export class BenchmarkLogger {
 
   /**
    * Complete a benchmark run with results
+   * Supports both old and new signatures for backwards compatibility
    */
-  async completeRun(data: {
-    runId: string;
-    batchId?: string;
-    suite: string;
-    scenario: string;
-    tier: string;
-    agent: string;
-    model?: string;
-    status: 'completed' | 'failed';
-    startedAt: string;
-    completedAt: string;
-    totalScore?: number;
-    weightedScore?: number;
-    isSuccessful?: boolean;
-    successMetric?: number;
-    metadata?: Record<string, any>;
-    evaluations?: EvaluationResult[];
-    telemetry?: RunTelemetry;
-  }): Promise<void> {
-    const payload: SubmitRunPayload = {
-      runId: data.runId,
-      batchId: data.batchId,
-      suite: data.suite,
-      scenario: data.scenario,
-      tier: data.tier,
-      agent: data.agent,
-      model: data.model,
-      status: data.status,
-      startedAt: data.startedAt,
-      completedAt: data.completedAt,
-      totalScore: data.totalScore,
-      weightedScore: data.weightedScore,
-      isSuccessful: data.isSuccessful,
-      successMetric: data.successMetric,
-      metadata: data.metadata,
-      evaluations: data.evaluations,
-      telemetry: data.telemetry,
-    };
+  async completeRun(
+    dataOrScore: {
+      runId: string;
+      batchId?: string;
+      suite: string;
+      scenario: string;
+      tier: string;
+      agent: string;
+      model?: string;
+      status: 'completed' | 'failed';
+      startedAt: string;
+      completedAt: string;
+      totalScore?: number;
+      weightedScore?: number;
+      isSuccessful?: boolean;
+      successMetric?: number;
+      metadata?: Record<string, any>;
+      evaluations?: EvaluationResult[];
+      telemetry?: RunTelemetry;
+    } | number,
+    weightedScore?: number,
+    metadata?: Record<string, any>,
+    isSuccessful?: boolean,
+    successMetric?: number
+  ): Promise<void> {
+    let payload: SubmitRunPayload;
+
+    // Check if using old signature: completeRun(score, weightedScore, metadata, isSuccessful, successMetric)
+    if (typeof dataOrScore === 'number') {
+      // Old signature - use stored run context
+      if (!this.currentRun) {
+        throw new Error('[BenchmarkLogger] No active run. Call startRun() first.');
+      }
+
+      payload = {
+        runId: this.currentRun.runId,
+        batchId: this.currentRun.batchId,
+        suite: this.currentRun.suite,
+        scenario: this.currentRun.scenario,
+        tier: this.currentRun.tier,
+        agent: this.currentRun.agent,
+        model: this.currentRun.model,
+        status: 'completed',
+        startedAt: this.currentRun.startedAt,
+        completedAt: new Date().toISOString(),
+        totalScore: dataOrScore,
+        weightedScore: weightedScore,
+        isSuccessful: isSuccessful,
+        successMetric: successMetric,
+        metadata: metadata,
+      };
+    } else {
+      // New signature - use provided data object
+      payload = {
+        runId: dataOrScore.runId,
+        batchId: dataOrScore.batchId,
+        suite: dataOrScore.suite,
+        scenario: dataOrScore.scenario,
+        tier: dataOrScore.tier,
+        agent: dataOrScore.agent,
+        model: dataOrScore.model,
+        status: dataOrScore.status,
+        startedAt: dataOrScore.startedAt,
+        completedAt: dataOrScore.completedAt,
+        totalScore: dataOrScore.totalScore,
+        weightedScore: dataOrScore.weightedScore,
+        isSuccessful: dataOrScore.isSuccessful,
+        successMetric: dataOrScore.successMetric,
+        metadata: dataOrScore.metadata,
+        evaluations: dataOrScore.evaluations,
+        telemetry: dataOrScore.telemetry,
+      };
+    }
 
     await this.client.submitRun(payload);
-    console.log(`[BenchmarkLogger] Run completed: ${data.runId}`);
+    console.log(`[BenchmarkLogger] Run completed: ${payload.runId}`);
+
+    // Clear current run
+    this.currentRun = null;
   }
 
   /**

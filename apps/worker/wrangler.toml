@@ -1,19 +1,34 @@
 # Zephyr Benchmarks Worker Configuration
-# Supports multiple environments: development (local), staging, production
+# Supports multiple environments: local, dev, staging, production
 
 name = "ze-benchmarks-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
-# Default configuration (development/local)
+# Default configuration (local development)
 [[ d1_databases ]]
 binding = "DB"
-database_name = "ze-benchmarks"
+database_name = "ze-benchmarks-local"
 database_id = "local-db-id" # Local development database
 migrations_dir = "drizzle"
 
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "local"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173"
+
+# Local Environment (explicit)
+# Domain: localhost:8787
+[env.local]
+name = "ze-benchmarks-api-local"
+
+[env.local.d1_databases]
+binding = "DB"
+database_name = "ze-benchmarks-local"
+database_id = "local-db-id"
+migrations_dir = "drizzle"
+
+[env.local.vars]
+ENVIRONMENT = "local"
 ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173"
 
 # Production Environment

@@ -8,12 +8,24 @@ The ze-benchmarks worker now supports deployment to multiple environments with c
 
 | Environment | Domain | Database | Purpose |
 |------------|---------|----------|---------|
-| **Local** | `localhost:8787` | Local D1 | Development & Testing |
+| **Local** | `localhost:8787` | `ze-benchmarks-local` (Local D1) | Development & Testing |
 | **Dev** | `bench-api-dev.zephyr-cloud.io` | `ze-benchmarks-dev` | Remote Development |
 | **Staging** | `bench-api-stg.zephyr-cloud.io` | `ze-benchmarks-staging` | Pre-production Testing |
 | **Production** | `bench-api.zephyr-cloud.io` | `ze-benchmarks-prod` | Production |
 
 ## Quick Start
+
+### Local Development
+
+```bash
+cd apps/worker
+
+# Start local worker with empty database
+pnpm dev
+
+# (Optional) Populate local database from production
+pnpm db:sync-from-prod
+```
 
 ### Deploy to an Environment
 
@@ -60,7 +72,11 @@ cd apps/worker
 
 ```bash
 # Local development
-pnpm dev                  # Start local worker
+pnpm dev                  # Start local worker (default)
+pnpm dev:local            # Start local worker (explicit)
+
+# Database sync (optional)
+pnpm db:sync-from-prod    # Populate local DB from production data
 
 # Deployment
 pnpm deploy:dev          # Deploy to dev environment
@@ -68,9 +84,10 @@ pnpm deploy:staging      # Deploy to staging environment
 pnpm deploy:production   # Deploy to production environment
 
 # Database migrations
-pnpm db:push:dev         # Apply migrations to dev
-pnpm db:push:staging     # Apply migrations to staging
-pnpm db:push:production  # Apply migrations to production
+pnpm db:migrate:local       # Apply migrations to local
+pnpm db:migrate:dev         # Apply migrations to dev
+pnpm db:migrate:staging     # Apply migrations to staging
+pnpm db:migrate:production  # Apply migrations to production
 ```
 
 ## Initial Setup Required
@@ -101,9 +118,9 @@ Before first deployment to each environment:
 
 5. **Apply Database Migrations**:
    ```bash
-   pnpm db:push:dev
-   pnpm db:push:staging
-   pnpm db:push:production
+   pnpm db:migrate:dev
+   pnpm db:migrate:staging
+   pnpm db:migrate:production
    ```
 
 ## Client Configuration

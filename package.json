@@ -8,11 +8,16 @@
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
     "build:worker-client": "pnpm --filter @ze/worker-client run build",
     "dev": "echo '⚠️  Start worker and dashboard separately:' && echo '  Terminal 1: pnpm dev:worker' && echo '  Terminal 2: pnpm dev:dashboard'",
-    "dev:worker": "cd apps/worker && pnpm dev",
-    "dev:dashboard": "cd apps/benchmark-report && pnpm dev",
+    "dev:worker": "pnpm --filter ze-benchmarks-worker run dev",
+    "dev:dashboard": "pnpm --filter benchmark-report run dev",
     "bench": "tsx packages/harness/src/cli.ts",
     "harness": "tsx packages/harness/src/cli.ts",
-    "cli": "tsx packages/harness/src/cli.ts"
+    "cli": "tsx packages/harness/src/cli.ts",
+    "db:migrate": "pnpm --filter ze-benchmarks-worker run db:migrate:local",
+    "db:sync": "pnpm --filter ze-benchmarks-worker run db:sync-from-prod",
+    "deploy:dev": "pnpm --filter ze-benchmarks-worker run deploy:dev",
+    "deploy:staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
+    "deploy:production": "pnpm --filter ze-benchmarks-worker run deploy:production"
   },
   "engines": {
     "node": ">=18"

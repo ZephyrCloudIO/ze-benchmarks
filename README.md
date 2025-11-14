@@ -67,9 +67,7 @@ ZE_BENCHMARKS_API_KEY=dev-local-key
 
 ### 3. Initialize D1 Database (First Time Only)
 ```bash
-cd apps/worker
-pnpm db:push:local
-cd ..
+pnpm db:migrate
 ```
 
 ### 4. Start the Worker (Required!)

@@ -33,9 +33,7 @@ cp .env.example .env
 ### 3. Initialize Database (First Time Only)
 
 ```bash
-cd apps/worker
-pnpm db:push:local
-cd ..
+pnpm db:migrate
 ```
 
 ### 4. Start Everything
@@ -144,9 +142,8 @@ curl http://localhost:8787/health
 ### "Database not initialized" Error
 
 ```bash
-cd apps/worker
-pnpm db:push:local
-pnpm dev
+pnpm db:migrate
+pnpm dev:worker
 ```
 
 ### Port Already in Use
@@ -224,7 +221,7 @@ pnpm bench update-deps nx-pnpm-monorepo --batch anthropic
 ## Important Notes
 
 ⚠️ **The worker MUST be running** for ANY benchmark operations
-⚠️ **Initialize D1 once** before first use: `cd apps/worker && pnpm db:push:local`
+⚠️ **Initialize D1 once** before first use: `pnpm db:migrate`
 ⚠️ **Worker must be started first** before running benchmarks
 ⚠️ **Dashboard connects to worker** at http://localhost:8787
 

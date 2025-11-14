@@ -20,6 +20,33 @@ We support three remote environments plus local development:
 3. **Custom Domain**: `zephyr-cloud.io` must be added to your Cloudflare account
 4. **D1 Databases**: Create three D1 databases (one for each remote environment)
 
+## Local Development (Quick Start)
+
+For local development, you can start immediately without any setup:
+
+```bash
+# Start local worker
+pnpm dev
+
+# The worker will be available at http://localhost:8787
+```
+
+### Optional: Sync Production Data Locally
+
+If you want to test with real production data:
+
+```bash
+# Sync production database to local
+pnpm db:sync-from-prod
+```
+
+This will:
+1. Export the full production database
+2. Import it into your local D1 instance
+3. Clean up temporary files
+
+**Note:** This is completely optional. The worker works fine with an empty local database.
+
 ## Initial Setup
 
 ### 1. Install Wrangler
@@ -80,13 +107,13 @@ Run migrations for each environment:
 
 ```bash
 # Development
-pnpm db:push:dev
+pnpm db:migrate:dev
 
 # Staging
-pnpm db:push:staging
+pnpm db:migrate:staging
 
 # Production
-pnpm db:push:production
+pnpm db:migrate:production
 ```
 
 ### 6. Configure Secrets
@@ -217,6 +244,10 @@ ZE_BENCHMARKS_API_KEY=your-production-api-key
 
 Each environment has specific variables configured in `wrangler.toml`:
 
+### Local
+- `ENVIRONMENT=local`
+- `ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173`
+
 ### Development
 - `ENVIRONMENT=dev`
 - `ALLOWED_ORIGINS=https://bench-dev.zephyr-cloud.io,http://localhost:3000`
@@ -247,10 +278,13 @@ This creates a new migration file in `drizzle/`.
 
 ```bash
 # Apply to specific environment
-pnpm db:push:dev
-pnpm db:push:staging
-pnpm db:push:production
+pnpm db:migrate:local       # Local development
+pnpm db:migrate:dev         # Development
+pnpm db:migrate:staging     # Staging
+pnpm db:migrate:production  # Production
 ```
+
+This command automatically applies all pending migrations from the `drizzle/` directory in the correct order.
 
 ### 3. Test Migration
 
