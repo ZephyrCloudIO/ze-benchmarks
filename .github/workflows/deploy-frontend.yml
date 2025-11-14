@@ -1,0 +1,90 @@
+name: Deploy Frontend - Benchmark Report
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/benchmark-report/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-frontend.yml'
+  release:
+    types: [prereleased, released]
+
+concurrency:
+  group: deploy-frontend-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'release' && (github.event.release.prerelease && 'staging' || 'production') || 'development' }}
+      url: ${{ github.event_name == 'release' && (github.event.release.prerelease && 'https://bench-stg.zephyr-cloud.io' || 'https://bench.zephyr-cloud.io') || 'https://bench-dev.zephyr-cloud.io' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+        env:
+          ZE_SECRET_TOKEN: ${{ secrets.ZE_SECRET_TOKEN }}
+
+      - name: Build frontend
+        run: pnpm --filter benchmark-report build
+        env:
+          ZE_SECRET_TOKEN: ${{ secrets.ZE_SECRET_TOKEN }}
+          NODE_ENV: production
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/benchmark-report/dist --project-name=ze-benchmarks-report --branch=${{ github.event_name == 'release' && (github.event.release.prerelease && 'staging' || 'production') || 'development' }}
+
+      - name: Deployment summary
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            if [ "${{ github.event.release.prerelease }}" == "true" ]; then
+              ENVIRONMENT="Staging"
+              URL="https://bench-stg.zephyr-cloud.io"
+              EMOJI="🧪"
+            else
+              ENVIRONMENT="Production"
+              URL="https://bench.zephyr-cloud.io"
+              EMOJI="🚀"
+            fi
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            ENVIRONMENT="Development"
+            URL="https://bench-dev.zephyr-cloud.io"
+            EMOJI="🔧"
+            VERSION="${{ github.sha }}"
+          fi
+
+          echo "### ${EMOJI} Frontend Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${ENVIRONMENT}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** ${URL}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
