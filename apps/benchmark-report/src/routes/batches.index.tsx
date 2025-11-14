@@ -78,7 +78,7 @@ function BatchesPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-600">
+      <div className="flex items-center justify-center h-64 text-destructive">
         Error: {error.message}
       </div>
     )

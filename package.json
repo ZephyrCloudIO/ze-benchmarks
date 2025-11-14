@@ -25,7 +25,9 @@
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
     "@types/figlet": "^1.7.0",
-    "tsx": "^4.20.6"
+    "next": "^14.2.0",
+    "tsx": "^4.20.6",
+    "vitest": "^2.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

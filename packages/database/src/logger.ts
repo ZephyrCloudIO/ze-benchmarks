@@ -86,11 +86,13 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   model?: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'incomplete';
   startedAt: string;
   completedAt?: string;
   totalScore?: number | null;
   weightedScore?: number | null;
+  packageManager?: string | null;
+  testResults?: string | null;
   metadata?: string;
 }
 
@@ -170,6 +172,7 @@ export class BenchmarkLogger {
     this.db.exec(SCHEMA);
     this.addBatchIdColumnIfNeeded();
     this.addSuccessTrackingColumnsIfNeeded();
+    this.addPackageManagerAndTestResultsColumnsIfNeeded();
   }
 
   private addBatchIdColumnIfNeeded() {
@@ -216,6 +219,28 @@ export class BenchmarkLogger {
       }
     } catch (error) {
       console.warn('Failed to add success tracking columns:', error);
+    }
+  }
+
+  private addPackageManagerAndTestResultsColumnsIfNeeded() {
+    try {
+      const columns = this.db.prepare("PRAGMA table_info(benchmark_runs)").all() as Array<{name: string}>;
+      const hasPackageManager = columns.some(col => col.name === 'package_manager');
+      const hasTestResults = columns.some(col => col.name === 'test_results');
+      
+      if (!hasPackageManager) {
+        console.log('Adding package_manager column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN package_manager TEXT');
+        console.log('✓ package_manager column added successfully');
+      }
+      
+      if (!hasTestResults) {
+        console.log('Adding test_results column to existing database...');
+        this.db.exec('ALTER TABLE benchmark_runs ADD COLUMN test_results TEXT');
+        console.log('✓ test_results column added successfully');
+      }
+    } catch (error) {
+      console.warn('Failed to add package manager and test results columns:', error);
     }
   }
 
@@ -295,15 +320,25 @@ export class BenchmarkLogger {
     return runId;
   }
 
-  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number) {
+  completeRun(totalScore?: number, weightedScore?: number, metadata?: Record<string, any>, isSuccessful?: boolean, successMetric?: number, packageManager?: string, testResults?: string) {
     if (!this.currentRunId) throw new Error('No active run');
     
     this.db.prepare(`
       UPDATE benchmark_runs 
-      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, total_score = ?, weighted_score = ?, is_successful = ?, success_metric = ?, metadata = ?
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, total_score = ?, weighted_score = ?, is_successful = ?, success_metric = ?, package_manager = ?, test_results = ?, metadata = ?
       WHERE run_id = ?
-    `).run(totalScore, weightedScore, isSuccessful ? 1 : 0, successMetric, JSON.stringify(metadata), this.currentRunId);
+    `).run(totalScore, weightedScore, isSuccessful ? 1 : 0, successMetric, packageManager, testResults, JSON.stringify(metadata), this.currentRunId);
     
+    this.updateTimestamp();
+  }
+
+  markRunIncomplete(reason?: string, stage?: string) {
+    if (!this.currentRunId) throw new Error('No active run');
+    this.db.prepare(`
+      UPDATE benchmark_runs 
+      SET status = 'incomplete', completed_at = CURRENT_TIMESTAMP, metadata = ?
+      WHERE run_id = ?
+    `).run(JSON.stringify({ reason: reason || 'Run interrupted', stage: stage || 'unknown', incomplete: true }), this.currentRunId);
     this.updateTimestamp();
   }
 
@@ -354,6 +389,8 @@ export class BenchmarkLogger {
         completed_at as completedAt,
         total_score as totalScore,
         weighted_score as weightedScore,
+        package_manager as packageManager,
+        test_results as testResults,
         metadata
       FROM benchmark_runs 
       ORDER BY started_at DESC 
@@ -373,6 +410,8 @@ export class BenchmarkLogger {
       completedAt: row.completedAt,
       totalScore: row.totalScore,
       weightedScore: row.weightedScore,
+      packageManager: row.packageManager,
+      testResults: row.testResults,
       metadata: row.metadata
     }));
   }
@@ -392,6 +431,8 @@ export class BenchmarkLogger {
         completed_at as completedAt,
         total_score as totalScore,
         weighted_score as weightedScore,
+        package_manager as packageManager,
+        test_results as testResults,
         metadata
       FROM benchmark_runs WHERE run_id = ?
     `).get(runId) as any;
@@ -409,6 +450,8 @@ export class BenchmarkLogger {
       completedAt: runRow.completedAt,
       totalScore: runRow.totalScore,
       weightedScore: runRow.weightedScore,
+      packageManager: runRow.packageManager,
+      testResults: runRow.testResults,
       metadata: runRow.metadata
     } : undefined;
     

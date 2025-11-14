@@ -26,6 +26,8 @@ export const SCHEMA = `
     weighted_score REAL,
     is_successful BOOLEAN DEFAULT 0,
     success_metric REAL,
+    package_manager TEXT,
+    test_results TEXT,
     metadata TEXT,
     FOREIGN KEY (batchId) REFERENCES batch_runs(batchId)
   );
