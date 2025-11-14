@@ -81,6 +81,12 @@ export interface RunStatistics {
   successful_runs: number;
   avg_score: number;
   avg_weighted_score: number;
+  totalRuns?: number;
+  successRate?: number;
+  averageScore?: number;
+  averageWeightedScore?: number;
+  averageDuration?: number;
+  evaluatorStats?: Record<string, any>;
 }
 
 export interface SuiteStatistics {
@@ -88,6 +94,18 @@ export interface SuiteStatistics {
   total_runs: number;
   successful_runs: number;
   avg_score: number;
+  totalRuns?: number;
+  successfulRuns?: number;
+  avgScore?: number;
+  avgWeightedScore?: number;
+  avgDuration?: number;
+  scenarioBreakdown?: Array<{
+    scenario: string;
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore?: number;
+    avgWeightedScore?: number;
+  }>;
 }
 
 export interface ScenarioStatistics {
@@ -95,13 +113,48 @@ export interface ScenarioStatistics {
   total_runs: number;
   successful_runs: number;
   avg_score: number;
+  totalRuns?: number;
+  successfulRuns?: number;
+  avgScore?: number;
+  avgWeightedScore?: number;
+  minScore?: number;
+  maxScore?: number;
+  avgDuration?: number;
+  agentComparison?: Array<{
+    agent: string;
+    runs: number;
+    avgScore: number;
+  }>;
 }
 
 export interface DetailedRunStatistics extends BenchmarkRun {
   evaluations: EvaluationResult[];
   telemetry?: RunTelemetry;
+  evaluatorStats?: Record<string, any>;
 }
 
 export interface BatchStatistics extends BatchRun {
   runs: BenchmarkRun[];
+  duration?: number;
+  suiteBreakdown?: Array<{
+    suite: string;
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore?: number;
+    avgWeightedScore?: number;
+  }>;
+  agentBreakdown?: Array<{
+    agent: string;
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore?: number;
+    avgWeightedScore?: number;
+  }>;
+  tierBreakdown?: Array<{
+    tier: string;
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore?: number;
+    avgWeightedScore?: number;
+  }>;
 }

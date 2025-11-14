@@ -277,19 +277,56 @@ export class BenchmarkLogger {
   /**
    * Get suite-specific statistics
    */
-  async getSuiteStats(): Promise<SuiteStatistics[]> {
+  async getSuiteStats(suite?: string): Promise<SuiteStatistics | SuiteStatistics[]> {
     // This would need a new API endpoint
-    // For now, return empty array
+    // For now, return empty object/array
+    if (suite) {
+      return {
+        suite,
+        total_runs: 0,
+        successful_runs: 0,
+        avg_score: 0,
+        totalRuns: 0,
+        successfulRuns: 0,
+        avgScore: 0,
+        avgWeightedScore: 0,
+        avgDuration: 0,
+        scenarioBreakdown: []
+      };
+    }
     return [];
   }
 
   /**
    * Get scenario-specific statistics
    */
-  async getScenarioStats(suite: string): Promise<ScenarioStatistics[]> {
+  async getScenarioStats(suite: string, scenario?: string): Promise<ScenarioStatistics | ScenarioStatistics[]> {
     // This would need a new API endpoint
-    // For now, return empty array
+    // For now, return empty object/array
+    if (scenario) {
+      return {
+        scenario,
+        total_runs: 0,
+        successful_runs: 0,
+        avg_score: 0,
+        totalRuns: 0,
+        successfulRuns: 0,
+        avgScore: 0,
+        avgWeightedScore: 0,
+        minScore: 0,
+        maxScore: 0,
+        avgDuration: 0,
+        agentComparison: []
+      };
+    }
     return [];
+  }
+
+  /**
+   * Get detailed run statistics
+   */
+  async getDetailedRunStats(runId: string): Promise<DetailedRunStatistics> {
+    return this.getRunDetails(runId);
   }
 
   /**
@@ -300,6 +337,134 @@ export class BenchmarkLogger {
     // Return empty array for now as this needs redesign for API-based system
     console.log('[BenchmarkLogger] getBatchComparison: Not yet implemented for worker-based system');
     return [];
+  }
+
+  /**
+   * Start a new batch
+   */
+  startBatch(): string {
+    const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[BenchmarkLogger] Batch started: ${batchId}`);
+    return batchId;
+  }
+
+  /**
+   * Complete a batch
+   */
+  async completeBatch(batchId: string, stats: {
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore?: number;
+    avgWeightedScore?: number;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    await this.upsertBatch({
+      batchId,
+      createdAt: Date.now(),
+      completedAt: Date.now(),
+      totalRuns: stats.totalRuns,
+      successfulRuns: stats.successfulRuns,
+      avgScore: stats.avgScore,
+      avgWeightedScore: stats.avgWeightedScore,
+      metadata: stats.metadata,
+    });
+    console.log(`[BenchmarkLogger] Batch completed: ${batchId}`);
+  }
+
+  /**
+   * Get successful runs count for a batch
+   */
+  async getBatchSuccessfulRunsCount(batchId: string): Promise<number> {
+    const details = await this.getBatchDetails(batchId);
+    return details.successfulRuns || 0;
+  }
+
+  /**
+   * Get batch score statistics
+   */
+  async getBatchScoreStats(batchId: string): Promise<{ avgScore?: number; avgWeightedScore?: number }> {
+    const details = await this.getBatchDetails(batchId);
+    return {
+      avgScore: details.avgScore,
+      avgWeightedScore: details.avgWeightedScore,
+    };
+  }
+
+  /**
+   * Get batch analytics
+   */
+  async getBatchAnalytics(batchId: string): Promise<any> {
+    const details = await this.getBatchDetails(batchId);
+    return {
+      suiteBreakdown: details.suiteBreakdown || [],
+      agentBreakdown: details.agentBreakdown || [],
+      tierBreakdown: details.tierBreakdown || [],
+      runs: details.runs || [],
+    };
+  }
+
+  /**
+   * Get failure breakdown
+   */
+  getFailureBreakdown(analytics: any): any[] {
+    return analytics.runs?.filter((r: any) => r.status === 'failed') || [];
+  }
+
+  /**
+   * Get run history
+   */
+  async getRunHistory(filters?: {
+    suite?: string;
+    scenario?: string;
+    agent?: string;
+    limit?: number;
+  }): Promise<BenchmarkRun[]> {
+    return this.getRuns(filters);
+  }
+
+  /**
+   * Get batch history
+   */
+  async getBatchHistory(limit?: number): Promise<BatchRun[]> {
+    return this.getBatches(limit);
+  }
+
+  /**
+   * Get all batches (alias for getBatchHistory)
+   */
+  async getAllBatches(limit?: number): Promise<BatchRun[]> {
+    return this.getBatches(limit);
+  }
+
+  /**
+   * Get model performance stats
+   */
+  async getModelPerformanceStats(runId: string): Promise<any> {
+    const details = await this.getRunDetails(runId);
+    return details.evaluatorStats || {};
+  }
+
+  /**
+   * Clear database (no-op for worker-based system)
+   */
+  async clearDatabase(): Promise<void> {
+    console.log('[BenchmarkLogger] clearDatabase: Not supported for worker-based system');
+  }
+
+  /**
+   * Log telemetry data
+   */
+  async logTelemetry(runId: string, telemetry: RunTelemetry): Promise<void> {
+    console.log(`[BenchmarkLogger] Telemetry logged for run: ${runId}`);
+    // Telemetry is sent as part of completeRun
+  }
+
+  /**
+   * Log evaluation result
+   */
+  async logEvaluation(runId: string, evaluation: EvaluationResult): Promise<void> {
+    console.log(`[BenchmarkLogger] Evaluation logged for run: ${runId}`);
+    // Evaluations are sent as part of completeRun
   }
 
   /**
