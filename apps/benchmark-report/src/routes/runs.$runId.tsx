@@ -77,7 +77,7 @@ function RunDetailsPage() {
           </div>
           <div>
             <div className="text-sm text-muted-foreground">Model</div>
-            <div className="font-semibold mt-1">{runDetails.model || 'N/A'}</div>
+            <div className="font-semibold mt-1">{runDetails.model || <span className="text-muted-foreground">None</span>}</div>
           </div>
           {runDetails.batchId && (
             <div>

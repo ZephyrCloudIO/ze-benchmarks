@@ -255,16 +255,18 @@ function BatchDetailsPage() {
   const runs = useMemo<Run[]>(() => {
     if (!batchData?.runs) return []
 
-    return batchData.runs.map(run => ({
-      runId: run.runId,
-      suite: run.suite,
-      scenario: run.scenario,
-      tier: run.tier,
-      agent: run.agent,
-      model: run.model || 'default',
-      status: run.status,
-      weightedScore: run.weightedScore,
-    }))
+    return batchData.runs
+      .filter(run => run && run.runId) // Filter out runs with undefined runId
+      .map(run => ({
+        runId: run.runId,
+        suite: run.suite,
+        scenario: run.scenario,
+        tier: run.tier,
+        agent: run.agent,
+        model: run.model || 'default',
+        status: run.status,
+        weightedScore: run.weightedScore,
+      }))
   }, [batchData?.runs])
 
   // Compute failed runs from batch runs
@@ -272,7 +274,7 @@ function BatchDetailsPage() {
     if (!batchData?.runs) return []
 
     return batchData.runs
-      .filter(run => run.status === 'failed')
+      .filter(run => run && run.runId && run.status === 'failed') // Filter out runs with undefined runId
       .map(run => {
         let error = null
         try {
@@ -298,7 +300,7 @@ function BatchDetailsPage() {
   const completedRunIds = useMemo(() => {
     if (!batchData?.runs) return []
     return batchData.runs
-      .filter(run => run.status === 'completed')
+      .filter(run => run && run.runId && run.status === 'completed') // Filter out runs with undefined runId
       .map(run => run.runId)
   }, [batchData?.runs])
 

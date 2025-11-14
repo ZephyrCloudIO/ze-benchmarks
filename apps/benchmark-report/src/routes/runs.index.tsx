@@ -101,13 +101,15 @@ function RunsPage() {
 
           <div className="space-y-2">
             {runs.length > 0 ? (
-              runs.map((run) => (
-                <Link
-                  key={run.runId}
-                  to="/runs/$runId"
-                  params={{ runId: run.runId }}
-                  className="flex items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
-                >
+              runs
+                .filter(run => run && run.runId) // Filter out runs with undefined runId
+                .map((run) => (
+                  <Link
+                    key={run.runId}
+                    to="/runs/$runId"
+                    params={{ runId: run.runId }}
+                    className="flex items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                  >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{run.scenario}</div>
                     <div className="text-sm text-muted-foreground flex gap-2 items-center flex-wrap">

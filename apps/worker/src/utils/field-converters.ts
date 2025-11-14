@@ -1,11 +1,14 @@
 // Utility functions to convert database snake_case fields to API camelCase fields
+// Note: Drizzle ORM already converts snake_case column names to camelCase property names,
+// so these functions just pass through the data (but we keep them for consistency and future-proofing)
 
 export function convertBenchmarkRunFields(dbRun: any) {
   if (!dbRun) return null;
 
+  // Drizzle already converts snake_case to camelCase, so just return as-is
   return {
     id: dbRun.id,
-    runId: dbRun.run_id,
+    runId: dbRun.runId,
     batchId: dbRun.batchId,
     suite: dbRun.suite,
     scenario: dbRun.scenario,
@@ -13,12 +16,12 @@ export function convertBenchmarkRunFields(dbRun: any) {
     agent: dbRun.agent,
     model: dbRun.model,
     status: dbRun.status,
-    startedAt: dbRun.started_at,
-    completedAt: dbRun.completed_at,
-    totalScore: dbRun.total_score,
-    weightedScore: dbRun.weighted_score,
-    isSuccessful: dbRun.is_successful,
-    successMetric: dbRun.success_metric,
+    startedAt: dbRun.startedAt,
+    completedAt: dbRun.completedAt,
+    totalScore: dbRun.totalScore,
+    weightedScore: dbRun.weightedScore,
+    isSuccessful: dbRun.isSuccessful,
+    successMetric: dbRun.successMetric,
     metadata: dbRun.metadata,
   };
 }
@@ -28,12 +31,12 @@ export function convertEvaluationFields(dbEval: any) {
 
   return {
     id: dbEval.id,
-    runId: dbEval.run_id,
-    evaluatorName: dbEval.evaluator_name,
+    runId: dbEval.runId,
+    evaluatorName: dbEval.evaluatorName,
     score: dbEval.score,
-    maxScore: dbEval.max_score,
+    maxScore: dbEval.maxScore,
     details: dbEval.details,
-    createdAt: dbEval.created_at,
+    createdAt: dbEval.createdAt,
   };
 }
 
@@ -42,13 +45,13 @@ export function convertTelemetryFields(dbTelemetry: any) {
 
   return {
     id: dbTelemetry.id,
-    runId: dbTelemetry.run_id,
-    toolCalls: dbTelemetry.tool_calls,
-    tokensIn: dbTelemetry.tokens_in,
-    tokensOut: dbTelemetry.tokens_out,
-    costUsd: dbTelemetry.cost_usd,
-    durationMs: dbTelemetry.duration_ms,
-    workspaceDir: dbTelemetry.workspace_dir,
+    runId: dbTelemetry.runId,
+    toolCalls: dbTelemetry.toolCalls,
+    tokensIn: dbTelemetry.tokensIn,
+    tokensOut: dbTelemetry.tokensOut,
+    costUsd: dbTelemetry.costUsd,
+    durationMs: dbTelemetry.durationMs,
+    workspaceDir: dbTelemetry.workspaceDir,
   };
 }
 

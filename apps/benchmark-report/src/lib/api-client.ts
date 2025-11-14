@@ -174,7 +174,12 @@ export class ApiClient {
       this.listRuns({ limit: 1000 }), // Get a large sample for accurate stats
       // We'll compute avgCost from run details
       this.listRuns({ limit: 50, status: 'completed' }).then(runs =>
-        Promise.all(runs.slice(0, 50).map(r => this.getRunTelemetry(r.runId)))
+        Promise.all(
+          runs
+            .slice(0, 50)
+            .filter(r => r && r.runId) // Filter out runs with undefined runId
+            .map(r => this.getRunTelemetry(r.runId))
+        )
       )
     ]);
 
@@ -231,9 +236,14 @@ export class ApiClient {
     }
 
     // Fetch costs for these runs
-    const costPromises = Array.from(runs.slice(0, 100).map(r =>
-      this.getRunTelemetry(r.runId).then(t => ({ runId: r.runId, cost: t?.costUsd || 0 }))
-    ));
+    const costPromises = Array.from(
+      runs
+        .slice(0, 100)
+        .filter(r => r && r.runId) // Filter out runs with undefined runId
+        .map(r =>
+          this.getRunTelemetry(r.runId).then(t => ({ runId: r.runId, cost: t?.costUsd || 0 }))
+        )
+    );
     const costs = await Promise.all(costPromises);
     const costMap = new Map(costs.map(c => [c.runId, c.cost]));
 
@@ -338,7 +348,9 @@ export class ApiClient {
     const telemetryPromises: Promise<{ runId: string; telemetry: RunTelemetry | null }>[] = [];
 
     for (const group of grouped.values()) {
-      const sampleIds = group.runIds.slice(0, Math.min(sampleSize, group.runIds.length));
+      const sampleIds = group.runIds
+        .filter(id => id !== undefined && id !== null) // Filter out undefined runIds
+        .slice(0, Math.min(sampleSize, group.runIds.length));
       for (const runId of sampleIds) {
         telemetryPromises.push(
           this.getRunTelemetry(runId).then(t => ({ runId, telemetry: t }))
@@ -512,9 +524,11 @@ export class ApiClient {
     const runs = await this.listRuns({ limit: 1000, status: 'completed' });
 
     // Fetch evaluations for all runs
-    const evaluationPromises = runs.map(run =>
-      this.getRunEvaluations(run.runId).catch(() => [])
-    );
+    const evaluationPromises = runs
+      .filter(r => r && r.runId) // Filter out runs with undefined runId
+      .map(run =>
+        this.getRunEvaluations(run.runId).catch(() => [])
+      );
     const allEvaluations = (await Promise.all(evaluationPromises)).flat();
 
     // Group by evaluator name
@@ -563,7 +577,9 @@ export class ApiClient {
   }> {
     const runs = await this.listRuns({ limit: 1000, status: 'completed' });
 
-    const telemetryPromises = runs.map(run => this.getRunTelemetry(run.runId));
+    const telemetryPromises = runs
+      .filter(r => r && r.runId) // Filter out runs with undefined runId
+      .map(run => this.getRunTelemetry(run.runId));
     const telemetries = await Promise.all(telemetryPromises);
 
     const validTelemetries = telemetries.filter(
@@ -619,7 +635,9 @@ export class ApiClient {
     // Fetch telemetry for cost data (sample for performance)
     const telemetryPromises: Promise<{ runId: string; cost: number }>[] = [];
     for (const group of grouped.values()) {
-      const sampleIds = group.runIds.slice(0, Math.min(50, group.runIds.length));
+      const sampleIds = group.runIds
+        .filter(id => id !== undefined && id !== null) // Filter out undefined runIds
+        .slice(0, Math.min(50, group.runIds.length));
       for (const runId of sampleIds) {
         telemetryPromises.push(
           this.getRunTelemetry(runId).then(t => ({ runId, cost: t?.costUsd || 0 }))
@@ -661,10 +679,12 @@ export class ApiClient {
 
     const grouped = new Map<string, number>();
 
-    const telemetryPromises = runs.map(async run => {
-      const telemetry = await this.getRunTelemetry(run.runId);
-      return { agent: run.agent, cost: telemetry?.costUsd || 0 };
-    });
+    const telemetryPromises = runs
+      .filter(r => r && r.runId) // Filter out runs with undefined runId
+      .map(async run => {
+        const telemetry = await this.getRunTelemetry(run.runId);
+        return { agent: run.agent, cost: telemetry?.costUsd || 0 };
+      });
 
     const results = await Promise.all(telemetryPromises);
 
@@ -693,10 +713,12 @@ export class ApiClient {
       tokensOut: number[];
     }>();
 
-    const telemetryPromises = runs.map(async run => {
-      const telemetry = await this.getRunTelemetry(run.runId);
-      return { run, telemetry };
-    });
+    const telemetryPromises = runs
+      .filter(r => r && r.runId) // Filter out runs with undefined runId
+      .map(async run => {
+        const telemetry = await this.getRunTelemetry(run.runId);
+        return { run, telemetry };
+      });
 
     const results = await Promise.all(telemetryPromises);
 

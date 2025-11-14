@@ -159,13 +159,15 @@ function Dashboard() {
         <h2 className="text-2xl font-semibold mb-4">Recent Runs</h2>
         <div className="space-y-2">
           {recentRuns.length > 0 ? (
-            recentRuns.map((run) => (
-              <Link
-                key={run.runId}
-                to="/runs/$runId"
-                params={{ runId: run.runId }}
-                className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
-              >
+            recentRuns
+              .filter(run => run && run.runId) // Filter out runs with undefined runId
+              .map((run) => (
+                <Link
+                  key={run.runId}
+                  to="/runs/$runId"
+                  params={{ runId: run.runId }}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{run.scenario}</div>
                   <div className="text-sm text-muted-foreground flex gap-2 items-center">
