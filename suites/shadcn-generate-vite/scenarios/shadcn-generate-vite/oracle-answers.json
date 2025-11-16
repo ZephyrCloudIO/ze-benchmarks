@@ -1,0 +1,14 @@
+{
+  "which_bundler_should_i_use": "Use Vite as specified in the requirements",
+  "which_package_manager": "Use pnpm as the package manager",
+  "which_styling_solution": "Use Tailwind CSS with the @tailwindcss/vite plugin as per shadcn/ui requirements",
+  "should_i_use_typescript": "Yes, shadcn/ui requires TypeScript configuration",
+  "how_to_add_button_component": "Use the command 'pnpm dlx shadcn@latest add button' after setting up the project",
+  "what_vite_plugins_needed": "You need @vitejs/plugin-react and proper tailwindcss configuration in vite.config.ts",
+  "where_to_configure_tailwind": "Configure Tailwind in src/index.css with @tailwind directives and in vite.config.ts",
+  "what_typescript_config_files": "You need both tsconfig.json and tsconfig.app.json with appropriate compiler options",
+  "should_i_initialize_git": "Not required for this benchmark, focus on the shadcn project setup",
+  "what_react_version": "Use the latest stable React version compatible with shadcn/ui",
+  "where_should_components_go": "shadcn components should be in src/components/ui/ directory",
+  "do_i_need_tailwind_config": "Yes, you need tailwind.config.js or tailwind.config.ts for proper configuration"
+}
