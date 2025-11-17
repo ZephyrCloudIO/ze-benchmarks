@@ -1,0 +1,29 @@
+{
+  "name": "agency-prompt-creator",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "test": "rstest"
+  },
+  "dependencies": {
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@rslib/core": "^0.17.1",
+    "@rstest/core": "^0.6.1",
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}

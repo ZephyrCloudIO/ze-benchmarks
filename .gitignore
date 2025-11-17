@@ -110,6 +110,10 @@ results/workspaces/**/*
 # Snapshot files
 snapshot.json5
 
+# Generated specialists
+.specialists
+specialists/
+
 # Wrangler local development state
 .wrangler/
 
