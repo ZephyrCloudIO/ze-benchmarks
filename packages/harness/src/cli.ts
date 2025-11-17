@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { config } from 'dotenv';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 // Load environment variables from .env file in project root
@@ -30,7 +30,7 @@ import { intro, outro, log } from '@clack/prompts';
 import chalk from 'chalk';
 
 // Runtime imports
-import { startDevServer, stopDevServer } from './dev-server.ts';
+import { stopDevServer } from './dev-server.ts';
 
 // CLI module imports
 import { parseArgs, showHelp } from './cli/args.ts';
@@ -38,7 +38,6 @@ import { validateEnvironment } from './cli/environment.ts';
 
 // Interactive module imports
 import { showInteractiveMenu } from './interactive/menu.ts';
-import { runInteractiveBenchmark } from './interactive/benchmark.ts';
 import { runInteractiveSuiteStats, runInteractiveScenarioStats, runInteractiveRunStats, runInteractiveEvaluators } from './interactive/statistics.ts';
 import { runInteractiveClear } from './interactive/clear.ts';
 import { createNewSuite, createNewScenario } from './interactive/suite-management.ts';
@@ -188,7 +187,7 @@ async function run() {
 		intro(chalk.bgCyan(' Benchmark History '));
 
 		try {
-			const runHistory = logger.getRunHistory(limit);
+			const runHistory = await logger.getRunHistory({ limit });
 
 			if (runHistory.length === 0) {
 				log.warning('No benchmark runs found');
@@ -200,13 +199,13 @@ async function run() {
 			runHistory.forEach((run, index) => displayRunInfo(run, index));
 
 			// Show overall stats
-			const stats = logger.getStats();
+			const stats = await logger.getStats();
 			console.log('\n' + chalk.underline('Overall Statistics'));
-			console.log(formatStats('Total Runs', stats.totalRuns));
-			console.log(formatStats('Success Rate', `${(stats.successRate * 100).toFixed(1)}%`, 'green'));
-			console.log(formatStats('Avg Score', stats.averageScore.toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Weighted', stats.averageWeightedScore.toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Duration', `${(stats.averageDuration / 1000).toFixed(2)}s`, 'blue'));
+			console.log(formatStats('Total Runs', stats.totalRuns ?? stats.total_runs ?? 0));
+			console.log(formatStats('Success Rate', `${((stats.successRate ?? 0) * 100).toFixed(1)}%`, 'green'));
+			console.log(formatStats('Avg Score', (stats.averageScore ?? stats.avg_score ?? 0).toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Weighted', (stats.averageWeightedScore ?? stats.avg_weighted_score ?? 0).toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Duration', `${((stats.averageDuration ?? 0) / 1000).toFixed(2)}s`, 'blue'));
 
 			outro(chalk.green(`Showing ${runHistory.length} recent runs`));
 
@@ -226,7 +225,7 @@ async function run() {
 		const limit = parsedArgs.limit;
 
 		try {
-			const batches = logger.getAllBatches({ limit });
+			const batches = await logger.getAllBatches(limit);
 
 			if (batches.length === 0) {
 				log.warning('No batches found');
@@ -240,11 +239,15 @@ async function run() {
 				const status = batch.completedAt
 					? chalk.green('✓')
 					: chalk.yellow('○');
-				const duration = batch.duration ? `${(batch.duration / 1000).toFixed(2)}s` : 'Running...';
-				const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(0) : 0;
+				const duration = batch.completedAt && batch.createdAt
+					? `${((batch.completedAt - batch.createdAt) / 1000).toFixed(2)}s`
+					: 'Running...';
+				const successRate = (batch.totalRuns ?? 0) > 0
+					? (((batch.successfulRuns ?? 0) / (batch.totalRuns ?? 1)) * 100).toFixed(0)
+					: '0';
 
 				console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
-				console.log(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns} (${successRate}%)`, 'green')}`);
+				console.log(`   ${formatStats('Runs', `${batch.successfulRuns ?? 0}/${batch.totalRuns ?? 0} (${successRate}%)`, 'green')}`);
 				console.log(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
 				console.log(`   ${formatStats('Duration', duration, 'blue')}`);
 				console.log(`   ${chalk.gray(new Date(batch.createdAt).toLocaleString())}`);
@@ -273,59 +276,64 @@ async function run() {
 		}
 
 		try {
-			const analytics = logger.getBatchAnalytics(batchId);
+			const batch = await logger.getBatchDetails(batchId);
+			const analytics = await logger.getBatchAnalytics(batchId);
 
-			if (!analytics) {
+			if (!batch) {
 				log.error(chalk.red(`Batch ${batchId} not found`));
 				return;
 			}
 
 			intro(chalk.bgCyan(' Batch Details '));
 
-			const batch = analytics.batch;
-			const duration = batch.duration / 1000;
-			const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(1) : 0;
+			const duration = batch.completedAt && batch.createdAt
+				? ((batch.completedAt - batch.createdAt) / 1000)
+				: 0;
+			const successRate = (batch.totalRuns ?? 0) > 0
+				? (((batch.successfulRuns ?? 0) / (batch.totalRuns ?? 1)) * 100).toFixed(1)
+				: '0';
 
 			console.log(`\n${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 16))}...`);
 			console.log(formatStats('Status', batch.completedAt ? 'Completed' : 'Running', batch.completedAt ? 'green' : 'yellow'));
-			console.log(formatStats('Total Runs', `${batch.totalRuns}`, 'blue'));
-			console.log(formatStats('Successful', `${batch.successfulRuns}/${batch.totalRuns} (${successRate}%)`, 'green'));
-			console.log(formatStats('Avg Score', batch.avgWeightedScore.toFixed(4), 'yellow'));
+			console.log(formatStats('Total Runs', `${batch.totalRuns ?? 0}`, 'blue'));
+			console.log(formatStats('Successful', `${batch.successfulRuns ?? 0}/${batch.totalRuns ?? 0} (${successRate}%)`, 'green'));
+			console.log(formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) ?? 'N/A', 'yellow'));
 			console.log(formatStats('Duration', `${duration.toFixed(2)}s`, 'blue'));
 			console.log(formatStats('Started', new Date(batch.createdAt).toLocaleString()));
 
 			// Suite breakdown
-			if (analytics.suiteBreakdown.length > 0) {
+			if (analytics.suiteBreakdown && analytics.suiteBreakdown.length > 0) {
 				console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
-				analytics.suiteBreakdown.forEach(suite => {
-					const rate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
-					console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${rate}% success, ${suite.runs} runs)`)}`);
+				analytics.suiteBreakdown.forEach((suite: any) => {
+					const rate = (suite.totalRuns ?? 0) > 0 ? (((suite.successfulRuns ?? 0) / (suite.totalRuns ?? 1)) * 100).toFixed(0) : 0;
+					console.log(`  ${chalk.cyan(suite.suite)}: ${suite.avgWeightedScore?.toFixed(2) ?? 'N/A'}/10 ${chalk.gray(`(${rate}% success, ${suite.totalRuns ?? 0} runs)`)}`);
 				});
 			}
 
 			// Agent performance
-			if (analytics.agentPerformance.length > 0) {
+			if (analytics.agentBreakdown && analytics.agentBreakdown.length > 0) {
 				console.log(`\n${chalk.bold.underline('Agent Performance')}`);
-				analytics.agentPerformance.forEach((agent, i) => {
+				analytics.agentBreakdown.forEach((agent: any, i: number) => {
 					const rankDisplay = i < 3 ? `#${i + 1}` : `${i + 1}.`;
 					const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : '';
-					const scoreColor = agent.avgWeightedScore >= 9 ? 'green' : agent.avgWeightedScore >= 7 ? 'yellow' : 'red';
-					console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor](agent.avgWeightedScore.toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns}/${agent.runs})`)}`);
+					const scoreColor = (agent.avgWeightedScore ?? 0) >= 9 ? 'green' : (agent.avgWeightedScore ?? 0) >= 7 ? 'yellow' : 'red';
+					console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor](agent.avgWeightedScore?.toFixed(2) ?? 'N/A')}/10 ${chalk.gray(`(${agent.successfulRuns ?? 0}/${agent.totalRuns ?? 0})`)}`);
 				});
 			}
 
 			// Tier distribution
-			if (analytics.tierDistribution.length > 0) {
+			if (analytics.tierBreakdown && analytics.tierBreakdown.length > 0) {
 				console.log(`\n${chalk.bold.underline('Tier Distribution')}`);
-				analytics.tierDistribution.forEach(tier => {
-					console.log(`  ${chalk.cyan(tier.tier)}: ${tier.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${tier.successfulRuns}/${tier.runs} runs)`)}`);
+				analytics.tierBreakdown.forEach((tier: any) => {
+					console.log(`  ${chalk.cyan(tier.tier)}: ${tier.avgWeightedScore?.toFixed(2) ?? 'N/A'}/10 ${chalk.gray(`(${tier.successfulRuns ?? 0}/${tier.totalRuns ?? 0} runs)`)}`);
 				});
 			}
 
 			// Failed runs
-			if (analytics.failedRuns.length > 0) {
+			const failedRuns = analytics.runs?.filter((r: any) => !r.isSuccessful) || [];
+			if (failedRuns.length > 0) {
 				console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
-				analytics.failedRuns.forEach(run => {
+				failedRuns.forEach((run: any) => {
 					console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent}`);
 				});
 			}
@@ -353,7 +361,9 @@ async function run() {
 		}
 
 		try {
-			const batches = logger.getBatchComparison(batchIds);
+			// Fetch each batch individually
+			const batchPromises = batchIds.map((id: string) => logger.getBatchDetails(id));
+			const batches = await Promise.all(batchPromises);
 
 			if (batches.length === 0) {
 				log.error(chalk.red('No batches found with the provided IDs'));
@@ -374,13 +384,17 @@ async function run() {
 
 			batches.forEach(batch => {
 				const batchIdShort = batch.batchId.substring(0, 8) + '...';
-				const successRate = batch.totalRuns > 0 ? ((batch.successfulRuns / batch.totalRuns) * 100).toFixed(0) + '%' : 'N/A';
-				const duration = batch.duration ? `${(batch.duration / 1000).toFixed(0)}s` : 'N/A';
+				const successRate = (batch.totalRuns ?? 0) > 0
+					? (((batch.successfulRuns ?? 0) / (batch.totalRuns ?? 1)) * 100).toFixed(0) + '%'
+					: 'N/A';
+				const duration = batch.completedAt && batch.createdAt
+					? `${((batch.completedAt - batch.createdAt) / 1000).toFixed(0)}s`
+					: 'N/A';
 				const score = batch.avgWeightedScore?.toFixed(2) || 'N/A';
 
 				console.log(
 					chalk.dim(batchIdShort.padEnd(12)) + ' | ' +
-					`${batch.totalRuns}`.padEnd(8) + ' | ' +
+					`${batch.totalRuns ?? 0}`.padEnd(8) + ' | ' +
 					successRate.padEnd(10) + ' | ' +
 					chalk.yellow(score.padEnd(10)) + ' | ' +
 					duration

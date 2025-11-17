@@ -55,7 +55,11 @@ export async function executeMultipleBenchmarks(
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
-	const batchId = logger.startBatch();
+	const batchId = await logger.startBatch();
+
+	if (!batchId || typeof batchId !== 'string') {
+		throw new Error('Failed to start batch - check if worker is running (pnpm --filter worker dev)');
+	}
 
 	// Calculate total combinations
 	const combinations: Array<{
