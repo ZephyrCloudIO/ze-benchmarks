@@ -40,25 +40,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@24.10.1)(lightningcss@1.30.2)(terser@5.44.1)
 
-  agency-prompt-creator:
-    dependencies:
-      json5:
-        specifier: ^2.2.3
-        version: 2.2.3
-    devDependencies:
-      '@rslib/core':
-        specifier: ^0.17.1
-        version: 0.17.2(typescript@5.9.3)
-      '@rstest/core':
-        specifier: ^0.6.1
-        version: 0.6.5
-      '@types/node':
-        specifier: ^24.10.0
-        version: 24.10.1
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   apps/benchmark-report:
     dependencies:
       '@radix-ui/react-accordion':
@@ -180,6 +161,25 @@ importers:
       wrangler:
         specifier: ^4.46.0
         version: 4.47.0(@cloudflare/workers-types@4.20251117.0)
+
+  packages/agency-prompt-creator:
+    dependencies:
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
+    devDependencies:
+      '@rslib/core':
+        specifier: ^0.17.1
+        version: 0.17.2(typescript@5.9.3)
+      '@rstest/core':
+        specifier: ^0.6.1
+        version: 0.6.5
+      '@types/node':
+        specifier: ^24.10.0
+        version: 24.10.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/agent-adapters:
     dependencies:
@@ -6432,7 +6432,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 20.19.25
+      '@types/node': 24.10.1
       form-data: 4.0.5
 
   '@types/node@18.19.130':
