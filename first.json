@@ -1,0 +1,92 @@
+{
+  "batchId": "8af48afb-ca78-4b51-b551-3d804ed31052",
+  "exportedAt": "2025-11-12T17:30:42.242Z",
+  "totalRuns": 5,
+  "runs": [
+    {
+      "runId": "aefb4e60-f59a-4c54-aa8c-43a1793dd03b",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4444444444444444,
+      "success": false,
+      "timestamp": "2025-11-12 16:07:50"
+    },
+    {
+      "runId": "3998cc58-4983-4794-bb5d-7577780469be",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.35555555555555557,
+      "success": false,
+      "timestamp": "2025-11-12 16:07:50"
+    },
+    {
+      "runId": "5ab9b4a2-23d7-42d4-a5f3-ac27c2d396f6",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4444444444444444,
+      "success": false,
+      "timestamp": "2025-11-12 16:07:50"
+    },
+    {
+      "runId": "7edd6834-8041-4ae9-9134-19ad0fe1c7f4",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.44305555555555554,
+      "success": false,
+      "timestamp": "2025-11-12 16:07:50"
+    },
+    {
+      "runId": "91c4eef6-4108-49c4-afc6-5802b8b6fd2d",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "openai/gpt-4o",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.4361111111111111,
+      "success": false,
+      "timestamp": "2025-11-12 16:07:50"
+    }
+  ]
+}

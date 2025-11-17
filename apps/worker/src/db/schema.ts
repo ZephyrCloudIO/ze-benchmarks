@@ -28,6 +28,7 @@ export const benchmarkRuns = sqliteTable('benchmark_runs', {
   weightedScore: real('weighted_score'),
   isSuccessful: integer('is_successful', { mode: 'boolean' }).default(false),
   successMetric: real('success_metric'),
+  specialistEnabled: integer('specialist_enabled', { mode: 'boolean' }).default(false),
   metadata: text('metadata'),
 }, (table) => ({
   suiteScenarioIdx: index('idx_runs_suite_scenario').on(table.suite, table.scenario),
@@ -58,6 +59,7 @@ export const runTelemetry = sqliteTable('run_telemetry', {
   costUsd: real('cost_usd'),
   durationMs: integer('duration_ms'),
   workspaceDir: text('workspace_dir'),
+  promptSent: text('prompt_sent'),
 });
 
 // Export types

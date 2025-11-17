@@ -56,8 +56,7 @@ ze-benchmarks/
 │  └─ (future-suite)/
 │     └─ scenarios/...
 ├─ results/
-│  ├─ summary.json
-│  └─ logs/<timestamp>/*.jsonl
+│  └─ workspaces/<run-id>/         # generated workspace per run
 ├─ .github/workflows/bench.yml
 └─ docker/
    ├─ node-latest.Dockerfile

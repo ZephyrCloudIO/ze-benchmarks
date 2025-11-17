@@ -17,7 +17,14 @@
     "worker:sync": "pnpm --filter ze-benchmarks-worker run db:sync-from-prod",
     "worker:deploy-dev": "pnpm --filter ze-benchmarks-worker run deploy:dev",
     "worker:deploy-staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
-    "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production"
+    "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production",
+    "start:report": "pnpm --filter benchmark-report run dev",
+    "bench:run": "tsx scripts/run-all-models.ts",
+    "bench:compare": "tsx scripts/compare-batches.ts",
+    "export:prompts": "tsx scripts/export-batch-prompts.ts",
+    "validate:prompts": "tsx scripts/validate-prompts.ts",
+    "clear:db": "tsx scripts/clear-database.ts",
+    "workflow:iterate": "tsx scripts/workflow-iterate.ts"
   },
   "engines": {
     "node": ">=24"
@@ -41,6 +48,8 @@
     "chalk": "^5.6.2",
     "cli-progress": "^3.12.0",
     "dotenv": "^16.4.5",
-    "figlet": "^1.9.3"
+    "figlet": "^1.9.3",
+    "json5": "^2.2.3",
+    "yaml": "^2.8.1"
   }
 }
