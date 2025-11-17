@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
 import type { AgentRequest } from '../../../agent-adapters/src/index.ts';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { runEvaluators } from '../../../evaluators/src/index.ts';
 import { runValidationCommands } from '../runtime/validation.ts';
 import { buildDiffArtifacts } from '../runtime/diff.ts';

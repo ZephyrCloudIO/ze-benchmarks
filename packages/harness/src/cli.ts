@@ -25,7 +25,7 @@ const envPath = resolve(workspaceRoot, '.env');
 config({ path: envPath });
 
 // External package imports
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { intro, outro, log } from '@clack/prompts';
 import chalk from 'chalk';
 

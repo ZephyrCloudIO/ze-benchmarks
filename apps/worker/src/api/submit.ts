@@ -30,6 +30,7 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
       weightedScore: payload.weightedScore,
       isSuccessful: payload.isSuccessful,
       successMetric: payload.successMetric,
+      specialistEnabled: payload.specialistEnabled,
       metadata: payload.metadata ? JSON.stringify(payload.metadata) : undefined
     });
 
@@ -55,7 +56,8 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
         tokensOut: payload.telemetry.tokensOut,
         costUsd: payload.telemetry.costUsd,
         durationMs: payload.telemetry.durationMs,
-        workspaceDir: payload.telemetry.workspaceDir
+        workspaceDir: payload.telemetry.workspaceDir,
+        promptSent: payload.telemetry.promptSent
       });
     }
 
