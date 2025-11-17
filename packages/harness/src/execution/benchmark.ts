@@ -74,7 +74,7 @@ export async function executeBenchmark(
 
 	// Determine the agent name to log (will be updated if specialist is used)
 	let agentName = agent;
-	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId, !!specialist);
+	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
 
 	// Timeout watchdog based on scenario timeout_minutes (default 60)
@@ -512,15 +512,15 @@ export async function executeBenchmark(
 
 	// Show database summary in table format
 	try {
-		const stats = logger.getStats();
+		const stats = await logger.getStats();
 		console.log(`\n${chalk.bold.underline('Database Summary')}`);
 		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
 		console.log(`│ ${chalk.bold('Metric'.padEnd(25))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Status'.padEnd(10))} │`);
 		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-		console.log(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue(stats.totalRuns.toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${(stats.successRate * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green(stats.averageWeightedScore.toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Database'.padEnd(25))} ${chalk.blue('benchmark-report/public/benchmarks.db'.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue((stats.totalRuns || 0).toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${((stats.successRate || 0) * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green((stats.averageWeightedScore || 0).toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		console.log(`│ ${chalk.cyan('API'.padEnd(25))} ${chalk.blue('Cloudflare Worker'.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
 		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
 	} catch (dbError) {

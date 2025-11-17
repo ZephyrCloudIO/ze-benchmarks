@@ -182,7 +182,7 @@ async function run() {
 		intro(chalk.bgCyan(' Benchmark History '));
 
 		try {
-			const runHistory = logger.getRunHistory(limit);
+			const runHistory = await logger.getRunHistory({ limit });
 
 			if (runHistory.length === 0) {
 				log.warning('No benchmark runs found');
@@ -194,13 +194,13 @@ async function run() {
 			runHistory.forEach((run, index) => displayRunInfo(run, index));
 
 			// Show overall stats
-			const stats = logger.getStats();
+			const stats = await logger.getStats();
 			console.log('\n' + chalk.underline('Overall Statistics'));
-			console.log(formatStats('Total Runs', stats.totalRuns));
-			console.log(formatStats('Success Rate', `${(stats.successRate * 100).toFixed(1)}%`, 'green'));
-			console.log(formatStats('Avg Score', stats.averageScore.toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Weighted', stats.averageWeightedScore.toFixed(4), 'yellow'));
-			console.log(formatStats('Avg Duration', `${(stats.averageDuration / 1000).toFixed(2)}s`, 'blue'));
+			console.log(formatStats('Total Runs', stats.totalRuns || 0));
+			console.log(formatStats('Success Rate', `${((stats.successRate || 0) * 100).toFixed(1)}%`, 'green'));
+			console.log(formatStats('Avg Score', (stats.averageScore || 0).toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Weighted', (stats.averageWeightedScore || 0).toFixed(4), 'yellow'));
+			console.log(formatStats('Avg Duration', `${((stats.averageDuration || 0) / 1000).toFixed(2)}s`, 'blue'));
 
 			outro(chalk.green(`Showing ${runHistory.length} recent runs`));
 
@@ -220,7 +220,7 @@ async function run() {
 		const limit = parsedArgs.limit;
 
 		try {
-			const batches = logger.getAllBatches({ limit });
+			const batches = await logger.getAllBatches(limit);
 
 			if (batches.length === 0) {
 				log.warning('No batches found');
@@ -267,7 +267,7 @@ async function run() {
 		}
 
 		try {
-			const analytics = logger.getBatchAnalytics(batchId);
+			const analytics = await logger.getBatchAnalytics(batchId);
 
 			if (!analytics) {
 				log.error(chalk.red(`Batch ${batchId} not found`));
@@ -347,7 +347,7 @@ async function run() {
 		}
 
 		try {
-			const batches = logger.getBatchComparison(batchIds);
+			const batches = await logger.getBatchComparison();
 
 			if (batches.length === 0) {
 				log.error(chalk.red('No batches found with the provided IDs'));

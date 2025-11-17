@@ -112,3 +112,6 @@ snapshot.json5
 
 # Wrangler local development state
 .wrangler/
+
+# Local DB
+benchmark-report

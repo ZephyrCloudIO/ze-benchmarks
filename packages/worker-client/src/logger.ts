@@ -471,6 +471,44 @@ export class BenchmarkLogger {
   }
 
   /**
+   * Mark a run as incomplete (backwards compatibility)
+   */
+  markRunIncomplete(reason?: string, stage?: string): void {
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run to mark incomplete');
+      return;
+    }
+
+    // Store incomplete status in currentRun metadata
+    const metadata = {
+      reason: reason || 'Run interrupted',
+      stage: stage || 'unknown',
+      incomplete: true
+    };
+    (this.currentRun as any).metadata = {
+      ...(this.currentRun as any).metadata,
+      ...metadata
+    };
+
+    console.log(`[BenchmarkLogger] Run marked incomplete: ${this.currentRun.runId}`);
+  }
+
+  /**
+   * Update the agent name for the current run (backwards compatibility)
+   */
+  updateAgent(agentName: string, runId?: string): void {
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run to update agent');
+      return;
+    }
+
+    // Update the agent name in currentRun
+    (this.currentRun as any).agent = agentName;
+
+    console.log(`[BenchmarkLogger] Agent updated to: ${agentName}`);
+  }
+
+  /**
    * Clear database (no-op for worker-based system)
    */
   async clearDatabase(): Promise<void> {
