@@ -19,6 +19,7 @@
     "globby": "^14.0.2",
     "openai": "^4.0.0",
     "ze-evaluator": "workspace:*",
+    "@ze/database": "workspace:*",
     "@ze/worker-client": "workspace:*"
   },
   "devDependencies": {
