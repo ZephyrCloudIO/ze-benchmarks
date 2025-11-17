@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { select, multiselect, isCancel, cancel, text } from '@clack/prompts';
 import chalk from 'chalk';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { OpenRouterAPI } from '../lib/openrouter-api.ts';
 import { log } from '@clack/prompts';
 import { executeBenchmark } from '../execution/benchmark.ts';
@@ -55,7 +55,7 @@ export async function executeMultipleBenchmarks(
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
-	const batchId = logger.startBatch();
+	const batchId = await logger.startBatch();
 
 	// Calculate total combinations
 	const combinations: Array<{
@@ -175,19 +175,19 @@ export async function executeMultipleBenchmarks(
 	const duration = endTime - startTime;
 
 	// Calculate batch statistics
-	const batchStats = logger.getBatchDetails(batchId);
+	const batchStats = await logger.getBatchDetails(batchId);
 	if (batchStats) {
 		// Calculate successful runs directly from individual runs in the batch
 		// This ensures we use the new is_successful field
-		successfulRuns = logger.getBatchSuccessfulRunsCount(batchId);
+		successfulRuns = await logger.getBatchSuccessfulRunsCount(batchId);
 
 		// Calculate average scores directly from individual runs in the batch
-		const scoreStats = logger.getBatchScoreStats(batchId);
-		totalScore = scoreStats.avgScore;
-		totalWeightedScore = scoreStats.avgWeightedScore;
+		const scoreStats = await logger.getBatchScoreStats(batchId);
+		totalScore = scoreStats.avgScore || 0;
+		totalWeightedScore = scoreStats.avgWeightedScore || 0;
 	}
 
-	logger.completeBatch(batchId, {
+	await logger.completeBatch(batchId, {
 		totalRuns: combinations.length,
 		successfulRuns,
 		avgScore: totalScore,
@@ -205,7 +205,7 @@ export async function executeMultipleBenchmarks(
 	// Note: Database is now created directly in public/ directory
 
 	// Get comprehensive batch analytics
-	const analytics = logger.getBatchAnalytics(batchId);
+	const analytics = await logger.getBatchAnalytics(batchId);
 
 	// Show batch summary header
 	console.log('\n' + chalk.bold.underline('Batch Summary'));
@@ -239,32 +239,35 @@ export async function executeMultipleBenchmarks(
 	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
 	// Show suite breakdown if analytics available
-	if (analytics && analytics.suiteBreakdown.length > 0) {
+	if (analytics && analytics.suiteBreakdown && analytics.suiteBreakdown.length > 0) {
 		console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
-		analytics.suiteBreakdown.forEach(suite => {
+		analytics.suiteBreakdown.forEach((suite: { suite: string; scenario: string; runs: number; successfulRuns: number; avgWeightedScore: number }) => {
 			const successRate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
-			console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore.toFixed(2)}/10 ${chalk.gray(`(${successRate}% success, ${suite.runs} runs)`)}`);
+			console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore?.toFixed(2) || 0}/10 ${chalk.gray(`(${successRate}% success, ${suite.runs} runs)`)}`);
 		});
 	}
 
 	// Show agent performance
-	if (analytics && analytics.agentPerformance.length > 0) {
+	if (analytics && analytics.agentBreakdown && analytics.agentBreakdown.length > 0) {
 		console.log(`\n${chalk.bold.underline('Agent Performance')}`);
-		analytics.agentPerformance.forEach((agent, index) => {
+		analytics.agentBreakdown.forEach((agent: any, index: number) => {
 			const rank = index + 1;
 			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
 			const modelStr = agent.model && agent.model !== 'default' ? ` [${agent.model}]` : '';
-			const scoreColor = agent.avgWeightedScore >= 9 ? 'green' : agent.avgWeightedScore >= 7 ? 'yellow' : 'red';
-			console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor](agent.avgWeightedScore.toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns}/${agent.runs} runs)`)}`);
+			const scoreColor = (agent.avgWeightedScore || 0) >= 9 ? 'green' : (agent.avgWeightedScore || 0) >= 7 ? 'yellow' : 'red';
+			console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}${modelStr}: ${chalk[scoreColor]((agent.avgWeightedScore || 0).toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns || 0}/${agent.totalRuns || 0} runs)`)}`);
 		});
 	}
 
-	// Show failed runs if any
-	if (analytics && analytics.failedRuns.length > 0) {
-		console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
-		analytics.failedRuns.forEach(run => {
-			console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent} - ${run.error || 'Unknown error'}`);
-		});
+	// Show failed runs if any (filter from runs array)
+	if (analytics && analytics.runs) {
+		const failedRuns = analytics.runs.filter((run: any) => run.status === 'failed');
+		if (failedRuns.length > 0) {
+			console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
+			failedRuns.forEach((run: any) => {
+				console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent} - ${run.error || 'Unknown error'}`);
+			});
+		}
 	}
 
 	// Show completion summary

@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { select, intro, outro, log } from '@clack/prompts';
 import chalk from 'chalk';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { startDevServer } from '../dev-server.ts';
 import { findRepoRoot } from '../lib/workspace-utils.ts';
 import { formatStats, displayModelPerformance } from '../lib/display.ts';

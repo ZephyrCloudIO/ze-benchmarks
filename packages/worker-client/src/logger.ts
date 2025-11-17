@@ -216,8 +216,15 @@ export class BenchmarkLogger {
       };
     }
 
-    await this.client.submitRun(payload);
-    console.log(`[BenchmarkLogger] Run completed: ${payload.runId}`);
+    try {
+      await this.client.submitRun(payload);
+      const evalCount = payload.evaluations?.length || 0;
+      console.log(`[BenchmarkLogger] Run completed: ${payload.runId} with ${evalCount} evaluations`);
+    } catch (error) {
+      console.warn(`[BenchmarkLogger] Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
+      // Continue without worker - result tracking is optional
+      // Note: If batch creation failed, startBatch() would have thrown, so batchId should always be valid
+    }
 
     // Clear current run
     this.currentRun = null;
@@ -363,6 +370,8 @@ export class BenchmarkLogger {
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Create the batch in the database immediately
+    // If this fails, throw an error to prevent returning a batchId that doesn't exist
+    // This ensures foreign key constraint is never violated because batches will always exist before runs reference them
     await this.upsertBatch({
       batchId,
       createdAt: Date.now(),

@@ -1,6 +1,6 @@
 import { select, intro, outro, log } from '@clack/prompts';
 import chalk from 'chalk';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 import { startDevServer } from '../dev-server.ts';
 import { displayRunInfo, formatStats } from '../lib/display.ts';
 

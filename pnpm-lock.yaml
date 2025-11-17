@@ -193,34 +193,6 @@ importers:
         specifier: ^5.5.4
         version: 5.9.3
 
-  packages/database:
-    dependencies:
-      better-sqlite3:
-        specifier: ^12.4.1
-        version: 12.4.1
-      dotenv:
-        specifier: ^16.0.0
-        version: 16.6.1
-      uuid:
-        specifier: ^9.0.1
-        version: 9.0.1
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
-    devDependencies:
-      '@types/better-sqlite3':
-        specifier: ^7.6.13
-        version: 7.6.13
-      '@types/node':
-        specifier: ^20.14.10
-        version: 20.19.19
-      '@types/uuid':
-        specifier: ^9.0.8
-        version: 9.0.8
-      typescript:
-        specifier: ^5.5.4
-        version: 5.9.3
-
   packages/evaluators:
     dependencies:
       dotenv:
@@ -245,9 +217,6 @@ importers:
 
   packages/harness:
     dependencies:
-      '@ze/database':
-        specifier: workspace:*
-        version: link:../database
       '@ze/worker-client':
         specifier: workspace:*
         version: link:../worker-client
@@ -2392,9 +2361,6 @@ packages:
   '@types/statuses@2.0.6':
     resolution: {integrity: sha512-xMAgYwceFhRA2zY+XbEA7mxYbA093wdiW8Vu6gZPGWy9cmOyU9XesH1tNcEWsKFd5Vzrqx5T3D38PWx1FIIXkA==}
 
-  '@types/uuid@9.0.8':
-    resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
-
   '@vitest/expect@2.1.9':
     resolution: {integrity: sha512-UJCIkTBenHeKT1TTlKMJWy1laZewsRIzYighyYiJKZreqtdxSos/S1t+ktRMQWu2CKqaarrkeszJx1cgC5tGZw==}
 
@@ -4481,10 +4447,6 @@ packages:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
     hasBin: true
 
-  uuid@9.0.1:
-    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
-    hasBin: true
-
   victory-vendor@36.9.2:
     resolution: {integrity: sha512-PnpQQMuxlwYdocC8fIJqVXvkeViHYzotI+NJrCuav0ZYFoq912ZHBk3mCeuj+5/VpodOjPe1z0Fk2ihgzlXqjQ==}
 
@@ -6519,8 +6481,6 @@ snapshots:
 
   '@types/statuses@2.0.6':
     optional: true
-
-  '@types/uuid@9.0.8': {}
 
   '@vitest/expect@2.1.9':
     dependencies:
@@ -8759,8 +8719,6 @@ snapshots:
       which-typed-array: 1.1.19
 
   uuid@8.3.2: {}
-
-  uuid@9.0.1: {}
 
   victory-vendor@36.9.2:
     dependencies:

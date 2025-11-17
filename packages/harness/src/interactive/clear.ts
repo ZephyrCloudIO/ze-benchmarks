@@ -1,6 +1,6 @@
 import { intro, outro, spinner, log, confirm } from '@clack/prompts';
 import chalk from 'chalk';
-import { BenchmarkLogger } from '@ze/database';
+import { BenchmarkLogger } from '@ze/worker-client';
 
 async function runInteractiveClear() {
 	const logger = BenchmarkLogger.getInstance();
@@ -9,8 +9,8 @@ async function runInteractiveClear() {
 		intro(chalk.bgRed(' Clear Database '));
 
 		// Get count before clearing
-		const stats = logger.getStats();
-		log.warning(`Found ${chalk.bold(stats.totalRuns)} benchmark runs`);
+		const stats = await logger.getStats();
+		log.warning(`Found ${chalk.bold(stats.totalRuns || 0)} benchmark runs`);
 
 		const shouldClear = await confirm({
 			message: 'Are you sure you want to clear all data?',
@@ -20,7 +20,7 @@ async function runInteractiveClear() {
 		if (shouldClear) {
 			const s = spinner();
 			s.start('Clearing database...');
-			logger.clearDatabase();
+			await logger.clearDatabase();
 			s.stop('Database cleared');
 			outro(chalk.green('✓ All data removed'));
 		} else {
