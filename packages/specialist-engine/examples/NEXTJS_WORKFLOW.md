@@ -15,7 +15,7 @@ This will:
 - Create enriched version with documentation metadata
 - Generate tier-based prompts (L0-Lx)
 
-**Output:** `starting_from_outcome/nextjs-specialist/nextjs-specialist-template.json5`
+**Output:** `specialists/nextjs-specialist/nextjs-specialist-template.json5`
 
 ## Step 2: Enrich the Template (Optional)
 
@@ -92,7 +92,8 @@ Results are automatically saved to the database. You can:
 ## Troubleshooting
 
 ### Template Not Found
-- Ensure template is at: `starting_from_outcome/nextjs-specialist/nextjs-specialist-template.json5`
+- Ensure template is at: `specialists/nextjs-specialist/nextjs-specialist-template.json5`
+- System also checks legacy location: `starting_from_outcome/nextjs-specialist-template.json5`
 - Check the specialist name matches: `@zephyr/nextjs-specialist`
 
 ### API Key Missing
@@ -105,8 +106,8 @@ Results are automatically saved to the database. You can:
 
 ## File Locations
 
-- **Template:** `starting_from_outcome/nextjs-specialist/nextjs-specialist-template.json5`
-- **Enriched:** `starting_from_outcome/nextjs-specialist/enriched/{version}/enriched-*.json5`
-- **Tier Prompts:** `starting_from_outcome/nextjs-specialist/prompts/nextjs-setup/L*.md`
+- **Template:** `specialists/nextjs-specialist/nextjs-specialist-template.json5`
+- **Enriched:** `specialists/nextjs-specialist/enriched/{version}/enriched-*.json5`
+- **Tier Prompts:** `specialists/nextjs-specialist/prompts/nextjs-setup/L*.md`
 - **Results:** Stored in database at `apps/benchmark-report/public/benchmarks.db`
 

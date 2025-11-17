@@ -55,7 +55,7 @@ async function main() {
         scenario: 'nextjs-setup'
       },
       output: {
-        outputDir: resolve(projectRoot, 'starting_from_outcome/nextjs-specialist'),
+        outputDir: resolve(projectRoot, 'specialists/nextjs-specialist'),
         includeBenchmarks: false,
         includeDocs: true,
         includeExamples: false,

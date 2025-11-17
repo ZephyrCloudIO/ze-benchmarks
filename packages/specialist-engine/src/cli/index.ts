@@ -264,7 +264,7 @@ async function enrichOnly() {
 
   const templatePath = await text({
     message: 'Path to existing template file?',
-    placeholder: './starting_from_outcome/shadcn-specialist-template.json5',
+    placeholder: './specialists/shadcn-specialist/shadcn-specialist-template.json5',
     validate: (value) => {
       if (!value) return 'Template path is required';
       const { existsSync } = require('node:fs');

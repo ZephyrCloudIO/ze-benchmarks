@@ -30,7 +30,7 @@ async function main() {
   }
 
   // Path to existing template (relative to project root)
-  const templatePath = resolve(projectRoot, 'starting_from_outcome/nextjs-specialist/nextjs-specialist-template.json5');
+  const templatePath = resolve(projectRoot, 'specialists/nextjs-specialist/nextjs-specialist-template.json5');
 
   try {
     console.log(`Loading template from: ${templatePath}\n`);
