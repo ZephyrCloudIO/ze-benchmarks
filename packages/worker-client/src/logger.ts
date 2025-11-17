@@ -141,6 +141,7 @@ export class BenchmarkLogger {
       weightedScore?: number;
       isSuccessful?: boolean;
       successMetric?: number;
+      specialistEnabled?: boolean;
       metadata?: Record<string, any>;
       evaluations?: EvaluationResult[];
       telemetry?: RunTelemetry;
@@ -148,16 +149,29 @@ export class BenchmarkLogger {
     weightedScore?: number,
     metadata?: Record<string, any>,
     isSuccessful?: boolean,
-    successMetric?: number
+    successMetric?: number,
+    packageManager?: string,
+    testResults?: string
   ): Promise<void> {
     let payload: SubmitRunPayload;
 
-    // Check if using old signature: completeRun(score, weightedScore, metadata, isSuccessful, successMetric)
+    // Check if using old signature: completeRun(score, weightedScore, metadata, isSuccessful, successMetric, packageManager, testResults)
     if (typeof dataOrScore === 'number') {
       // Old signature - use stored run context
       if (!this.currentRun) {
         throw new Error('[BenchmarkLogger] No active run. Call startRun() first.');
       }
+
+      // Get cached telemetry and evaluations
+      const cachedTelemetry = (this.currentRun as any).telemetry;
+      const cachedEvaluations = (this.currentRun as any).evaluations;
+
+      // Add packageManager and testResults to metadata if provided
+      const enrichedMetadata = {
+        ...metadata,
+        ...(packageManager && { packageManager }),
+        ...(testResults && { testResults }),
+      };
 
       payload = {
         runId: this.currentRun.runId,
@@ -174,7 +188,9 @@ export class BenchmarkLogger {
         weightedScore: weightedScore,
         isSuccessful: isSuccessful,
         successMetric: successMetric,
-        metadata: metadata,
+        metadata: enrichedMetadata,
+        evaluations: cachedEvaluations,
+        telemetry: cachedTelemetry,
       };
     } else {
       // New signature - use provided data object
@@ -193,14 +209,22 @@ export class BenchmarkLogger {
         weightedScore: dataOrScore.weightedScore,
         isSuccessful: dataOrScore.isSuccessful,
         successMetric: dataOrScore.successMetric,
+        specialistEnabled: dataOrScore.specialistEnabled,
         metadata: dataOrScore.metadata,
         evaluations: dataOrScore.evaluations,
         telemetry: dataOrScore.telemetry,
       };
     }
 
-    await this.client.submitRun(payload);
-    console.log(`[BenchmarkLogger] Run completed: ${payload.runId}`);
+    try {
+      await this.client.submitRun(payload);
+      const evalCount = payload.evaluations?.length || 0;
+      console.log(`[BenchmarkLogger] Run completed: ${payload.runId} with ${evalCount} evaluations`);
+    } catch (error) {
+      console.warn(`[BenchmarkLogger] Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
+      // Continue without worker - result tracking is optional
+      // Note: If batch creation failed, startBatch() would have thrown, so batchId should always be valid
+    }
 
     // Clear current run
     this.currentRun = null;
@@ -346,6 +370,8 @@ export class BenchmarkLogger {
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Create the batch in the database immediately
+    // If this fails, throw an error to prevent returning a batchId that doesn't exist
+    // This ensures foreign key constraint is never violated because batches will always exist before runs reference them
     await this.upsertBatch({
       batchId,
       createdAt: Date.now(),
@@ -454,6 +480,44 @@ export class BenchmarkLogger {
   }
 
   /**
+   * Mark a run as incomplete (backwards compatibility)
+   */
+  markRunIncomplete(reason?: string, stage?: string): void {
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run to mark incomplete');
+      return;
+    }
+
+    // Store incomplete status in currentRun metadata
+    const metadata = {
+      reason: reason || 'Run interrupted',
+      stage: stage || 'unknown',
+      incomplete: true
+    };
+    (this.currentRun as any).metadata = {
+      ...(this.currentRun as any).metadata,
+      ...metadata
+    };
+
+    console.log(`[BenchmarkLogger] Run marked incomplete: ${this.currentRun.runId}`);
+  }
+
+  /**
+   * Update the agent name for the current run (backwards compatibility)
+   */
+  updateAgent(agentName: string, runId?: string): void {
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run to update agent');
+      return;
+    }
+
+    // Update the agent name in currentRun
+    (this.currentRun as any).agent = agentName;
+
+    console.log(`[BenchmarkLogger] Agent updated to: ${agentName}`);
+  }
+
+  /**
    * Clear database (no-op for worker-based system)
    */
   async clearDatabase(): Promise<void> {
@@ -462,18 +526,83 @@ export class BenchmarkLogger {
 
   /**
    * Log telemetry data
+   * Supports both old and new signatures for backwards compatibility
    */
-  async logTelemetry(runId: string, telemetry: RunTelemetry): Promise<void> {
-    console.log(`[BenchmarkLogger] Telemetry logged for run: ${runId}`);
-    // Telemetry is sent as part of completeRun
+  logTelemetry(
+    runIdOrToolCalls?: string | number,
+    telemetryOrTokensIn?: RunTelemetry | number,
+    tokensOut?: number,
+    costUsd?: number,
+    durationMs?: number,
+    workspaceDir?: string,
+    promptSent?: string
+  ): void {
+    // New signature: logTelemetry(runId: string, telemetry: RunTelemetry)
+    if (typeof runIdOrToolCalls === 'string' && typeof telemetryOrTokensIn === 'object') {
+      console.log(`[BenchmarkLogger] Telemetry logged for run: ${runIdOrToolCalls}`);
+      // Telemetry is sent as part of completeRun in the new API-based system
+      return;
+    }
+
+    // Old signature: logTelemetry(toolCalls?, tokensIn?, tokensOut?, costUsd?, durationMs?, workspaceDir?, promptSent?)
+    // Store telemetry to be sent with completeRun
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run for telemetry logging');
+      return;
+    }
+
+    // Store telemetry in currentRun context
+    (this.currentRun as any).telemetry = {
+      toolCalls: runIdOrToolCalls as number,
+      tokensIn: telemetryOrTokensIn as number,
+      tokensOut,
+      costUsd,
+      durationMs,
+      workspaceDir,
+      promptSent,
+    };
+
+    console.log(`[BenchmarkLogger] Telemetry cached for run: ${this.currentRun.runId}`);
   }
 
   /**
    * Log evaluation result
+   * Supports both old and new signatures for backwards compatibility
    */
-  async logEvaluation(runId: string, evaluation: EvaluationResult): Promise<void> {
-    console.log(`[BenchmarkLogger] Evaluation logged for run: ${runId}`);
-    // Evaluations are sent as part of completeRun
+  logEvaluation(
+    runIdOrEvaluatorName: string,
+    evaluationOrScore?: EvaluationResult | number,
+    maxScore?: number,
+    details?: string
+  ): void {
+    // New signature: logEvaluation(runId: string, evaluation: EvaluationResult)
+    if (typeof evaluationOrScore === 'object') {
+      console.log(`[BenchmarkLogger] Evaluation logged for run: ${runIdOrEvaluatorName}`);
+      // Evaluations are sent as part of completeRun in the new API-based system
+      return;
+    }
+
+    // Old signature: logEvaluation(evaluatorName: string, score: number, maxScore: number, details?: string)
+    // Store evaluation to be sent with completeRun
+    if (!this.currentRun) {
+      console.log('[BenchmarkLogger] Warning: No active run for evaluation logging');
+      return;
+    }
+
+    // Initialize evaluations array if not exists
+    if (!(this.currentRun as any).evaluations) {
+      (this.currentRun as any).evaluations = [];
+    }
+
+    // Store evaluation
+    (this.currentRun as any).evaluations.push({
+      evaluatorName: runIdOrEvaluatorName,
+      score: evaluationOrScore as number,
+      maxScore: maxScore!,
+      details,
+    });
+
+    console.log(`[BenchmarkLogger] Evaluation cached for run: ${this.currentRun.runId} (${runIdOrEvaluatorName})`);
   }
 
   /**

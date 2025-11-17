@@ -41,3 +41,5 @@ export class EchoAgent implements AgentAdapter {
 export { ClaudeCodeAdapter } from './claude-code.ts';
 export { AnthropicAdapter } from './anthropic.ts';
 export { OpenRouterAdapter } from './openrouter.ts';
+// SpecialistAdapter is now lazy-loaded directly where needed to avoid loading agency-prompt-creator unless required
+// export { SpecialistAdapter } from './specialist.ts';

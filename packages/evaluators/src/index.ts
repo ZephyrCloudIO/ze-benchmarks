@@ -6,6 +6,9 @@ import { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
 import { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 import { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 import { TestEvaluator } from './evaluators/test.ts';
+import { FileStructureEvaluator } from './evaluators/file-structure.ts';
+import { ConfigAccuracyEvaluator } from './evaluators/config-accuracy.ts';
+import { DependencyProximityEvaluator } from './evaluators/dependency-proximity.ts';
 
 export async function runEvaluators(
 	ctx: EvaluationContext,
@@ -16,6 +19,9 @@ export async function runEvaluators(
 		new PackageManagerEvaluator(),
 		new DependencyTargetsEvaluator(),
 		new IntegrityGuardEvaluator(),
+		new FileStructureEvaluator(),
+		new ConfigAccuracyEvaluator(),
+		new DependencyProximityEvaluator(),
 	];
 
 	// Add LLM judge if enabled
@@ -38,6 +44,9 @@ export async function runEvaluators(
 		manager_correctness: results.find((result) => result.name === 'PackageManagerEvaluator')?.score ?? 0,
 		dependency_targets: results.find((result) => result.name === 'DependencyTargetsEvaluator')?.score ?? 0,
 		integrity_guard: results.find((result) => result.name === 'IntegrityGuardEvaluator')?.score ?? 0,
+		file_structure: results.find((result) => result.name === 'FileStructureEvaluator')?.score ?? 0,
+		config_accuracy: results.find((result) => result.name === 'ConfigAccuracyEvaluator')?.score ?? 0,
+		dependency_proximity: results.find((result) => result.name === 'DependencyProximityEvaluator')?.score ?? 0,
 		llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
 	};
 
@@ -62,4 +71,7 @@ export { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
 export { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 export { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 export { TestEvaluator } from './evaluators/test.ts';
+export { FileStructureEvaluator } from './evaluators/file-structure.ts';
+export { ConfigAccuracyEvaluator } from './evaluators/config-accuracy.ts';
+export { DependencyProximityEvaluator } from './evaluators/dependency-proximity.ts';
 

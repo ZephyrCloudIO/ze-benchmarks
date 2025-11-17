@@ -15,6 +15,7 @@ export interface BenchmarkRun {
   weightedScore?: number;
   isSuccessful?: boolean;
   successMetric?: number;
+  specialistEnabled?: boolean;
   metadata?: Record<string, any>;
 }
 
@@ -32,6 +33,7 @@ export interface RunTelemetry {
   costUsd?: number;
   durationMs?: number;
   workspaceDir?: string;
+  promptSent?: string;
 }
 
 export interface BatchRun {
@@ -60,6 +62,7 @@ export interface SubmitRunPayload {
   weightedScore?: number;
   isSuccessful?: boolean;
   successMetric?: number;
+  specialistEnabled?: boolean;
   metadata?: Record<string, any>;
   evaluations?: EvaluationResult[];
   telemetry?: RunTelemetry;

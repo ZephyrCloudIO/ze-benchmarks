@@ -1,0 +1,1039 @@
+{
+  "batchId": "8f957e5d-5903-470f-8edb-05098e83ae00",
+  "exportedAt": "2025-11-12T23:30:26.625Z",
+  "totalRuns": 5,
+  "runs": [
+    {
+      "runId": "f38597f4-0fdb-4244-aafe-2e4e02418150",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7149603174603175,
+      "weightedScore": 7.8028,
+      "success": false,
+      "timestamp": "2025-11-12 23:25:20",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-tFgJVm",
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.915,
+          "maxScore": 1,
+          "details": {
+            "score": "0.92",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 1,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, path aliases configured"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.6571428571428571,
+          "maxScore": 1,
+          "details": {
+            "score": "0.66",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 0.3,
+                "workspace": "^5.4.21",
+                "reference": "^7.2.2",
+                "reason": "Version mismatch"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.3,
+                "workspace": "^3.4.18",
+                "reference": "^4.1.17",
+                "reason": "Version mismatch"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 1,
+                "workspace": "^24.10.1",
+                "reference": "^24.10.1",
+                "reason": "Exact or compatible version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.8625,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly updated dependencies, but some minor issues were found in the versioning (e.g., `@radix-ui/react-slot` was updated to `^1.2.4` instead of `^1.2.3`). However, the overall dependency management was solid, and the agent demonstrated a good understanding of semantic versioning principles."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent maintained full stability and compatibility throughout the process, demonstrating a thorough risk assessment and effective handling of breaking changes. The agent also ensured proper rollback considerations and regression prevention."
+              },
+              {
+                "category": "best_practices",
+                "score": 4,
+                "reasoning": "The agent followed semantic versioning principles and properly categorized dependencies. However, some minor issues were found in security and vulnerability considerations (e.g., `@types/node` was updated to `^24.10.1` without a clear justification)."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent demonstrated seamless monorepo management, ensuring workspace-level dependency management, cross-package dependency alignment, and build system compatibility (pnpm workspace handling)."
+              },
+              {
+                "category": "technical_execution",
+                "score": 4,
+                "reasoning": "The agent correctly executed commands (e.g., `pnpm install`, `pnpm build`) and demonstrated robust error handling and recovery procedures. However, some minor issues were found in validation through automated checks (e.g., missing linting checks)."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations and reasoning for its decisions, identifying risks, benefits, and assumptions. The agent also justified its decisions and skipped updates effectively."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 4,
+                "reasoning": "The agent demonstrated a good understanding of future compatibility and modernization, but some minor issues were found in the removal of deprecated/unused dependencies (e.g., `control/README.md` was deleted without a clear justification)."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 4.3,
+                "reasoning": "The agent demonstrated a solid performance across all categories, with some minor issues and areas for improvement. The overall execution integrity is good, but not exemplary."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated a solid performance in dependency management, safety, and stability. However, some minor issues were found in best practices, technical execution, and long-term maintainability. The agent's overall integrity is good, but not exemplary.",
+            "normalized_score": 0.8625,
+            "input_tokens": 1842
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        }
+      ]
+    },
+    {
+      "runId": "06f2e005-3c5e-44c1-be0f-7a12172d024b",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "openai/gpt-4o",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.5470899470899471,
+      "weightedScore": 5.4699,
+      "success": false,
+      "timestamp": "2025-11-12 23:25:20",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-pfTDFE",
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.4375,
+          "maxScore": 1,
+          "details": {
+            "score": "0.44",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0,
+                "reason": "File does not exist"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, missing tsconfig.app.json, path aliases configured"
+              },
+              {
+                "name": "components.json",
+                "score": 0,
+                "reason": "missing style config, missing aliases, missing component paths"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.5571428571428572,
+          "maxScore": 1,
+          "details": {
+            "score": "0.56",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "react-dom",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^19.2.0",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.9,
+                "workspace": "^4.1.16",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 1,
+                "workspace": "^4.1.17",
+                "reference": "^4.1.17",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^24.10.1",
+                "reason": "Dependency not installed"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 0.4166666666666667,
+          "maxScore": 1,
+          "details": {
+            "score": "0.42",
+            "total": 12,
+            "present": 5,
+            "missing": 7,
+            "missingFiles": [
+              "vite.config.ts",
+              "tsconfig.app.json",
+              "tsconfig.node.json",
+              "src/main.tsx",
+              "src/App.tsx",
+              "src/components/ui/button.tsx",
+              "src/lib/utils.ts"
+            ]
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.5125,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly added the required dependencies (vite, tailwindcss, @tailwindcss/vite) with appropriate versions. However, it did not address the version updates and semantic versioning adherence for all dependencies, which is a minor issue."
+              },
+              {
+                "category": "safety_stability",
+                "score": 3,
+                "reasoning": "The agent introduced some instability by not properly handling the shadcn component configuration, which may lead to potential issues in the future. However, it maintained the overall stability of the project."
+              },
+              {
+                "category": "best_practices",
+                "score": 3,
+                "reasoning": "The agent followed some best practices, such as using semantic versioning for dependencies. However, it did not properly categorize dependencies and did not consider security and vulnerability aspects."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 2,
+                "reasoning": "The agent did not properly manage workspace-level dependencies and did not align cross-package dependencies, which may lead to issues in a monorepo environment."
+              },
+              {
+                "category": "technical_execution",
+                "score": 4,
+                "reasoning": "The agent correctly executed the commands (pnpm install, etc.) and handled errors. However, it did not validate the build/test/lint process, which is a minor issue."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 2,
+                "reasoning": "The agent provided a vague explanation for the shadcn component configuration issue and did not clearly justify its decisions and skipped updates."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 2,
+                "reasoning": "The agent did not consider future compatibility and modernization, and did not remove deprecated/unused dependencies, which may lead to technical debt in the long run."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 3,
+                "reasoning": "The agent's performance is average, with some issues and partial compliance across categories. It requires improvement in several areas to achieve a higher overall score."
+              }
+            ],
+            "overall_assessment": "The agent's performance is average, with some issues and partial compliance across categories. It requires improvement in several areas to achieve a higher overall score.",
+            "normalized_score": 0.5125,
+            "input_tokens": 1466
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        }
+      ]
+    },
+    {
+      "runId": "3cf01783-6e25-4a9d-a852-63c5e19e4069",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\nSet up a new {framework} project with shadcn/ui, using {packageManager} and configuring {features}\n\nAdd {componentName} component to the project using the shadcn CLI\n\nDebug {issueType} issue in shadcn/ui project: {description}\n\nConfigure theming with {themeType} using {baseColor} color palette"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.6814285714285714,
+      "weightedScore": 7.3779,
+      "success": false,
+      "timestamp": "2025-11-12 23:25:20",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-LqKCfu",
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.8525,
+          "maxScore": 1,
+          "details": {
+            "score": "0.85",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.7428571428571429,
+          "maxScore": 1,
+          "details": {
+            "score": "0.74",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.3,
+                "workspace": "^3.4.18",
+                "reference": "^4.1.17",
+                "reason": "Version mismatch"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0.9,
+                "workspace": "^24.10.0",
+                "reference": "^24.10.1",
+                "reason": "Close version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.5375,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 4,
+                "reasoning": "The agent correctly added the required dependencies, but some of the versions could be more up-to-date. For example, `@radix-ui/react-slot` is at `^1.2.4` instead of the latest version. However, the agent did follow semantic versioning principles and pinned versions correctly."
+              },
+              {
+                "category": "safety_stability",
+                "score": 3,
+                "reasoning": "The agent introduced some breaking changes by adding new dependencies, which may cause instability in the project. However, the agent did not introduce any known security vulnerabilities. The risk assessment and compatibility preservation could be improved."
+              },
+              {
+                "category": "best_practices",
+                "score": 4,
+                "reasoning": "The agent followed some best practices, such as proper dependency categorization and security considerations. However, the agent could improve by following semantic versioning principles more strictly and removing unused dependencies."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 2,
+                "reasoning": "The agent did not demonstrate seamless monorepo management. The workspace-level dependency management and cross-package dependency alignment could be improved."
+              },
+              {
+                "category": "technical_execution",
+                "score": 3,
+                "reasoning": "The agent executed some commands correctly, but there were errors in the execution of other commands. The error handling and recovery procedures could be improved."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 2,
+                "reasoning": "The agent's explanations and reasoning were not clear, and the identification of risks, benefits, and assumptions was not transparent."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 3,
+                "reasoning": "The agent did not demonstrate long-term maintainability. The removal of deprecated/unused dependencies and facilitation of ongoing stability and upgradeability could be improved."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 3,
+                "reasoning": "The agent's overall performance was average, with some strengths and weaknesses. The weighted assessment is based on the scores above."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated some strengths in dependency management and best practices, but struggled with safety, stability, and long-term maintainability. The overall performance was average, with room for improvement in several areas.",
+            "normalized_score": 0.5375,
+            "input_tokens": 1434
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        }
+      ]
+    },
+    {
+      "runId": "7bd2dbef-7117-4ce3-9a53-8c636bb1a759",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "specialist:shadcn-specialist:openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "system",
+          "content": "I'm a shadcn/ui specialist. I follow the official documentation exactly, understand that shadcn is a code distribution platform (not a library), and ensure proper configuration of Tailwind CSS v4, TypeScript path aliases, and component installation.\n\nSet up a new {framework} project with shadcn/ui, using {packageManager} and configuring {features}\n\nAdd {componentName} component to the project using the shadcn CLI\n\nDebug {issueType} issue in shadcn/ui project: {description}\n\nConfigure theming with {themeType} using {baseColor} color palette"
+        },
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7439285714285714,
+      "weightedScore": 8.0734,
+      "success": false,
+      "timestamp": "2025-11-12 23:25:20",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-oJc5u1",
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.8525,
+          "maxScore": 1,
+          "details": {
+            "score": "0.85",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.8428571428571429,
+          "maxScore": 1,
+          "details": {
+            "score": "0.84",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 1,
+                "workspace": "^4.1.17",
+                "reference": "^4.1.17",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0.9,
+                "workspace": "^24.10.0",
+                "reference": "^24.10.1",
+                "reason": "Close version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 5,
+                "reasoning": "The agent correctly selected and updated dependencies, adhering to semantic versioning principles and pinning versions appropriately. The version updates were correct, and the agent demonstrated a good understanding of major/minor/patch updates."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent demonstrated a thorough risk assessment and compatibility preservation, ensuring that the project remains stable and secure. The agent handled breaking changes and migration strategies effectively, preventing regressions and providing rollback considerations."
+              },
+              {
+                "category": "best_practices",
+                "score": 5,
+                "reasoning": "The agent followed semantic versioning principles, properly categorized dependencies, and considered security and vulnerability aspects. The agent's adherence to best practices was exemplary, demonstrating a strong understanding of dependency management."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent effectively managed workspace-level dependencies, aligned cross-package dependencies, and ensured build system compatibility. The agent demonstrated seamless monorepo management, showcasing a deep understanding of monorepo coordination."
+              },
+              {
+                "category": "technical_execution",
+                "score": 5,
+                "reasoning": "The agent executed commands correctly, handled errors and recovery procedures effectively, and validated the project through automated checks. The agent's technical execution was robust and reliable, demonstrating a strong understanding of technical processes."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations and reasoning, identifying risks, benefits, and assumptions. The agent justified decisions and skipped updates, demonstrating a high level of transparency and communication."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 5,
+                "reasoning": "The agent considered future compatibility and modernization, removed deprecated/unused dependencies, and facilitated ongoing stability and upgradeability. The agent's approach to long-term maintainability was exemplary, ensuring a modernized and maintainable landscape."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 5,
+                "reasoning": "The agent's performance across all categories was exemplary, demonstrating a comprehensive understanding of dependency management, safety, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The agent's overall integrity was outstanding, showcasing a high level of expertise and professionalism."
+              }
+            ],
+            "overall_assessment": "The agent demonstrated exceptional performance across all categories, showcasing a deep understanding of dependency management, safety, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The agent's overall integrity was outstanding, and its performance was exemplary.",
+            "normalized_score": 1,
+            "input_tokens": 1920
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        }
+      ]
+    },
+    {
+      "runId": "01b6dcad-86ae-483d-b781-68f9efb52e2d",
+      "suite": "shadcn-generate-vite",
+      "scenario": "shadcn-generate-vite",
+      "agent": "openrouter",
+      "model": "anthropic/claude-sonnet-4.5",
+      "tier": "L0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Generate a new shadcn project, use vite and add the button component\n"
+        }
+      ],
+      "score": 0.7423412698412698,
+      "weightedScore": 8.0588,
+      "success": false,
+      "timestamp": "2025-11-12 23:25:20",
+      "workspaceDir": "/Users/zackarychapple/code/shadcn-benchmarks/ze-benchmarks/results/workspaces/shadcn-generate-vite-shadcn-generate-vite-FPVxsl",
+      "evaluations": [
+        {
+          "evaluatorName": "ConfigAccuracyEvaluator",
+          "score": 0.8525,
+          "maxScore": 1,
+          "details": {
+            "score": "0.85",
+            "checks": [
+              {
+                "name": "vite.config.ts",
+                "score": 0.66,
+                "reason": "missing Tailwind plugin"
+              },
+              {
+                "name": "tailwind-setup",
+                "score": 1,
+                "reason": "Tailwind properly configured"
+              },
+              {
+                "name": "tsconfig",
+                "score": 0.75,
+                "reason": "tsconfig.json exists, tsconfig.app.json exists, missing path aliases"
+              },
+              {
+                "name": "components.json",
+                "score": 1,
+                "reason": "Properly configured"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyProximityEvaluator",
+          "score": 0.8285714285714286,
+          "maxScore": 1,
+          "details": {
+            "score": "0.83",
+            "dependencies": [
+              {
+                "name": "vite",
+                "score": 1,
+                "workspace": "^7.2.2",
+                "reference": "^7.2.2",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "react-dom",
+                "score": 1,
+                "workspace": "^19.2.0",
+                "reference": "^19.2.0",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "tailwindcss",
+                "score": 0.9,
+                "workspace": "^4.1.16",
+                "reference": "^4.1.17",
+                "reason": "Close version"
+              },
+              {
+                "name": "@tailwindcss/vite",
+                "score": 0,
+                "workspace": "missing",
+                "reference": "^4.1.17",
+                "reason": "Dependency not installed"
+              },
+              {
+                "name": "typescript",
+                "score": 1,
+                "workspace": "~5.9.3",
+                "reference": "~5.9.3",
+                "reason": "Exact or compatible version"
+              },
+              {
+                "name": "@types/node",
+                "score": 0.9,
+                "workspace": "^24.10.0",
+                "reference": "^24.10.1",
+                "reason": "Close version"
+              }
+            ]
+          }
+        },
+        {
+          "evaluatorName": "DependencyTargetsEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "FileStructureEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "score": "1.00",
+            "total": 12,
+            "present": 12,
+            "missing": 0
+          }
+        },
+        {
+          "evaluatorName": "InstallEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "IntegrityGuardEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": {
+            "scores": [
+              {
+                "category": "dependency_quality",
+                "score": 5,
+                "reasoning": "The agent correctly selected and updated dependencies, adhering to semantic versioning principles and pinning versions appropriately. The dependencies are well-categorized, and there are no security vulnerabilities."
+              },
+              {
+                "category": "safety_stability",
+                "score": 5,
+                "reasoning": "The agent demonstrated a thorough understanding of risk assessment and compatibility preservation, ensuring that the project remains stable and secure. The agent handled breaking changes and migration strategies effectively, preventing regressions and ensuring rollback considerations."
+              },
+              {
+                "category": "best_practices",
+                "score": 5,
+                "reasoning": "The agent followed semantic versioning principles, properly categorized dependencies, and considered security and vulnerability aspects. The agent's adherence to best practices is exemplary, demonstrating a deep understanding of dependency management."
+              },
+              {
+                "category": "monorepo_coordination",
+                "score": 5,
+                "reasoning": "The agent effectively managed workspace-level dependencies, aligned cross-package dependencies, and ensured build system compatibility. The agent's monorepo coordination is seamless, demonstrating a high level of expertise in managing complex dependency relationships."
+              },
+              {
+                "category": "technical_execution",
+                "score": 5,
+                "reasoning": "The agent executed commands correctly, handled errors and recovery procedures effectively, and validated the project through automated checks. The technical execution is robust, demonstrating a high level of expertise in dependency management and automation."
+              },
+              {
+                "category": "communication_transparency",
+                "score": 5,
+                "reasoning": "The agent provided clear explanations and reasoning for its decisions, identified risks, benefits, and assumptions, and justified its choices. The communication is transparent, structured, and easy to follow."
+              },
+              {
+                "category": "long_term_maintainability",
+                "score": 5,
+                "reasoning": "The agent prioritized future compatibility and modernization, removed deprecated/unused dependencies, and facilitated ongoing stability and upgradeability. The agent's approach ensures long-term maintainability and modernization."
+              },
+              {
+                "category": "overall_integrity",
+                "score": 5,
+                "reasoning": "The agent demonstrated exceptional performance across all categories, showcasing a deep understanding of dependency management, safety, stability, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The overall integrity is exemplary, making the agent's performance outstanding."
+              }
+            ],
+            "overall_assessment": "The agent's performance is outstanding, demonstrating exceptional expertise in dependency management, safety, stability, best practices, monorepo coordination, technical execution, communication, and long-term maintainability. The agent's overall integrity is exemplary, making it an excellent choice for managing complex dependency relationships.",
+            "normalized_score": 1,
+            "input_tokens": 1949
+          }
+        },
+        {
+          "evaluatorName": "PackageManagerEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        },
+        {
+          "evaluatorName": "TestEvaluator",
+          "score": 0,
+          "maxScore": 1,
+          "details": null
+        }
+      ]
+    }
+  ]
+}
