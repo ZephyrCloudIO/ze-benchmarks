@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 
 export const batchRuns = sqliteTable('batch_runs', {
   batchId: text('batchId').primaryKey(),
@@ -61,6 +61,37 @@ export const runTelemetry = sqliteTable('run_telemetry', {
   workspaceDir: text('workspace_dir'),
   promptSent: text('prompt_sent'),
 });
+
+// Relationships
+export const batchRunsRelations = relations(batchRuns, ({ many }) => ({
+  benchmarkRuns: many(benchmarkRuns),
+}));
+
+export const benchmarkRunsRelations = relations(benchmarkRuns, ({ one, many }) => ({
+  batchRun: one(batchRuns, {
+    fields: [benchmarkRuns.batchId],
+    references: [batchRuns.batchId],
+  }),
+  evaluationResults: many(evaluationResults),
+  telemetry: one(runTelemetry, {
+    fields: [benchmarkRuns.runId],
+    references: [runTelemetry.runId],
+  }),
+}));
+
+export const evaluationResultsRelations = relations(evaluationResults, ({ one }) => ({
+  benchmarkRun: one(benchmarkRuns, {
+    fields: [evaluationResults.runId],
+    references: [benchmarkRuns.runId],
+  }),
+}));
+
+export const runTelemetryRelations = relations(runTelemetry, ({ one }) => ({
+  benchmarkRun: one(benchmarkRuns, {
+    fields: [runTelemetry.runId],
+    references: [benchmarkRuns.runId],
+  }),
+}));
 
 // Export types
 export type BatchRun = typeof batchRuns.$inferSelect;
