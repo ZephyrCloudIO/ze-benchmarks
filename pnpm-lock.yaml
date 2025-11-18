@@ -306,7 +306,7 @@ importers:
         version: 0.17.2(typescript@5.9.3)
       '@rstest/core':
         specifier: ^0.6.5
-        version: 0.6.5(jsdom@26.1.0)
+        version: 0.6.5(jsdom@27.2.0)
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
