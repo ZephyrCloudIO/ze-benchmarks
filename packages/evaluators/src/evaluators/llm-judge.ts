@@ -6,6 +6,7 @@ import type {
 import { OpenAI } from "openai";
 import * as dotenv from "dotenv";
 import { resolve } from "node:path";
+import chalk from "chalk";
 
 // Load environment variables from .env file in project root
 dotenv.config({ path: resolve(process.cwd(), ".env") });
@@ -33,8 +34,11 @@ export class LLMJudgeEvaluator implements Evaluator {
   meta = { name: "LLMJudgeEvaluator" } as const;
 
   async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
+    console.log(chalk.blue('\n[LLMJudgeEvaluator] Starting evaluation...'));
+    
     // Check if LLM judge is enabled for this scenario
     if (!ctx.scenario.llm_judge?.enabled) {
+      console.log(chalk.yellow('[LLMJudgeEvaluator] LLM judge disabled for this scenario'));
       return {
         name: this.meta.name,
         score: 0,
@@ -44,6 +48,7 @@ export class LLMJudgeEvaluator implements Evaluator {
 
     // Check if categories are defined
     if (!ctx.scenario.llm_judge.categories || ctx.scenario.llm_judge.categories.length === 0) {
+      console.log(chalk.yellow('[LLMJudgeEvaluator] LLM judge categories not defined'));
       return {
         name: this.meta.name,
         score: 0,
@@ -51,17 +56,20 @@ export class LLMJudgeEvaluator implements Evaluator {
       };
     }
 
+    console.log(chalk.blue(`[LLMJudgeEvaluator] Categories to evaluate: ${ctx.scenario.llm_judge.categories.join(', ')}`));
+
     // Initialize OpenAI client
     const apiKey = process.env.OPENROUTER_API_KEY;
 
     // Debug: Log environment variable
     console.log(
-      `[env] LLM Judge Evaluator - OPENROUTER_API_KEY=${
+      chalk.gray(`[LLMJudgeEvaluator] OPENROUTER_API_KEY=${
         apiKey ? "***set***" : "(not set)"
-      }`
+      }`)
     );
 
     if (!apiKey) {
+      console.log(chalk.red('[LLMJudgeEvaluator] OpenRouter API key not configured'));
       return {
         name: this.meta.name,
         score: 0,
@@ -76,19 +84,46 @@ export class LLMJudgeEvaluator implements Evaluator {
 
     try {
       // Build the evaluation prompt
+      console.log(chalk.blue('[LLMJudgeEvaluator] Building evaluation prompt...'));
       const prompt = this.buildPrompt(ctx);
+      console.log(chalk.gray(`[LLMJudgeEvaluator] Prompt length: ${prompt.length} characters`));
+      console.log(chalk.gray(`[LLMJudgeEvaluator] Prompt preview (first 500 chars):\n${prompt.substring(0, 500)}...`));
 
       // Count tokens in the prompt
       const tokenCount = this.countPromptTokens(prompt);
+      console.log(chalk.blue(`[LLMJudgeEvaluator] Estimated input tokens: ${tokenCount}`));
 
       // Call OpenAI API through OpenRouter
+      console.log(chalk.blue('[LLMJudgeEvaluator] Calling LLM judge API...'));
       const response = await this.callOpenAI(openai, prompt);
+      console.log(chalk.green('[LLMJudgeEvaluator] Received response from LLM judge'));
+
+      // Log the raw response
+      console.log(chalk.cyan('\n[LLMJudgeEvaluator] Raw LLM Response:'));
+      console.log(chalk.gray(JSON.stringify(response, null, 2)));
 
       // Normalize scores (convert 1-5 scale to 0-1 scale)
       const normalizedScore = this.normalizeScore(response);
+      console.log(chalk.blue(`[LLMJudgeEvaluator] Normalized score: ${normalizedScore.toFixed(4)} (from 1-5 scale)`));
+
+      // Log individual category scores
+      console.log(chalk.cyan('\n[LLMJudgeEvaluator] Category Scores:'));
+      response.scores.forEach((score) => {
+        const normalized = (score.score - 1) / 4; // Convert 1-5 to 0-1
+        console.log(chalk.gray(`  ${score.category}: ${score.score}/5 (normalized: ${normalized.toFixed(4)})`));
+        console.log(chalk.gray(`    Reasoning: ${score.reasoning.substring(0, 100)}${score.reasoning.length > 100 ? '...' : ''}`));
+      });
+
+      // Log overall assessment
+      if (response.overall_assessment) {
+        console.log(chalk.cyan('\n[LLMJudgeEvaluator] Overall Assessment:'));
+        console.log(chalk.gray(`  ${response.overall_assessment}`));
+      }
 
       // Format detailed results with token count
       const details = this.formatDetails(response, tokenCount);
+
+      console.log(chalk.green(`\n[LLMJudgeEvaluator] Evaluation complete. Final score: ${normalizedScore.toFixed(4)}`));
 
       return {
         name: this.meta.name,
@@ -96,6 +131,10 @@ export class LLMJudgeEvaluator implements Evaluator {
         details
       };
     } catch (error) {
+      console.error(chalk.red(`[LLMJudgeEvaluator] Evaluation failed: ${error instanceof Error ? error.message : String(error)}`));
+      if (error instanceof Error && error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
       return {
         name: this.meta.name,
         score: 0,
@@ -114,6 +153,9 @@ export class LLMJudgeEvaluator implements Evaluator {
       process.env.LLM_JUDGE_MODEL || "meta-llama/llama-3.1-8b-instruct";
     const temperature = parseFloat(process.env.LLM_JUDGE_TEMPERATURE || "0.1");
     const maxTokens = parseInt(process.env.LLM_JUDGE_MAX_TOKENS || "2000", 10);
+
+    console.log(chalk.blue(`[LLMJudgeEvaluator] Using model: ${model}`));
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Temperature: ${temperature}, Max tokens: ${maxTokens}`));
 
     const response = await openai.chat.completions.create({
       model,
@@ -135,10 +177,18 @@ export class LLMJudgeEvaluator implements Evaluator {
       }
     });
 
+    // Log API response metadata
+    if (response.usage) {
+      console.log(chalk.gray(`[LLMJudgeEvaluator] Token usage: ${response.usage.prompt_tokens} prompt + ${response.usage.completion_tokens} completion = ${response.usage.total_tokens} total`));
+    }
+
     const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error("No response content from OpenAI");
     }
+
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Raw response content length: ${content.length} characters`));
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Response preview (first 300 chars):\n${content.substring(0, 300)}...`));
 
     const parsed = JSON.parse(content) as JudgeResponse;
 
