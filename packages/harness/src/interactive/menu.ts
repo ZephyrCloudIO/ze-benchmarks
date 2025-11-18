@@ -27,10 +27,6 @@ async function showInteractiveMenu() {
 	console.log(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' Interactive Mode '));
 
-	// Show web dashboard info
-	console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')} ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
-	console.log(`   ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}\n`);
-
 	while (true) {
 		const action = await select({
 			message: 'What would you like to do?',

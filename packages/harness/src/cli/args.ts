@@ -138,9 +138,5 @@ export function showHelp() {
 	console.log(`  ${chalk.gray('Search by:')} model name, provider, or description`);
 	console.log(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
 
-	console.log('\n' + chalk.bold('Web Dashboard:'));
-	console.log(`  ${chalk.blue('http://localhost:3000')} ${chalk.gray('- Interactive charts and analytics')}`);
-	console.log(`  ${chalk.gray('Run:')} ${chalk.yellow('pnpm dev')} ${chalk.gray('to start the web server')}`);
-
 	outro(chalk.gray('Run any command to get started'));
 }
