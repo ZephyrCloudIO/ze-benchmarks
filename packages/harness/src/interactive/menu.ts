@@ -16,6 +16,14 @@ async function showInteractiveMenu() {
 	// Check environment variables for interactive mode
 	await validateEnvironment();
 
+	// Handle Ctrl+C gracefully
+	process.on('SIGINT', () => {
+		console.log(); // New line after ^C
+		cancel('Operation cancelled.');
+		outro(chalk.yellow('Goodbye!'));
+		process.exit(0);
+	});
+
 	console.log(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' Interactive Mode '));
 
@@ -38,6 +46,13 @@ async function showInteractiveMenu() {
 				{ value: 'exit', label: 'Exit' }
 			]
 		});
+
+		// Handle user cancellation (Ctrl+C)
+		if (isCancel(action)) {
+			cancel('Operation cancelled.');
+			outro(chalk.yellow('Goodbye!'));
+			process.exit(0);
+		}
 
 		switch (action) {
 			case 'benchmark-specialist':
@@ -84,6 +99,11 @@ async function runInteractiveHistoryMenu() {
 		]
 	}) as string;
 
+	// Handle user cancellation (Ctrl+C)
+	if (isCancel(historyType)) {
+		return; // Return to main menu
+	}
+
 	switch (historyType) {
 		case 'run-history':
 			await runInteractiveHistory();
@@ -105,6 +125,11 @@ async function runInteractiveStatisticsMenu() {
 			{ value: 'evaluators', label: 'Evaluator Performance' }
 		]
 	}) as string;
+
+	// Handle user cancellation (Ctrl+C)
+	if (isCancel(statsType)) {
+		return; // Return to main menu
+	}
 
 	switch (statsType) {
 		case 'suite-stats':
