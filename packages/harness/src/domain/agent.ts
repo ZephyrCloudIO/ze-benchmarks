@@ -2,6 +2,9 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import chalk from 'chalk';
 import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter } from '../../../agent-adapters/src/index.ts';
+// Import types from agency-prompt-creator (using relative path since it's a workspace package)
+import type { SpecialistTemplate, PreferredModel } from '../../../agency-prompt-creator/src/types.ts';
+import type { OpenRouterModel } from '../lib/openrouter-api.js';
 
 // ============================================================================
 // AGENT MANAGEMENT
@@ -17,6 +20,115 @@ export async function getAvailableAgents(): Promise<Array<{value: string, label:
   ];
 
   return agents;
+}
+
+
+/**
+ * Select preferred model from template
+ * 
+ * Returns the first preferred model from the template's preferred_models array.
+ * Future enhancement: use weight if available to select highest weight model.
+ * 
+ * @param template - Specialist template with preferred_models
+ * @returns Preferred model or undefined if none found
+ */
+export function selectPreferredModel(template: SpecialistTemplate): PreferredModel | undefined {
+	if (!template.preferred_models || template.preferred_models.length === 0) {
+		return undefined;
+	}
+	
+	// For now, return first model. Future: sort by weight if available
+	// TODO: If weights are provided, select model with highest weight
+	return template.preferred_models[0];
+}
+
+/**
+ * Find closest matching OpenRouter model using the same search logic as CLI
+ * 
+ * Uses the same searchModels logic from OpenRouterAPI to find matches, then
+ * selects the best match based on relevance scoring.
+ * 
+ * @param preferredModelName - Model name from template (e.g., "claude-sonnet-4.5")
+ * @param availableModels - List of available OpenRouter models
+ * @param openrouterAPI - OpenRouterAPI instance for searching
+ * @returns Closest matching model ID or the original name if no match found
+ */
+export function findClosestOpenRouterModel(
+	preferredModelName: string,
+	availableModels: OpenRouterModel[],
+	openrouterAPI: { searchModels: (models: OpenRouterModel[], searchTerm: string) => OpenRouterModel[] }
+): string {
+	// Search using the same method as interactive CLI
+	const searchResults = openrouterAPI.searchModels(availableModels, preferredModelName);
+	
+	if (searchResults.length === 0) {
+		// No matches found, return original
+		return preferredModelName;
+	}
+	
+	// Score matches by relevance (same logic as CLI would use)
+	const normalized = preferredModelName.toLowerCase();
+	
+	// Find best match by scoring:
+	// 1. Exact ID match (highest priority)
+	// 2. ID contains the search term
+	// 3. Name contains the search term
+	// 4. Description contains the search term
+	
+	const scoredMatches = searchResults.map((model: OpenRouterModel) => {
+		let score = 0;
+		const modelId = model.id.toLowerCase();
+		const modelName = model.name?.toLowerCase() || '';
+		const modelDesc = model.description?.toLowerCase() || '';
+		
+		// Exact ID match
+		if (modelId === normalized || modelId === `anthropic/${normalized}` || modelId === `openai/${normalized}`) {
+			score += 100;
+		}
+		
+		// ID starts with search term
+		if (modelId.startsWith(normalized) || modelId.startsWith(`anthropic/${normalized}`) || modelId.startsWith(`openai/${normalized}`)) {
+			score += 50;
+		}
+		
+		// ID contains search term
+		if (modelId.includes(normalized)) {
+			score += 30;
+		}
+		
+		// Model ID ends with search term (e.g., "claude-sonnet-4.5" matches "anthropic/claude-sonnet-4.5")
+		const modelIdSuffix = modelId.split('/').pop() || '';
+		if (modelIdSuffix === normalized || normalized.includes(modelIdSuffix)) {
+			score += 40;
+		}
+		
+		// Name matches
+		if (modelName === normalized) {
+			score += 20;
+		} else if (modelName.includes(normalized)) {
+			score += 10;
+		}
+		
+		// Description contains search term (lowest priority)
+		if (modelDesc.includes(normalized)) {
+			score += 5;
+		}
+		
+		return { model, score };
+	});
+	
+	// Sort by score (highest first) and return the best match
+	scoredMatches.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+	
+	const bestMatch = scoredMatches[0];
+	
+	// Only return if score is meaningful (at least 10 points)
+	if (bestMatch.score >= 10) {
+		return bestMatch.model.id;
+	}
+	
+	// If no good match, return first search result (CLI would show these)
+	return searchResults[0].id;
 }
 
 /**
@@ -35,7 +147,7 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 	const templateName = specialistName.replace(/^@[^/]+\//, '');
 
 	// Construct template path relative to workspace root
-	const templatePath = `starting_from_outcome/${templateName}-template.json5`;
+	const templatePath = `templates/${templateName}-template.json5`;
 	const absolutePath = resolve(workspaceRoot, templatePath);
 
 	// Verify template exists
@@ -53,36 +165,132 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 	return absolutePath;
 }
 
-export async function createAgentAdapter(agentName: string, model?: string, specialistName?: string, workspaceRoot?: string): Promise<AgentAdapter> {
+export async function createAgentAdapter(agentName?: string, model?: string, specialistName?: string, workspaceRoot?: string): Promise<AgentAdapter> {
 	// Log agent creation attempt
 	console.log(chalk.gray('[DEBUG] createAgentAdapter()'));
-	console.log(chalk.gray(`  Agent: ${agentName}`));
-	console.log(chalk.gray(`  Model: ${model || 'default'}`));
+	console.log(chalk.gray(`  Agent: ${agentName || 'auto-detect'}`));
+	console.log(chalk.gray(`  Model: ${model || 'auto-detect'}`));
 	console.log(chalk.gray(`  Specialist: ${specialistName || 'none'}`));
 	console.log(chalk.gray(`  Workspace root: ${workspaceRoot || 'none'}`));
+
+	// If specialist is provided but model/agent not specified, try to auto-detect from template
+	let finalAgentName = agentName;
+	let finalModel = model;
+
+	if (specialistName && workspaceRoot && (!model || !agentName)) {
+		try {
+			console.log(chalk.gray(`  Auto-detecting model and agent from specialist template...`));
+			const templatePath = resolveSpecialistTemplatePath(specialistName, workspaceRoot);
+			
+			// Load template to get preferred models
+			const { loadTemplate } = await import('../../../agency-prompt-creator/src/loader.js');
+			const template = await loadTemplate(templatePath, {
+				baseDir: workspaceRoot
+			});
+
+			// Select preferred model if model not provided
+			if (!model) {
+				const preferredModel = selectPreferredModel(template);
+				if (preferredModel) {
+					finalModel = preferredModel.model;
+					console.log(chalk.blue(`  ℹ️  Using preferred model from template: ${chalk.cyan(finalModel)}`));
+				} else {
+					console.log(chalk.yellow(`  ⚠️  No preferred models found in template, using default agent`));
+				}
+			}
+
+			// If agent not provided, default to openrouter (we'll find the model in OpenRouter's catalog)
+			if (!agentName) {
+				finalAgentName = 'openrouter';
+				console.log(chalk.blue(`  ℹ️  Auto-detected agent: ${chalk.cyan('openrouter')} (will find model in OpenRouter catalog)`));
+			}
+
+			// Find the OpenRouter model by name using the same search logic as the interactive CLI
+			if (finalAgentName === 'openrouter' && finalModel) {
+				try {
+					const { OpenRouterAPI } = await import('../lib/openrouter-api.js');
+					const openrouterAPI = new OpenRouterAPI(process.env.OPENROUTER_API_KEY || '');
+					const availableModels = await openrouterAPI.getModelsWithToolSupport();
+					
+					if (availableModels.length > 0) {
+						// Use the same search logic as CLI's interactive mode
+						const searchResults = openrouterAPI.searchModels(availableModels, finalModel);
+						
+						if (searchResults.length > 0) {
+							// Find best match using scoring (same as CLI would do)
+							const closestModel = findClosestOpenRouterModel(finalModel, availableModels, openrouterAPI);
+							
+							if (closestModel !== finalModel) {
+								const matchedModel = availableModels.find(m => m.id === closestModel);
+								console.log(chalk.blue(`  ℹ️  Found closest OpenRouter model: ${chalk.cyan(closestModel)}`));
+								if (matchedModel?.name) {
+									console.log(chalk.gray(`     Model name: ${matchedModel.name}`));
+								}
+								if (searchResults.length > 1) {
+									console.log(chalk.gray(`     (${searchResults.length} matches found, selected best match)`));
+								}
+								finalModel = closestModel;
+							} else {
+								// Use first search result if scoring didn't find a better match
+								finalModel = searchResults[0].id;
+								console.log(chalk.blue(`  ℹ️  Using OpenRouter model: ${chalk.cyan(finalModel)}`));
+								if (searchResults.length > 1) {
+									console.log(chalk.gray(`     (${searchResults.length} matches found)`));
+								}
+							}
+						} else {
+							console.log(chalk.yellow(`  ⚠️  No OpenRouter models found matching "${finalModel}"`));
+							console.log(chalk.gray(`     Using model as-is: ${finalModel}`));
+						}
+					}
+				} catch (error) {
+					console.log(chalk.yellow(`  ⚠️  Could not fetch OpenRouter models for matching: ${error instanceof Error ? error.message : String(error)}`));
+					console.log(chalk.gray(`  Continuing with model: ${finalModel}`));
+				}
+			}
+
+			// If still no agent determined, default to openrouter
+			if (!finalAgentName) {
+				console.log(chalk.yellow(`  ⚠️  Could not determine agent, defaulting to openrouter`));
+				finalAgentName = 'openrouter';
+			}
+		} catch (error) {
+			console.error(chalk.yellow(`  ⚠️  Failed to auto-detect from template: ${error instanceof Error ? error.message : String(error)}`));
+			console.log(chalk.gray(`  Continuing with provided or default values...`));
+			// Continue with provided values or defaults
+			if (!finalAgentName) {
+				finalAgentName = 'openrouter';
+			}
+		}
+	}
+
+	// Ensure we have an agent name (default to echo if nothing specified)
+	if (!finalAgentName) {
+		finalAgentName = 'echo';
+	}
 
 	// Create base adapter
 	let baseAdapter: AgentAdapter;
 
 	try {
-		switch (agentName) {
+		switch (finalAgentName) {
 			case 'openrouter':
 				console.log(chalk.gray(`  Creating OpenRouterAdapter...`));
 				// Pass model directly to constructor instead of using environment variable
-				baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, model);
+				baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, finalModel);
 				console.log(chalk.gray(`  ✓ OpenRouterAdapter created`));
 				break;
 			case 'anthropic':
 				console.log(chalk.gray(`  Creating AnthropicAdapter...`));
-				if (model) {
-					process.env.CLAUDE_MODEL = model;
+				if (finalModel) {
+					process.env.CLAUDE_MODEL = finalModel;
 				}
 				baseAdapter = new AnthropicAdapter();
 				console.log(chalk.gray(`  ✓ AnthropicAdapter created`));
 				break;
 			case 'claude-code':
 				console.log(chalk.gray(`  Creating ClaudeCodeAdapter...`));
-				baseAdapter = new ClaudeCodeAdapter(model);
+				baseAdapter = new ClaudeCodeAdapter(finalModel);
 				console.log(chalk.gray(`  ✓ ClaudeCodeAdapter created`));
 				break;
 			case 'echo':
@@ -108,7 +316,8 @@ export async function createAgentAdapter(agentName: string, model?: string, spec
 			// Lazy load SpecialistAdapter to avoid loading agency-prompt-creator unless needed
 			console.log(chalk.gray(`  Loading SpecialistAdapter...`));
 			const { SpecialistAdapter } = await import('../../../agent-adapters/src/specialist.ts');
-			const specialistAdapter = new SpecialistAdapter(baseAdapter, templatePath);
+			// Use static factory method for async template loading with inheritance support
+			const specialistAdapter = await SpecialistAdapter.create(baseAdapter, templatePath);
 			console.log(chalk.gray(`  ✓ SpecialistAdapter created and wrapped base adapter`));
 			return specialistAdapter;
 		} catch (error) {

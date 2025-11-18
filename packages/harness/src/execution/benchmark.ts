@@ -62,7 +62,7 @@ export async function executeBenchmark(
 	suite: string,
 	scenario: string,
 	tier: string,
-	agent: string,
+	agent: string | undefined,
 	model?: string,
 	batchId?: string,
 	quiet?: boolean,
@@ -73,7 +73,9 @@ export async function executeBenchmark(
 	const logger = BenchmarkLogger.getInstance();
 
 	// Determine the agent name to log (will be updated if specialist is used)
-	let agentName = agent;
+	// Use 'auto-detect' as placeholder if agent is undefined and specialist is provided
+	let agentName = agent || (specialist ? 'auto-detect' : 'echo');
+	const agentDisplay = agent || 'auto-detect'; // For display purposes throughout the function
 	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
 
@@ -102,10 +104,10 @@ export async function executeBenchmark(
 	const promptContent = loadPrompt(suite, scenario, tier);
 
 		// Early failure check: prompt missing for non-echo agents
-		if (!promptContent && agent !== 'echo') {
+		if (!promptContent && agent !== 'echo' && agent !== undefined) {
 			logger.failRun('Prompt file not found', 'prompt');
 			if (!quiet) console.log(chalk.red('✗ Prompt file not found'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
 			return;
 		}
 
@@ -124,7 +126,7 @@ export async function executeBenchmark(
 					console.log(chalk.red(`[Benchmark] Agent error: ${warmupResult.agentError}`));
 				}
 			}
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
 			return;
 		}
 		if (!quiet) {
@@ -145,7 +147,7 @@ export async function executeBenchmark(
 		if (!workspacePrep) {
 			logger.failRun('Workspace preparation failed', 'workspace');
 			if (!quiet) console.log(chalk.red('✗ Workspace preparation failed'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`));
 			return;
 		}
 
@@ -161,7 +163,7 @@ export async function executeBenchmark(
 		suite,
 		scenario,
 		tier,
-		agent,
+		agent: agent || 'auto-detect',
 		model: model || 'default',
 		agent_response: '',
 		scores: {
@@ -182,13 +184,13 @@ export async function executeBenchmark(
 
 
 	// Stage 3: Agent Execution
-	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agent));
-	if (promptContent && agent !== 'echo') {
+	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
+	if (promptContent && agent !== 'echo' && agent !== undefined) {
 		console.log(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
 			console.log(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
-			// Create agent adapter
+			// Create agent adapter (agent can be undefined if specialist will auto-detect)
 		const agentAdapter = await createAgentAdapter(agent, model, specialist, workspaceRoot);
 
 			// Update the logged agent name with the actual adapter name
@@ -196,7 +198,7 @@ export async function executeBenchmark(
 			logger.updateAgent(agentAdapter.name, runId);
 
 			// Show selected model info - ALWAYS for OpenRouter
-			if (agent === 'openrouter' && 'getModel' in agentAdapter) {
+			if ((agent === 'openrouter' || (!agent && specialist)) && 'getModel' in agentAdapter) {
 				const adapterModel = (agentAdapter as any).getModel();
 				const modelSource = 'getModelSource' in agentAdapter
 					? (agentAdapter as any).getModelSource()
@@ -219,7 +221,7 @@ export async function executeBenchmark(
 				} else {
 					console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(adapterModel)}`));
 				}
-			} else if (model && agent !== 'openrouter') {
+			} else if (model && agent !== 'openrouter' && agent !== undefined) {
 				// For non-OpenRouter agents, show model if provided
 				console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(model)}`));
 			}
@@ -255,7 +257,9 @@ export async function executeBenchmark(
 			};
 
 			// Add tools if agent supports them (Anthropic and OpenRouter)
-			if ((agent === 'anthropic' || agent === 'openrouter') && workspaceDir) {
+			// Also support when agent is undefined but specialist will auto-detect (will be determined in createAgentAdapter)
+			const supportsTools = agent === 'anthropic' || agent === 'openrouter' || (!agent && specialist);
+			if (supportsTools && workspaceDir) {
 				// Create workspace tool handlers
 				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
 
@@ -273,7 +277,9 @@ export async function executeBenchmark(
 				}
 
 				// Convert tools to adapter-specific format
-				if (agent === 'openrouter') {
+				// If agent is undefined, we'll determine format after adapter is created
+				// For now, default to OpenRouter format when agent is undefined
+				if (agent === 'openrouter' || (!agent && specialist)) {
 					// Convert ToolDefinition to OpenRouter format
 					(request as any).tools = tools.map(tool => ({
 						type: 'function',
@@ -343,13 +349,13 @@ export async function executeBenchmark(
 			console.log(chalk.magenta('🔍 DEBUG: Agent execution threw error:', error));
 			logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) console.log(chalk.red('✗ Agent execution failed'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
+			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
 			return; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
 		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
-	} else {
-		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent'));
+	} else if (agent === 'echo' || agent === undefined) {
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or auto-detect'));
 	}
 
 	// Stage 4: Validation
@@ -460,13 +466,13 @@ export async function executeBenchmark(
 		const status = isSuccessful ? chalk.green('✓') : chalk.red('✗');
 		const modelStr = model ? ` [${model}]` : '';
 		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
-		console.log(`${status} ${suite}/${scenario} (${tier}) ${agent}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
+		console.log(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
 		return;
 	}
 
 	console.log(`\n${chalk.bold.underline('Benchmark Results')}`);
 	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-	console.log(`│ ${chalk.bold('Agent:')} ${chalk.cyan(agent.padEnd(15))} ${chalk.bold('Tier:')} ${chalk.cyan(tier.padEnd(8))} ${chalk.bold('Duration:')} ${chalk.blue(duration.toFixed(2) + 's')} │`);
+	console.log(`│ ${chalk.bold('Agent:')} ${chalk.cyan(agentDisplay.padEnd(15))} ${chalk.bold('Tier:')} ${chalk.cyan(tier.padEnd(8))} ${chalk.bold('Duration:')} ${chalk.blue(duration.toFixed(2) + 's')} │`);
 	console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
 	console.log(`│ ${chalk.bold('Score (mean ± σ):')} ${chalk.green(weightedScore.toFixed(4))} ± ${chalk.green('0.0000')} ${chalk.gray('(out of 10.0)')} │`);
 	console.log(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
@@ -553,7 +559,7 @@ export async function executeBenchmark(
 			}
 		}
 		if (quiet) {
-			console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agent}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`));
+			console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`));
 		}
 	} finally {
 		if (progress) completeProgress(progress);

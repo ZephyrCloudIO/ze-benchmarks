@@ -72,17 +72,19 @@ export function parseArgs(argv: string[]) {
 	const tierIndex = rest.indexOf('--tier');
 	const tier = tierIndex !== -1 ? rest[tierIndex + 1] : 'L0';
 
+	const specialistIndex = rest.indexOf('--specialist');
+	const specialist = specialistIndex !== -1 ? rest[specialistIndex + 1] : undefined;
+
 	const agentIndex = rest.indexOf('--agent');
-	const agent = agentIndex !== -1 ? rest[agentIndex + 1] : 'echo';
+	// If specialist is provided, agent can be undefined (will be auto-detected)
+	// Otherwise, default to 'echo'
+	const agent = agentIndex !== -1 ? rest[agentIndex + 1] : (specialist ? undefined : 'echo');
 
 	const modelIndex = rest.indexOf('--model');
 	const model = modelIndex !== -1 ? rest[modelIndex + 1] : undefined;
 
 	const batchIdIndex = rest.indexOf('--batch-id');
 	const batchId = batchIdIndex !== -1 ? rest[batchIdIndex + 1] : undefined;
-
-	const specialistIndex = rest.indexOf('--specialist');
-	const specialist = specialistIndex !== -1 ? rest[specialistIndex + 1] : undefined;
 
 	const skipWarmup = rest.includes('--skip-warmup');
 	const warmupOnly = rest.includes('--warmup-only');

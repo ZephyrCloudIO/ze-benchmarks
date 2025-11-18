@@ -106,6 +106,20 @@ export interface SpecialistTemplate {
   preferred_models?: PreferredModel[];
   documentation?: DocumentationEntry[];
 
+  // Task detection configuration (optional)
+  // If not provided, LLM will analyze template to generate patterns
+  task_detection?: {
+    patterns?: Record<string, string[]>; // Task type -> array of regex pattern strings
+    priority?: string[]; // Priority order for checking task types (most specific first)
+  };
+
+  // Dependencies (tools, subscriptions, etc.)
+  dependencies?: {
+    available_tools?: string[]; // Tools available to specialist (file_system, terminal, etc.)
+    subscription?: string[]; // Required subscriptions or services
+    [key: string]: any;
+  };
+
   // Metadata
   [key: string]: any;
 }

@@ -184,13 +184,13 @@ export type SpecialistTemplate = z.infer<typeof SpecialistTemplateSchema>;
 export async function readAndValidateTemplate(
   filePath: string
 ): Promise<SpecialistTemplate> {
-  try {
-    const fileContent = await readFile(filePath, 'utf8');
+    try {
+      const fileContent = await readFile(filePath, 'utf8');
     const parsedData = json5.parse(fileContent);
     
     // Validate against schema
     return SpecialistTemplateSchema.parse(parsedData);
-  } catch (error) {
+    } catch (error) {
     if (error instanceof z.ZodError) {
       console.error(`Validation error in ${filePath}:`);
       console.error(JSON.stringify(error.errors, null, 2));

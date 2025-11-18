@@ -167,6 +167,9 @@ importers:
       json5:
         specifier: ^2.2.3
         version: 2.2.3
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@rslib/core':
         specifier: ^0.17.1

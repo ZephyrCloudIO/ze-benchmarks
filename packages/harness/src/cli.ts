@@ -512,20 +512,24 @@ async function run() {
 	// Show modern CLI intro with hyperfine-style header (skip if quiet mode)
 	if (!quiet) {
 		console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
-		console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agent}'`)}`);
+		const agentDisplay = agent || (specialist ? 'auto-detect' : 'echo');
+		console.log(`\n${chalk.green('►')} ${chalk.green('pnpm bench')} ${chalk.yellow(`'${suite}/${scenario}'`)} ${chalk.yellow(`'${tier}'`)} ${chalk.yellow(`'${agentDisplay}'`)}`);
 
 		log.info(chalk.bold(`Running: ${suite}/${scenario}`));
-		log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agent)}`);
+		log.info(`${chalk.gray('Tier:')} ${chalk.cyan(tier)} ${chalk.gray('Agent:')} ${chalk.cyan(agentDisplay)}`);
+		if (specialist && !agent) {
+			log.info(chalk.blue(`  ℹ️  Agent will be auto-detected from specialist preferred model`));
+		}
 
-		// Warn if OpenRouter agent but no model specified
-		if (agent === 'openrouter' && !model && !process.env.OPENROUTER_MODEL) {
+		// Warn if OpenRouter agent but no model specified (and no specialist to auto-detect)
+		if (agent === 'openrouter' && !model && !specialist && !process.env.OPENROUTER_MODEL) {
 			console.log(chalk.yellow(`\n⚠️  Warning: No model specified for OpenRouter agent. Using default model.`));
 			console.log(chalk.gray(`   Tip: Use --model flag or set OPENROUTER_MODEL environment variable`));
 			console.log(chalk.gray(`   Example: pnpm bench ${suite}/${scenario} ${tier} ${agent} --model openai/gpt-4o-mini\n`));
 		}
 	}
 
-	// Execute the benchmark
+	// Execute the benchmark (agent can be undefined if specialist will auto-detect)
 	await executeBenchmark(suite, scenario, tier, agent, model, batchId, quiet, specialist, skipWarmup);
 }
 

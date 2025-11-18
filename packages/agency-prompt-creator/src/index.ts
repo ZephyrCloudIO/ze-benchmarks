@@ -14,6 +14,11 @@ export {
   detectTaskType,
   detectTaskTypesWithConfidence,
   getTaskKeywords,
+  analyzeTemplateWithLLM,
+  buildTaskDetectionPrompt,
+  parseTaskDetectionResponse,
+  TASK_DETECTION_TOOL,
+  type TaskDetectionResult,
 } from './task-detection.js';
 
 // Prompt selection

@@ -18,7 +18,8 @@
     "test": "rstest"
   },
   "dependencies": {
-    "json5": "^2.2.3"
+    "json5": "^2.2.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@rslib/core": "^0.17.1",

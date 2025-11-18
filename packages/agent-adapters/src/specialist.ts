@@ -15,7 +15,8 @@ import {
   parseComponentSelectionResponse,
   COMPONENT_SELECTION_TOOL,
   substituteWithLLM,
-  SUBSTITUTION_TOOL
+  SUBSTITUTION_TOOL,
+  loadTemplate
 } from 'agency-prompt-creator';
 import {
   buildPromptSelectionPrompt,
@@ -120,15 +121,113 @@ export class SpecialistAdapter implements AgentAdapter {
   private llmTelemetry: LLMTelemetry = {};
 
   /**
+   * Create a new specialist adapter (async factory method)
+   * Uses agency-prompt-creator's loadTemplate for inheritance and validation
+   *
+   * @param underlyingAdapter - The base adapter to wrap (AnthropicAdapter, OpenRouterAdapter, etc.)
+   * @param templatePath - Path to specialist template or snapshot JSON5 file (relative to project root)
+   * @returns Promise resolving to SpecialistAdapter instance
+   * @throws Error if template file not found, invalid, or loading fails
+   */
+  static async create(
+    underlyingAdapter: AgentAdapter,
+    templatePath: string
+  ): Promise<SpecialistAdapter> {
+    try {
+      // Resolve enriched template path first (before loading)
+      const resolvedPath = SpecialistAdapter.resolveTemplatePathSync(templatePath);
+      
+      // Load template using agency-prompt-creator (handles inheritance)
+      console.log('[SpecialistAdapter] Loading template with agency-prompt-creator:', resolvedPath);
+      let template: SpecialistTemplate;
+      
+      try {
+        template = await loadTemplate(resolvedPath, {
+          baseDir: process.cwd()
+        });
+      } catch (loadError) {
+        if (loadError instanceof Error) {
+          // Provide more context about template loading failures
+          if (loadError.message.includes('not found') || loadError.message.includes('ENOENT')) {
+            throw new Error(
+              `Specialist template not found: ${templatePath}\n` +
+              `  Resolved path: ${resolvedPath}\n` +
+              `  Make sure the path is relative to project root and the file exists.`
+            );
+          }
+          if (loadError.message.includes('circular') || loadError.message.includes('Circular')) {
+            throw new Error(
+              `Circular dependency detected in template inheritance: ${templatePath}\n` +
+              `  ${loadError.message}`
+            );
+          }
+          if (loadError.message.includes('Invalid template') || loadError.message.includes('validation')) {
+            throw new Error(
+              `Invalid specialist template: ${templatePath}\n` +
+              `  ${loadError.message}\n` +
+              `  Ensure the template follows the correct schema.`
+            );
+          }
+          throw new Error(`Failed to load specialist template: ${loadError.message}`);
+        }
+        throw loadError;
+      }
+
+      // Validate loaded template has required fields
+      if (!template.name || !template.prompts) {
+        throw new Error(
+          `Invalid specialist template: missing required fields 'name' or 'prompts'\n` +
+          `  Template path: ${templatePath}\n` +
+          `  Loaded template name: ${template.name || 'missing'}\n` +
+          `  Has prompts: ${!!template.prompts}`
+        );
+      }
+
+      console.log('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
+      console.log('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
+
+      // Create instance with pre-loaded template
+      return new SpecialistAdapter(underlyingAdapter, templatePath, template);
+    } catch (error) {
+      // Re-throw with additional context if not already enhanced
+      if (error instanceof Error) {
+        // Only add context if error message doesn't already include template path
+        if (!error.message.includes(templatePath)) {
+          throw new Error(
+            `Failed to create SpecialistAdapter: ${error.message}\n` +
+            `  Template path: ${templatePath}`
+          );
+        }
+        throw error;
+      }
+      throw new Error(`Failed to create SpecialistAdapter: ${String(error)}`);
+    }
+  }
+
+  /**
    * Create a new specialist adapter
    *
    * @param underlyingAdapter - The base adapter to wrap (AnthropicAdapter, OpenRouterAdapter, etc.)
    * @param templatePath - Path to specialist template or snapshot JSON5 file (relative to project root)
+   * @param preLoadedTemplate - Optional pre-loaded template (for use by static create() method)
    */
-  constructor(underlyingAdapter: AgentAdapter, templatePath: string) {
+  constructor(
+    underlyingAdapter: AgentAdapter,
+    templatePath: string,
+    preLoadedTemplate?: SpecialistTemplate
+  ) {
     this.underlyingAdapter = underlyingAdapter;
     this.templatePath = templatePath;
-    this.template = this.loadTemplate(templatePath);
+    
+    // Use pre-loaded template if provided, otherwise fall back to sync loading (backward compatibility)
+    if (preLoadedTemplate) {
+      this.template = preLoadedTemplate;
+    } else {
+      // Fallback to sync loading for backward compatibility
+      console.warn('[SpecialistAdapter] Using synchronous template loading (deprecated). Use SpecialistAdapter.create() for async loading with inheritance support.');
+      this.template = this.loadTemplateSync(templatePath);
+    }
+    
     this.name = `specialist:${this.template.name}:${underlyingAdapter.name}`;
 
     // Initialize LLM configuration
@@ -144,16 +243,17 @@ export class SpecialistAdapter implements AgentAdapter {
   }
 
   /**
-   * Load and parse specialist template from filesystem
-   * Automatically uses enriched template if available
+   * Synchronous template loading (backward compatibility only)
+   * Uses direct JSON5 parsing - does NOT support inheritance
    *
    * @param templatePath - Path to JSON5 template file
    * @returns Parsed specialist template
    * @throws Error if file not found or invalid JSON5
+   * @deprecated Use SpecialistAdapter.create() for async loading with inheritance support
    */
-  private loadTemplate(templatePath: string): SpecialistTemplate {
+  private loadTemplateSync(templatePath: string): SpecialistTemplate {
     try {
-      console.log('[SpecialistAdapter] Loading template from:', templatePath);
+      console.log('[SpecialistAdapter] Loading template synchronously (deprecated):', templatePath);
 
       // Resolve template path (automatically use enriched version if available)
       const resolvedPath = this.resolveTemplatePath(templatePath);
@@ -188,6 +288,48 @@ export class SpecialistAdapter implements AgentAdapter {
 
   /**
    * Resolve template path, automatically using latest enriched version if available
+   * Static version for use in factory method
+   *
+   * NEW STRUCTURE:
+   * - Original: starting_from_outcome/shadcn-specialist-template.json5
+   * - Enriched: starting_from_outcome/enriched/0.0.5/enriched-001.json5
+   *             starting_from_outcome/enriched/0.0.5/enriched-002.json5
+   *             ... (always use highest number)
+   */
+  private static resolveTemplatePathSync(templatePath: string): string {
+    const absolutePath = resolve(process.cwd(), templatePath);
+
+    // If path is already an enriched template, use it
+    if (SpecialistAdapter.isEnrichedTemplatePath(absolutePath)) {
+      console.log(`[SpecialistAdapter] Using explicitly specified enriched template: ${absolutePath}`);
+      return absolutePath;
+    }
+
+    // Try to find latest enriched version
+    try {
+      const contents = readFileSync(absolutePath, 'utf-8');
+      const template = JSON5.parse(contents) as SpecialistTemplate;
+      const latestEnrichedPath = SpecialistAdapter.getLatestEnrichedTemplatePath(absolutePath, template.version);
+
+      if (latestEnrichedPath) {
+        console.log(`[SpecialistAdapter] Using enriched template: ${latestEnrichedPath}`);
+        return latestEnrichedPath;
+      } else {
+        console.warn(`[SpecialistAdapter] No enriched template found for version ${template.version}`);
+        console.warn(`[SpecialistAdapter] Expected location: ${SpecialistAdapter.getEnrichedDir(absolutePath, template.version)}`);
+        console.warn(`[SpecialistAdapter] Using original template. Run enrichment to generate enriched template.`);
+      }
+    } catch (error) {
+      // If we can't read the template, fall back to original path
+      console.warn(`[SpecialistAdapter] Failed to check for enriched template:`, error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    return absolutePath;
+  }
+
+  /**
+   * Resolve template path, automatically using latest enriched version if available
+   * Instance method for backward compatibility
    *
    * NEW STRUCTURE:
    * - Original: starting_from_outcome/shadcn-specialist-template.json5
@@ -229,24 +371,38 @@ export class SpecialistAdapter implements AgentAdapter {
   /**
    * Check if a path is an enriched template
    */
-  private isEnrichedTemplatePath(path: string): boolean {
+  private static isEnrichedTemplatePath(path: string): boolean {
     return path.includes('/enriched/') && path.includes('enriched-') && path.endsWith('.json5');
+  }
+
+  /**
+   * Instance method for backward compatibility
+   */
+  private isEnrichedTemplatePath(path: string): boolean {
+    return SpecialistAdapter.isEnrichedTemplatePath(path);
   }
 
   /**
    * Get enriched directory for a template version
    */
-  private getEnrichedDir(templatePath: string, version: string): string {
+  private static getEnrichedDir(templatePath: string, version: string): string {
     const dir = dirname(templatePath);
     return join(dir, 'enriched', version);
+  }
+
+  /**
+   * Instance method for backward compatibility
+   */
+  private getEnrichedDir(templatePath: string, version: string): string {
+    return SpecialistAdapter.getEnrichedDir(templatePath, version);
   }
 
   /**
    * Get latest enriched template path for a given template path and version
    * Returns null if no enriched templates exist
    */
-  private getLatestEnrichedTemplatePath(templatePath: string, version: string): string | null {
-    const enrichedDir = this.getEnrichedDir(templatePath, version);
+  private static getLatestEnrichedTemplatePath(templatePath: string, version: string): string | null {
+    const enrichedDir = SpecialistAdapter.getEnrichedDir(templatePath, version);
 
     if (!existsSync(enrichedDir)) {
       return null;
@@ -273,6 +429,13 @@ export class SpecialistAdapter implements AgentAdapter {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Instance method for backward compatibility
+   */
+  private getLatestEnrichedTemplatePath(templatePath: string, version: string): string | null {
+    return SpecialistAdapter.getLatestEnrichedTemplatePath(templatePath, version);
   }
 
   /**
