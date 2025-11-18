@@ -57,7 +57,7 @@ async function loadTemplateRecursive(
   inheritanceChain.add(resolvedPath);
 
   // Load the template file
-  const template = loadTemplateFile(resolvedPath);
+  const template = await loadTemplateFile(resolvedPath);
 
   // Validate basic structure
   if (!validateTemplate(template)) {
@@ -127,7 +127,7 @@ function resolveTemplatePath(templatePath: string, baseDir: string): string {
  * Load and parse a template file
  * Supports both JSON5 and JSON formats
  */
-function loadTemplateFile(filePath: string): any {
+async function loadTemplateFile(filePath: string): Promise<any> {
   if (!existsSync(filePath)) {
     throw new Error(`Template file not found: ${filePath}`);
   }
@@ -135,17 +135,47 @@ function loadTemplateFile(filePath: string): any {
   try {
     const content = readFileSync(filePath, 'utf-8');
 
-    // Try JSON first (faster for standard JSON files)
+    // Check if file has JSON5 features (comments, trailing commas)
+    // If it starts with // or has trailing commas, use JSON5 directly
+    const hasComments = content.trim().startsWith('//') || content.includes('//');
+    const hasTrailingCommas = /,\s*[}\]\s]*$/.test(content);
+    
+    // Import JSON5 at the top level (it's a CommonJS module that works with require)
+    let JSON5: any;
+    try {
+      JSON5 = require('json5');
+    } catch (e) {
+      // If require fails, try dynamic import
+      const json5Module = await import('json5');
+      JSON5 = json5Module.default || json5Module;
+    }
+    
+    if (hasComments || hasTrailingCommas || filePath.endsWith('.json5')) {
+      // Use JSON5 for .json5 files or files with comments
+      try {
+        return JSON5.parse(content);
+      } catch (json5Error) {
+        throw new Error(
+          `Failed to parse JSON5 template file ${filePath}: ${
+            json5Error instanceof Error ? json5Error.message : String(json5Error)
+          }`
+        );
+      }
+    }
+
+    // Try JSON for standard JSON files
     try {
       return JSON.parse(content);
     } catch (jsonError) {
-      // Fall back to JSON5 for files with comments/trailing commas
+      // Fall back to JSON5 if JSON parsing fails
       try {
-        // Use dynamic import for JSON5
-        const JSON5 = require('json5');
         return JSON5.parse(content);
       } catch (json5Error) {
-        throw jsonError; // Throw original JSON error
+        throw new Error(
+          `Failed to parse template file ${filePath}: ${
+            jsonError instanceof Error ? jsonError.message : String(jsonError)
+          }`
+        );
       }
     }
   } catch (error) {

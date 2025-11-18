@@ -38,6 +38,9 @@ This guide explains how to test the new auto-detection feature for specialist pr
 ```bash
 # Use a simple test scenario
 pnpm bench test-suite test-scenario --tier L1 --specialist shadcn-specialist
+
+# Or with Next.js specialist
+pnpm bench next.js 001-server-component --tier L1 --specialist nextjs-specialist
 ```
 
 **What to Look For:**
@@ -62,6 +65,9 @@ pnpm bench test-suite test-scenario --tier L1 --specialist shadcn-specialist
 ```bash
 # Override with a different model
 pnpm bench test-suite test-scenario --tier L1 --specialist shadcn-specialist --model gpt-4o
+
+# Or with Next.js specialist
+pnpm bench next.js 001-server-component --tier L1 --specialist nextjs-specialist --model openrouter/openai/gpt-4o
 ```
 
 **What to Look For:**

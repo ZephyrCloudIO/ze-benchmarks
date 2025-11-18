@@ -185,7 +185,11 @@ export async function executeBenchmark(
 
 	// Stage 3: Agent Execution
 	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
-	if (promptContent && agent !== 'echo' && agent !== undefined) {
+	// Allow agent execution if:
+	// 1. We have prompt content
+	// 2. Agent is not 'echo'
+	// 3. Either agent is defined OR specialist is provided (specialist will auto-detect agent via createAgentAdapter)
+	if (promptContent && agent !== 'echo' && (agent !== undefined || specialist)) {
 		console.log(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
@@ -354,8 +358,10 @@ export async function executeBenchmark(
 		}
 	} else if (!promptContent) {
 		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
-	} else if (agent === 'echo' || agent === undefined) {
-		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or auto-detect'));
+	} else if (agent === 'echo' || (agent === undefined && !specialist)) {
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or no specialist provided'));
+	} else {
+		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
 	}
 
 	// Stage 4: Validation
