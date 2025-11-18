@@ -17,11 +17,15 @@ export function computeWeightedTotals(
 	scenarioCfg: { rubric_overrides?: { weights?: Record<string, number> } },
 ) {
 	const baseWeights: Record<string, number> = {
-		install_success: 1.5,
-		tests_nonregression: 2.5,
-		manager_correctness: 1,
-		dependency_targets: 2,
-		integrity_guard: 1.5,
+		install_success: 0,
+		tests_nonregression: 0,
+		manager_correctness: 0,
+		dependency_targets: 0,
+		integrity_guard: 0,
+		file_structure: 0,
+		config_accuracy: 0,
+		dependency_proximity: 0,
+		llm_judge: 1.0, // Only LLM judge contributes to the score
 	};
 
 	const overrideWeights = scenarioCfg.rubric_overrides?.weights ?? {};

@@ -185,6 +185,31 @@ export class SpecialistAdapter implements AgentAdapter {
 
       console.log('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
       console.log('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
+      
+      // Debug: Log template prompts structure
+      console.log('[SpecialistAdapter] ========== TEMPLATE PROMPTS STRUCTURE ==========');
+      console.log('[SpecialistAdapter] Top-level prompt keys:', Object.keys(template.prompts || {}).join(', '));
+      
+      if (template.prompts) {
+        // Log each task type
+        for (const [key, value] of Object.entries(template.prompts)) {
+          if (key === 'default' || key === 'model_specific' || key === 'prompt_strategy') {
+            continue;
+          }
+          console.log(`[SpecialistAdapter] Task type "${key}":`, {
+            hasDefault: !!(value as any)?.default,
+            hasModelSpecific: !!(value as any)?.model_specific,
+            defaultKeys: (value as any)?.default ? Object.keys((value as any).default) : [],
+            modelSpecificModels: (value as any)?.model_specific ? Object.keys((value as any).model_specific) : []
+          });
+          
+          // Log model-specific structure for migration specifically
+          if (key === 'migration' && (value as any)?.model_specific) {
+            console.log(`[SpecialistAdapter] Migration model_specific structure:`, JSON.stringify((value as any).model_specific, null, 2).substring(0, 1000));
+          }
+        }
+      }
+      console.log('[SpecialistAdapter] ================================================');
 
       // Create instance with pre-loaded template
       return new SpecialistAdapter(underlyingAdapter, templatePath, template);
@@ -733,6 +758,32 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const prompt = buildComponentSelectionPrompt(userPrompt, intent, this.template);
+    
+    // Debug: Log what prompts are available for selection
+    console.log('[SpecialistAdapter] ========== COMPONENT SELECTION DEBUG ==========');
+    console.log('[SpecialistAdapter] Template prompts structure check:');
+    console.log('[SpecialistAdapter]   - Has prompts object:', !!this.template.prompts);
+    console.log('[SpecialistAdapter]   - Prompt keys:', Object.keys(this.template.prompts || {}).join(', '));
+    
+    // Check migration specifically
+    const migrationPrompts = (this.template.prompts as any)?.migration;
+    if (migrationPrompts) {
+      console.log('[SpecialistAdapter] Migration prompts found:');
+      console.log('[SpecialistAdapter]   - Has default:', !!migrationPrompts.default);
+      console.log('[SpecialistAdapter]   - Has model_specific:', !!migrationPrompts.model_specific);
+      if (migrationPrompts.model_specific) {
+        console.log('[SpecialistAdapter]   - Model-specific models:', Object.keys(migrationPrompts.model_specific).join(', '));
+        if (migrationPrompts.model_specific['claude-sonnet-4.5']) {
+          console.log('[SpecialistAdapter]   - claude-sonnet-4.5 keys:', Object.keys(migrationPrompts.model_specific['claude-sonnet-4.5']).join(', '));
+          console.log('[SpecialistAdapter]   - Has systemPrompt:', !!migrationPrompts.model_specific['claude-sonnet-4.5'].systemPrompt);
+        } else {
+          console.log('[SpecialistAdapter]   - ⚠️ claude-sonnet-4.5 NOT FOUND in model_specific');
+        }
+      }
+    } else {
+      console.log('[SpecialistAdapter] ⚠️ Migration prompts NOT FOUND in template');
+    }
+    console.log('[SpecialistAdapter] ================================================');
 
     try {
       const response = await Promise.race([
@@ -753,7 +804,28 @@ export class SpecialistAdapter implements AgentAdapter {
         throw new Error('No tool call in component selection response');
       }
 
+      // Debug: Log raw LLM response
+      console.log('[SpecialistAdapter] ========== LLM COMPONENT SELECTION RESPONSE ==========');
+      console.log('[SpecialistAdapter] Raw tool call arguments:', toolCall.function.arguments);
+      try {
+        const parsedArgs = typeof toolCall.function.arguments === 'string' 
+          ? JSON.parse(toolCall.function.arguments)
+          : toolCall.function.arguments;
+        console.log('[SpecialistAdapter] Parsed taskPromptId:', parsedArgs.taskPromptId);
+        console.log('[SpecialistAdapter] Parsed spawnerPromptId:', parsedArgs.spawnerPromptId);
+      } catch (e) {
+        console.log('[SpecialistAdapter] Could not parse tool call arguments');
+      }
+      console.log('[SpecialistAdapter] =======================================================');
+      
       const selection = parseComponentSelectionResponse(toolCall.function.arguments, this.template);
+      
+      // Debug: Log parsed selection
+      console.log('[SpecialistAdapter] ========== PARSED SELECTION ==========');
+      console.log('[SpecialistAdapter] Selection taskPromptId:', selection.taskPromptId);
+      console.log('[SpecialistAdapter] Selection spawnerPromptId:', selection.spawnerPromptId);
+      console.log('[SpecialistAdapter] ====================================');
+      
       this.llmCache.set(cacheKey, selection);
       return selection;
     } catch (error) {
@@ -772,28 +844,72 @@ export class SpecialistAdapter implements AgentAdapter {
     intent: ExtractedIntent,
     selection: SpecialistSelection
   ): Promise<string> {
+    console.log('[SpecialistAdapter] ========== CREATING SYSTEM PROMPT ==========');
+    console.log('[SpecialistAdapter] Requested spawnerPromptId:', selection.spawnerPromptId);
+    console.log('[SpecialistAdapter] Requested taskPromptId:', selection.taskPromptId);
+    
+    // Debug: Log full template.prompts structure before lookup
+    console.log('[SpecialistAdapter] Full template.prompts keys:', Object.keys(this.template.prompts || {}).join(', '));
+    
     // 1. Get spawner prompt content
+    console.log('[SpecialistAdapter] Looking up spawner prompt...');
     const spawnerPromptContent = this.getPromptById(selection.spawnerPromptId);
     if (!spawnerPromptContent) {
+      console.error('[SpecialistAdapter] ❌ Spawner prompt lookup FAILED');
       throw new Error(`Spawner prompt not found: ${selection.spawnerPromptId}`);
     }
+    console.log('[SpecialistAdapter] ✓ Spawner prompt found, length:', spawnerPromptContent.length);
 
     // 2. Get task prompt content
+    console.log('[SpecialistAdapter] Looking up task prompt...');
     let taskPromptContent = this.getPromptById(selection.taskPromptId);
     if (!taskPromptContent) {
+      console.log('[SpecialistAdapter] ⚠️ Task prompt not found on first attempt');
       // Try to fallback to default if model-specific not found
       const parts = selection.taskPromptId.split('.');
+      console.log('[SpecialistAdapter] Task prompt ID parts:', parts);
       if (parts.length >= 4 && parts[1] === 'model_specific') {
         // Try default version: "migration.model_specific.claude-sonnet-4.5.systemPrompt" -> "migration.default.systemPrompt"
         const fallbackId = `${parts[0]}.default.${parts[3]}`;
-        console.log(`[SpecialistAdapter] Task prompt not found: ${selection.taskPromptId}, trying fallback: ${fallbackId}`);
+        console.log(`[SpecialistAdapter] Trying fallback: ${fallbackId}`);
         taskPromptContent = this.getPromptById(fallbackId);
+        if (taskPromptContent) {
+          console.log('[SpecialistAdapter] ✓ Fallback prompt found');
+        } else {
+          console.log('[SpecialistAdapter] ❌ Fallback prompt also not found');
+        }
       }
       
       if (!taskPromptContent) {
+        // Final debug: Log the exact structure we're looking for
+        console.log('[SpecialistAdapter] ========== FINAL DEBUG: TEMPLATE STRUCTURE ==========');
+        const taskType = parts[0];
+        const modelKey = parts.length >= 3 ? parts[2] : 'N/A';
+        const promptKey = parts.length >= 4 ? parts[3] : 'N/A';
+        console.log('[SpecialistAdapter] Looking for:', { taskType, modelKey, promptKey });
+        
+        const taskPrompts = (this.template.prompts as any)?.[taskType];
+        console.log('[SpecialistAdapter] Task prompts exists:', !!taskPrompts);
+        if (taskPrompts) {
+          console.log('[SpecialistAdapter] Task prompts keys:', Object.keys(taskPrompts).join(', '));
+          console.log('[SpecialistAdapter] Has model_specific:', !!taskPrompts.model_specific);
+          if (taskPrompts.model_specific) {
+            console.log('[SpecialistAdapter] Model-specific keys:', Object.keys(taskPrompts.model_specific).join(', '));
+            if (taskPrompts.model_specific[modelKey]) {
+              console.log('[SpecialistAdapter] Model key exists, its keys:', Object.keys(taskPrompts.model_specific[modelKey]).join(', '));
+            } else {
+              console.log('[SpecialistAdapter] Model key does not exist');
+            }
+          }
+        }
+        console.log('[SpecialistAdapter] ====================================================');
+        
         throw new Error(`Task prompt not found: ${selection.taskPromptId} (also tried fallback)`);
       }
+    } else {
+      console.log('[SpecialistAdapter] ✓ Task prompt found, length:', taskPromptContent.length);
     }
+    console.log('[SpecialistAdapter] ===========================================');
 
     // 3. Build context for substitution
     const context = {
@@ -1271,7 +1387,9 @@ The following documentation resources are most relevant to your task:
    * - "general.model_specific.claude-sonnet-4.5.spawnerPrompt"
    */
   private getPromptById(promptId: string): string | null {
+    console.log(`[SpecialistAdapter] getPromptById called with: "${promptId}"`);
     const parts = promptId.split('.');
+    console.log(`[SpecialistAdapter] Split into ${parts.length} parts:`, parts);
 
     // Handle general default prompts: "default.spawnerPrompt"
     if (parts[0] === 'default' && parts.length === 2) {
@@ -1295,20 +1413,46 @@ The following documentation resources are most relevant to your task:
     }
 
     // Handle task-specific model prompts: "project_setup.model_specific.claude-sonnet-4.5.systemPrompt"
+    // NOTE: Model names can contain dots (e.g., "claude-sonnet-4.5"), so we can't just split by "."
+    // Format: <taskType>.model_specific.<modelName>.<promptKey>
+    // We need to extract: taskType, "model_specific" (constant), modelName (can have dots), promptKey
     if (parts.length >= 4 && parts[1] === 'model_specific') {
       const taskType = parts[0];
-      const modelKey = parts[2];
-      const promptKey = parts[3];
+      
+      // Model name is everything between "model_specific" and the last part (promptKey)
+      // So if we have: ["migration", "model_specific", "claude-sonnet-4", "5", "systemPrompt"]
+      // We need: modelKey = "claude-sonnet-4.5" (parts[2] + "." + parts[3] + ... + parts[length-2])
+      // And: promptKey = "systemPrompt" (last part)
+      const modelKeyParts = parts.slice(2, -1); // Everything except first 2 and last 1
+      const modelKey = modelKeyParts.join('.'); // Rejoin with dots to handle model names like "claude-sonnet-4.5"
+      const promptKey = parts[parts.length - 1]; // Last part is always the prompt key
+      
       const taskPrompts = (this.template.prompts as any)[taskType];
       
+      console.log(`[SpecialistAdapter] Looking for prompt: ${promptId}`);
+      console.log(`[SpecialistAdapter] Parsed: taskType="${taskType}", modelKey="${modelKey}", promptKey="${promptKey}"`);
+      console.log(`[SpecialistAdapter] Task prompts exists: ${!!taskPrompts}`);
+      
       if (!taskPrompts) {
-        console.log(`[SpecialistAdapter] Task type "${taskType}" not found in template. Available tasks: ${Object.keys(this.template.prompts || {}).filter(k => k !== 'default' && k !== 'model_specific' && k !== 'prompt_strategy').join(', ')}`);
+        const availableTasks = Object.keys(this.template.prompts || {}).filter(k => k !== 'default' && k !== 'model_specific' && k !== 'prompt_strategy');
+        console.log(`[SpecialistAdapter] Task type "${taskType}" not found in template. Available tasks: ${availableTasks.join(', ')}`);
+        console.log(`[SpecialistAdapter] All prompt keys: ${Object.keys(this.template.prompts || {}).join(', ')}`);
         return null;
       }
       
+      console.log(`[SpecialistAdapter] Task prompts structure:`, {
+        hasDefault: !!taskPrompts.default,
+        hasModelSpecific: !!taskPrompts.model_specific,
+        defaultKeys: taskPrompts.default ? Object.keys(taskPrompts.default) : [],
+        modelSpecificKeys: taskPrompts.model_specific ? Object.keys(taskPrompts.model_specific) : []
+      });
+      
       // Try model-specific first
       const modelSpecificPrompt = taskPrompts?.model_specific?.[modelKey]?.[promptKey];
+      console.log(`[SpecialistAdapter] Model-specific prompt lookup: taskPrompts.model_specific["${modelKey}"]["${promptKey}"] = ${modelSpecificPrompt ? 'FOUND' : 'NOT FOUND'}`);
+      
       if (modelSpecificPrompt) {
+        console.log(`[SpecialistAdapter] ✓ Found model-specific prompt: ${promptId}`);
         return modelSpecificPrompt;
       }
       
@@ -1316,8 +1460,10 @@ The following documentation resources are most relevant to your task:
       if (taskPrompts.model_specific) {
         const availableModels = Object.keys(taskPrompts.model_specific);
         console.log(`[SpecialistAdapter] Model "${modelKey}" not found in model_specific. Available models: ${availableModels.join(', ')}`);
+        console.log(`[SpecialistAdapter] Full model_specific structure:`, JSON.stringify(taskPrompts.model_specific, null, 2).substring(0, 500));
       } else {
         console.log(`[SpecialistAdapter] No model_specific section found for task "${taskType}"`);
+        console.log(`[SpecialistAdapter] Task prompts keys: ${Object.keys(taskPrompts).join(', ')}`);
       }
       
       // Fallback to default if model-specific not found

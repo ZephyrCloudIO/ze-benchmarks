@@ -34,7 +34,18 @@ export class LLMJudgeEvaluator implements Evaluator {
   meta = { name: "LLMJudgeEvaluator" } as const;
 
   async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
-    console.log(chalk.blue('\n[LLMJudgeEvaluator] Starting evaluation...'));
+    console.log(chalk.blue('\n[LLMJudgeEvaluator] ========== STARTING EVALUATION =========='));
+    console.log(chalk.blue(`[LLMJudgeEvaluator] Scenario: ${ctx.scenario.id || 'unknown'}`));
+    console.log(chalk.blue(`[LLMJudgeEvaluator] Suite: ${ctx.scenario.suite || 'unknown'}`));
+    
+    // Debug: Log evaluation context
+    console.log(chalk.cyan('\n[LLMJudgeEvaluator] Evaluation Context:'));
+    console.log(chalk.gray(`  - Workspace dir: ${ctx.workspaceDir || 'N/A'}`));
+    console.log(chalk.gray(`  - Reference path: ${ctx.referencePath || 'N/A'}`));
+    console.log(chalk.gray(`  - Agent response length: ${ctx.agentResponse?.length || 0} chars`));
+    console.log(chalk.gray(`  - Command log entries: ${ctx.commandLog?.length || 0}`));
+    console.log(chalk.gray(`  - Diff summary: ${ctx.diffSummary ? 'present' : 'missing'}`));
+    console.log(chalk.gray(`  - Deps delta: ${ctx.depsDelta ? 'present' : 'missing'}`));
     
     // Check if LLM judge is enabled for this scenario
     if (!ctx.scenario.llm_judge?.enabled) {
@@ -56,7 +67,10 @@ export class LLMJudgeEvaluator implements Evaluator {
       };
     }
 
-    console.log(chalk.blue(`[LLMJudgeEvaluator] Categories to evaluate: ${ctx.scenario.llm_judge.categories.join(', ')}`));
+    console.log(chalk.blue(`[LLMJudgeEvaluator] Categories to evaluate (${ctx.scenario.llm_judge.categories.length}):`));
+    ctx.scenario.llm_judge.categories.forEach((cat, idx) => {
+      console.log(chalk.gray(`  ${idx + 1}. ${cat}`));
+    });
 
     // Initialize OpenAI client
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -84,10 +98,26 @@ export class LLMJudgeEvaluator implements Evaluator {
 
     try {
       // Build the evaluation prompt
-      console.log(chalk.blue('[LLMJudgeEvaluator] Building evaluation prompt...'));
+      console.log(chalk.blue('\n[LLMJudgeEvaluator] Building evaluation prompt...'));
       const prompt = this.buildPrompt(ctx);
       console.log(chalk.gray(`[LLMJudgeEvaluator] Prompt length: ${prompt.length} characters`));
       console.log(chalk.gray(`[LLMJudgeEvaluator] Prompt preview (first 500 chars):\n${prompt.substring(0, 500)}...`));
+      console.log(chalk.gray(`[LLMJudgeEvaluator] Prompt preview (last 500 chars):\n...${prompt.substring(Math.max(0, prompt.length - 500))}`));
+      
+      // Debug: Log full prompt if it's not too long (or save to file)
+      if (prompt.length < 10000) {
+        console.log(chalk.cyan('\n[LLMJudgeEvaluator] Full Prompt:'));
+        console.log(chalk.gray(prompt));
+      } else {
+        console.log(chalk.yellow(`[LLMJudgeEvaluator] Prompt too long (${prompt.length} chars), showing sections...`));
+        const sections = prompt.split('##');
+        sections.forEach((section, idx) => {
+          if (section.trim()) {
+            const title = section.split('\n')[0].trim();
+            console.log(chalk.gray(`  Section ${idx}: ${title || 'Untitled'} (${section.length} chars)`));
+          }
+        });
+      }
 
       // Count tokens in the prompt
       const tokenCount = this.countPromptTokens(prompt);
@@ -103,27 +133,56 @@ export class LLMJudgeEvaluator implements Evaluator {
       console.log(chalk.gray(JSON.stringify(response, null, 2)));
 
       // Normalize scores (convert 1-5 scale to 0-1 scale)
+      console.log(chalk.cyan('\n[LLMJudgeEvaluator] ========== SCORE NORMALIZATION =========='));
+      console.log(chalk.blue(`[LLMJudgeEvaluator] Raw scores count: ${response.scores.length}`));
+      console.log(chalk.blue(`[LLMJudgeEvaluator] Expected categories: ${ctx.scenario.llm_judge.categories.length}`));
+      
       const normalizedScore = this.normalizeScore(response);
       console.log(chalk.blue(`[LLMJudgeEvaluator] Normalized score: ${normalizedScore.toFixed(4)} (from 1-5 scale)`));
+      console.log(chalk.blue(`[LLMJudgeEvaluator] Score calculation: average of ${response.scores.length} category scores`));
 
-      // Log individual category scores
-      console.log(chalk.cyan('\n[LLMJudgeEvaluator] Category Scores:'));
-      response.scores.forEach((score) => {
+      // Log individual category scores with detailed breakdown
+      console.log(chalk.cyan('\n[LLMJudgeEvaluator] ========== CATEGORY SCORES BREAKDOWN =========='));
+      let totalRawScore = 0;
+      response.scores.forEach((score, idx) => {
         const normalized = (score.score - 1) / 4; // Convert 1-5 to 0-1
-        console.log(chalk.gray(`  ${score.category}: ${score.score}/5 (normalized: ${normalized.toFixed(4)})`));
-        console.log(chalk.gray(`    Reasoning: ${score.reasoning.substring(0, 100)}${score.reasoning.length > 100 ? '...' : ''}`));
+        totalRawScore += score.score;
+        console.log(chalk.cyan(`\n[LLMJudgeEvaluator] Category ${idx + 1}: ${score.category}`));
+        console.log(chalk.gray(`  Raw score: ${score.score}/5`));
+        console.log(chalk.gray(`  Normalized: ${normalized.toFixed(4)}/1.0`));
+        console.log(chalk.gray(`  Reasoning (full): ${score.reasoning}`));
+        console.log(chalk.gray(`  Reasoning length: ${score.reasoning.length} chars`));
       });
+      
+      const avgRawScore = totalRawScore / response.scores.length;
+      console.log(chalk.cyan(`\n[LLMJudgeEvaluator] Average raw score: ${avgRawScore.toFixed(2)}/5`));
+      console.log(chalk.cyan(`[LLMJudgeEvaluator] Average normalized: ${normalizedScore.toFixed(4)}/1.0`));
+      
+      // Check if score is 0 and why
+      if (normalizedScore === 0) {
+        console.log(chalk.red('\n[LLMJudgeEvaluator] ⚠️  WARNING: Final score is 0.0000'));
+        console.log(chalk.red('[LLMJudgeEvaluator] This could indicate:'));
+        console.log(chalk.red('  - All category scores were 1/5 (minimum)'));
+        console.log(chalk.red('  - Score normalization issue'));
+        console.log(chalk.red('  - Missing or invalid scores in response'));
+        console.log(chalk.red(`[LLMJudgeEvaluator] Raw scores received: ${response.scores.map(s => s.score).join(', ')}`));
+      }
 
       // Log overall assessment
       if (response.overall_assessment) {
-        console.log(chalk.cyan('\n[LLMJudgeEvaluator] Overall Assessment:'));
+        console.log(chalk.cyan('\n[LLMJudgeEvaluator] ========== OVERALL ASSESSMENT =========='));
         console.log(chalk.gray(`  ${response.overall_assessment}`));
+        console.log(chalk.gray(`  Assessment length: ${response.overall_assessment.length} chars`));
+      } else {
+        console.log(chalk.yellow('\n[LLMJudgeEvaluator] ⚠️  No overall_assessment in response'));
       }
 
-      // Format detailed results with token count
-      const details = this.formatDetails(response, tokenCount);
+      // Format detailed results with token count (use already-calculated normalizedScore)
+      const details = this.formatDetails(response, normalizedScore, tokenCount);
 
-      console.log(chalk.green(`\n[LLMJudgeEvaluator] Evaluation complete. Final score: ${normalizedScore.toFixed(4)}`));
+      console.log(chalk.green(`\n[LLMJudgeEvaluator] ========== EVALUATION COMPLETE ==========`));
+      console.log(chalk.green(`[LLMJudgeEvaluator] Final score: ${normalizedScore.toFixed(4)}/1.0`));
+      console.log(chalk.green(`[LLMJudgeEvaluator] ===========================================\n`));
 
       return {
         name: this.meta.name,
@@ -189,8 +248,64 @@ export class LLMJudgeEvaluator implements Evaluator {
 
     console.log(chalk.gray(`[LLMJudgeEvaluator] Raw response content length: ${content.length} characters`));
     console.log(chalk.gray(`[LLMJudgeEvaluator] Response preview (first 300 chars):\n${content.substring(0, 300)}...`));
+    
+    // Try to fix incomplete JSON (common when max_tokens is reached)
+    let jsonContent = content.trim();
+    
+    // If JSON appears incomplete, try to fix it
+    if (!jsonContent.endsWith('}')) {
+      console.log(chalk.yellow('[LLMJudgeEvaluator] ⚠️  JSON appears incomplete, attempting to fix...'));
+      
+      // Try to find the last complete object/array and close it
+      let braceCount = 0;
+      let lastValidIndex = -1;
+      
+      for (let i = 0; i < jsonContent.length; i++) {
+        if (jsonContent[i] === '{') braceCount++;
+        if (jsonContent[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            lastValidIndex = i;
+          }
+        }
+      }
+      
+      // If we found a complete object, use it
+      if (lastValidIndex > 0 && braceCount > 0) {
+        jsonContent = jsonContent.substring(0, lastValidIndex + 1);
+        console.log(chalk.yellow(`[LLMJudgeEvaluator] Truncated to last complete object at position ${lastValidIndex + 1}`));
+      } else {
+        // Try to close the JSON manually
+        const openBraces = (jsonContent.match(/{/g) || []).length;
+        const closeBraces = (jsonContent.match(/}/g) || []).length;
+        const missingBraces = openBraces - closeBraces;
+        
+        if (missingBraces > 0) {
+          // Close any open strings first
+          if (jsonContent.match(/"[^"]*$/)) {
+            jsonContent = jsonContent.replace(/"[^"]*$/, '"');
+          }
+          // Close any open arrays
+          const openArrays = (jsonContent.match(/\[/g) || []).length;
+          const closeArrays = (jsonContent.match(/\]/g) || []).length;
+          if (openArrays > closeArrays) {
+            jsonContent += ']'.repeat(openArrays - closeArrays);
+          }
+          // Close braces
+          jsonContent += '}'.repeat(missingBraces);
+          console.log(chalk.yellow(`[LLMJudgeEvaluator] Attempted to close ${missingBraces} missing braces`));
+        }
+      }
+    }
 
-    const parsed = JSON.parse(content) as JudgeResponse;
+    let parsed: JudgeResponse;
+    try {
+      parsed = JSON.parse(jsonContent) as JudgeResponse;
+    } catch (parseError) {
+      console.error(chalk.red(`[LLMJudgeEvaluator] JSON parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`));
+      console.error(chalk.red(`[LLMJudgeEvaluator] Full content (last 500 chars):\n${jsonContent.substring(Math.max(0, jsonContent.length - 500))}`));
+      throw new Error(`Failed to parse LLM judge response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
 
     // Validate response structure
     if (!parsed.scores || !Array.isArray(parsed.scores)) {
@@ -217,11 +332,20 @@ export class LLMJudgeEvaluator implements Evaluator {
   private buildPrompt(ctx: EvaluationContext): string {
     const { scenario, agentResponse, diffSummary, depsDelta, commandLog } = ctx;
 
+    console.log(chalk.cyan('[LLMJudgeEvaluator] Building prompt sections...'));
+    
     // Build context sections
     const taskDescription = this.buildTaskDescription(scenario);
+    console.log(chalk.gray(`  - Task description: ${taskDescription.length} chars`));
+    
     const agentResponseSection = this.buildAgentResponseSection(agentResponse);
+    console.log(chalk.gray(`  - Agent response section: ${agentResponseSection.length} chars`));
+    
     const changesSection = this.buildChangesSection(diffSummary, depsDelta);
+    console.log(chalk.gray(`  - Changes section: ${changesSection.length} chars`));
+    
     const commandResultsSection = this.buildCommandResultsSection(commandLog);
+    console.log(chalk.gray(`  - Command results section: ${commandResultsSection.length} chars`));
 
     // Combine into full prompt
     const prompt = `
@@ -378,29 +502,32 @@ ${agentResponse}
   }
 
   private normalizeScore(response: JudgeResponse): number {
+    console.log(chalk.cyan('[LLMJudgeEvaluator] Normalizing scores...'));
+    
     if (!response.scores || response.scores.length === 0) {
+      console.log(chalk.red('[LLMJudgeEvaluator] ⚠️  No scores in response, returning 0'));
       return 0;
     }
 
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Processing ${response.scores.length} scores`));
+    
     // Calculate simple average with equal weights for all categories
     let sum = 0;
     let count = 0;
-
-    for (const score of response.scores) {
-      if (typeof score.score === 'number' && score.score >= 1 && score.score <= 5) {
-        sum += score.score;
-        count++;
-      }
-    }
-
-    if (count === 0) {
-      return 0;
-    }
-
-    const average = sum / count;
-
-    // Convert from 1-5 scale to 0-1 scale: (score - 1) / 4
-    return Math.max(0, Math.min(1, (average - 1) / 4));
+    
+    response.scores.forEach((score, idx) => {
+      const normalized = (score.score - 1) / 4;
+      sum += normalized;
+      count++;
+      console.log(chalk.gray(`  Score ${idx + 1} (${score.category}): ${score.score}/5 → ${normalized.toFixed(4)}/1.0`));
+    });
+    
+    const average = count > 0 ? sum / count : 0;
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Sum of normalized scores: ${sum.toFixed(4)}`));
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Count: ${count}`));
+    console.log(chalk.gray(`[LLMJudgeEvaluator] Average (final score): ${average.toFixed(4)}`));
+    
+    return average;
   }
 
   private countPromptTokens(prompt: string): number {
@@ -411,11 +538,11 @@ ${agentResponse}
     return countTokens(fullPrompt);
   }
 
-  private formatDetails(response: JudgeResponse, tokenCount?: number): string {
+  private formatDetails(response: JudgeResponse, normalizedScore: number, tokenCount?: number): string {
     const details = {
       scores: response.scores,
       overall_assessment: response.overall_assessment,
-      normalized_score: this.normalizeScore(response),
+      normalized_score: normalizedScore,
       ...(tokenCount && { input_tokens: tokenCount })
     };
 

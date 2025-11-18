@@ -15,7 +15,8 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
     const db = drizzle(env.DB);
 
     // Insert benchmark run
-    await db.insert(schema.benchmarkRuns).values({
+    // Build values object conditionally to handle missing columns
+    const runValues: any = {
       runId: payload.runId,
       batchId: payload.batchId,
       suite: payload.suite,
@@ -30,9 +31,26 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
       weightedScore: payload.weightedScore,
       isSuccessful: payload.isSuccessful,
       successMetric: payload.successMetric,
-      specialistEnabled: payload.specialistEnabled,
       metadata: payload.metadata ? JSON.stringify(payload.metadata) : undefined
-    });
+    };
+    
+    // Try to insert with specialistEnabled, but fallback if column doesn't exist
+    if (payload.specialistEnabled !== undefined) {
+      runValues.specialistEnabled = payload.specialistEnabled;
+    }
+    
+    try {
+      await db.insert(schema.benchmarkRuns).values(runValues);
+    } catch (dbError: any) {
+      // If error is about missing column, retry without specialistEnabled
+      if (dbError?.message?.includes('specialist_enabled') || dbError?.message?.includes('no column named')) {
+        console.warn('Database column specialist_enabled not found, retrying without it');
+        delete runValues.specialistEnabled;
+        await db.insert(schema.benchmarkRuns).values(runValues);
+      } else {
+        throw dbError;
+      }
+    }
 
     // Insert evaluations
     if (payload.evaluations && payload.evaluations.length > 0) {
