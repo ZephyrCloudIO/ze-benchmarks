@@ -1,0 +1,694 @@
+// JSON5 Schema for Specialist Snapshots (Post-minting)
+// This schema validates specialist snapshots after benchmarking and minting
+// It extends the template schema with benchmarks and run metadata
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://zephyr-cloud.dev/schemas/specialist-snapshot.json",
+  "title": "Specialist Snapshot Schema",
+  "description": "Schema for AI specialist snapshots in the Zephyr Agency system. Snapshots extend templates with benchmark results and run metadata after minting.",
+  "type": "object",
+
+  // Required fields include all template requirements plus benchmarks
+  "required": [
+    "schema_version",
+    "name",
+    "version",
+    "persona",
+    "capabilities",
+    "prompts",
+    "benchmarks"
+  ],
+
+  "properties": {
+    // ========================================
+    // All Template Schema Properties
+    // (Inherited from template.schema.json5)
+    // ========================================
+
+    "schema_version": {
+      "type": "string",
+      "description": "Version of the schema specification (e.g., '0.0.1')",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the specialist, typically namespaced (e.g., '@zephyr-cloud/shadcn-specialist')",
+      "pattern": "^(@[a-z0-9-]+/)?[a-z0-9-]+$"
+    },
+
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable display name for the specialist (e.g., 'shadcn/ui Expert')"
+    },
+
+    "version": {
+      "type": "string",
+      "description": "Semantic version of this specialist template",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+
+    "from": {
+      "type": "string",
+      "description": "Optional parent template for inheritance. Can be a scoped package reference (e.g., '@zephyr-cloud/base'), relative path (e.g., './base.json5'), or absolute path. See INHERITANCE.md for merge rules."
+    },
+
+    "license": {
+      "type": "string",
+      "description": "Software license for this specialist (e.g., 'MIT', 'Apache-2.0', 'UNLICENSED')"
+    },
+
+    "availability": {
+      "type": "string",
+      "enum": ["public", "private", "paid"],
+      "description": "Availability status: 'public' (free), 'private' (internal), or 'paid' (subscription required)"
+    },
+
+    "maintainers": {
+      "type": "array",
+      "description": "List of individuals or teams responsible for maintaining this specialist",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Maintainer name or team name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Contact email for the maintainer"
+          }
+        }
+      }
+    },
+
+    "persona": {
+      "type": "object",
+      "description": "Defines the specialist's identity, expertise, and behavioral characteristics",
+      "required": ["purpose", "values", "attributes", "tech_stack"],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "description": "Clear statement of what this specialist does and its primary focus area"
+        },
+
+        "values": {
+          "type": "array",
+          "description": "Core principles and priorities that guide the specialist's behavior (e.g., 'Performance first', 'Developer experience')",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+
+        "attributes": {
+          "type": "array",
+          "description": "Key characteristics and expertise areas of the specialist",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+
+        "tech_stack": {
+          "type": "array",
+          "description": "Technologies, frameworks, and tools the specialist is proficient with",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    },
+
+    "capabilities": {
+      "type": "object",
+      "description": "Defines what the specialist can do and helps with specialist discovery",
+      "required": ["tags", "descriptions"],
+      "properties": {
+        "tags": {
+          "type": "array",
+          "description": "Searchable tags for capability discovery (e.g., 'shadcn-ui', 'component-theming')",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]+$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+
+        "descriptions": {
+          "type": "object",
+          "description": "Detailed descriptions for each capability tag. Keys must match tags in the 'tags' array.",
+          "patternProperties": {
+            "^[a-z0-9-]+$": {
+              "type": "string",
+              "description": "Description of what this capability enables"
+            }
+          }
+        },
+
+        "considerations": {
+          "type": "array",
+          "description": "Important notes, limitations, or context about the specialist's capabilities",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+
+    "dependencies": {
+      "type": "object",
+      "description": "External services, tools, and MCPs required or used by this specialist",
+      "properties": {
+        "subscription": {
+          "type": "object",
+          "description": "Information about subscription requirements",
+          "properties": {
+            "required": {
+              "type": "boolean",
+              "description": "Whether a paid subscription is required to use this specialist"
+            },
+            "purpose": {
+              "type": "string",
+              "description": "Explanation of what the subscription provides"
+            }
+          }
+        },
+
+        "available_tools": {
+          "type": "array",
+          "description": "System tools the specialist requires or uses (e.g., 'file_system', 'terminal', 'git')",
+          "items": {
+            "type": "string"
+          }
+        },
+
+        "mcps": {
+          "type": "array",
+          "description": "Model Context Protocol servers used by this specialist",
+          "items": {
+            "type": "object",
+            "required": ["name", "version"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the MCP server"
+              },
+              "version": {
+                "type": "string",
+                "description": "Version constraint (e.g., '^1.0.0')"
+              },
+              "permissions": {
+                "type": "array",
+                "description": "Required permissions for this MCP",
+                "items": {
+                  "type": "string",
+                  "enum": ["read", "write", "execute"]
+                }
+              },
+              "description": {
+                "type": "string",
+                "description": "Purpose of this MCP integration"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Whether this MCP is required or optional"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "documentation": {
+      "type": "array",
+      "description": "Documentation resources for the specialist and its domain",
+      "items": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["official", "reference", "recipes", "examples", "control"],
+            "description": "Type of documentation resource"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "External URL for web-based documentation"
+          },
+          "path": {
+            "type": "string",
+            "description": "Local file path for documentation stored with the specialist"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief description of what this documentation covers"
+          }
+        },
+        "oneOf": [
+          {"required": ["url"]},
+          {"required": ["path"]}
+        ]
+      }
+    },
+
+    "preferred_models": {
+      "type": "array",
+      "description": "AI models recommended for use with this specialist, with optional performance weights",
+      "items": {
+        "type": "object",
+        "required": ["model"],
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Model identifier (e.g., 'claude-sonnet-4.5', 'gpt-4o')"
+          },
+          "specialist_enabled": {
+            "type": "boolean",
+            "description": "Whether this model uses the specialist (true) or is a baseline/vanilla model (false)"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Overall performance weight for this model (0-1)"
+          },
+          "benchmarks": {
+            "type": "object",
+            "description": "Per-benchmark performance weights for this model",
+            "patternProperties": {
+              "^[a-z_]+$": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "prompts": {
+      "type": "object",
+      "description": "Prompt templates for different tasks and models, using Mustache interpolation",
+      "required": ["default", "prompt_strategy"],
+      "properties": {
+        "default": {
+          "type": "object",
+          "description": "Default prompts used when no model-specific prompt is available",
+          "properties": {
+            "spawnerPrompt": {
+              "type": "string",
+              "description": "Prompt used when spawning this specialist in a conversation"
+            }
+          },
+          "patternProperties": {
+            "^[a-z_]+$": {
+              "type": "string",
+              "description": "Task-specific prompt template with {mustache} placeholders"
+            }
+          }
+        },
+
+        "model_specific": {
+          "type": "object",
+          "description": "Prompts tailored for specific AI models",
+          "patternProperties": {
+            "^[a-z0-9.-]+$": {
+              "type": "object",
+              "description": "Prompts for a specific model (e.g., 'claude-sonnet-4.5')",
+              "properties": {
+                "spawnerPrompt": {
+                  "type": "string",
+                  "description": "Model-specific spawner prompt"
+                }
+              },
+              "patternProperties": {
+                "^[a-z_]+$": {
+                  "type": "string",
+                  "description": "Model-specific task prompt template"
+                }
+              }
+            }
+          }
+        },
+
+        "prompt_strategy": {
+          "type": "object",
+          "description": "Configuration for prompt selection and interpolation behavior",
+          "properties": {
+            "fallback": {
+              "type": "string",
+              "enum": ["default", "error"],
+              "description": "What to do when no model-specific prompt is found: use 'default' or throw 'error'"
+            },
+            "model_detection": {
+              "type": "string",
+              "enum": ["auto", "manual"],
+              "description": "How to detect which model is being used"
+            },
+            "allow_override": {
+              "type": "boolean",
+              "description": "Whether users can override prompts at runtime"
+            },
+            "interpolation": {
+              "type": "object",
+              "description": "Template interpolation settings",
+              "properties": {
+                "style": {
+                  "type": "string",
+                  "enum": ["mustache", "handlebars"],
+                  "description": "Template syntax style"
+                },
+                "escape_html": {
+                  "type": "boolean",
+                  "description": "Whether to escape HTML in interpolated values"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "spawnable_sub-agent_specialists": {
+      "type": "array",
+      "description": "Sub-specialists that can be spawned by this specialist for specialized subtasks (preferred naming with hyphen)",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "purpose"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the sub-specialist"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Version of the sub-specialist"
+          },
+          "license": {
+            "type": "string",
+            "description": "License for the sub-specialist"
+          },
+          "availability": {
+            "type": "string",
+            "enum": ["public", "private", "paid"],
+            "description": "Availability of the sub-specialist"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "What specialized task this sub-specialist handles"
+          }
+        }
+      }
+    },
+
+    "spawnable_sub_agent_specialists": {
+      "type": "array",
+      "description": "Sub-specialists that can be spawned by this specialist for specialized subtasks (alternative naming with underscores for backward compatibility)",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "purpose"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the sub-specialist"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Version of the sub-specialist"
+          },
+          "license": {
+            "type": "string",
+            "description": "License for the sub-specialist"
+          },
+          "availability": {
+            "type": "string",
+            "enum": ["public", "private", "paid"],
+            "description": "Availability of the sub-specialist"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "What specialized task this sub-specialist handles"
+          }
+        }
+      }
+    },
+
+    // ========================================
+    // Snapshot-Specific Properties
+    // (Added during the minting process)
+    // ========================================
+
+    "benchmarks": {
+      "type": "object",
+      "description": "Benchmark configuration and results for this specialist snapshot",
+      "required": ["test_suites", "scoring"],
+      "properties": {
+        "test_suites": {
+          "type": "array",
+          "description": "Test suites used to benchmark this specialist",
+          "items": {
+            "type": "object",
+            "required": ["name", "path", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Unique name for this test suite (e.g., 'vite-project-setup')"
+              },
+              "path": {
+                "type": "string",
+                "description": "Relative path to the test suite directory"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["functional", "accuracy", "performance"],
+                "description": "Type of test: functional (does it work?), accuracy (how correct?), or performance (how fast?)"
+              },
+              "description": {
+                "type": "string",
+                "description": "Brief description of what this test suite validates"
+              }
+            }
+          },
+          "minItems": 1
+        },
+
+        "scoring": {
+          "type": "object",
+          "description": "Configuration for how benchmark scores are calculated and maintained",
+          "required": ["methodology"],
+          "properties": {
+            "methodology": {
+              "type": "string",
+              "enum": ["weighted_average", "simple_average", "max_score", "min_score", "custom"],
+              "description": "Method used to aggregate scores across test suites"
+            },
+            "update_frequency": {
+              "type": "string",
+              "description": "How often benchmarks are re-run (e.g., 'weekly', 'monthly', 'per_experiment')"
+            },
+            "comparison_targets": {
+              "type": "array",
+              "description": "What this specialist's performance is compared against (e.g., ['control', 'generic'])",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+
+        "runs": {
+          "type": "array",
+          "description": "Array of all benchmark runs from a batch",
+          "items": {
+            "type": "object",
+            "required": ["run_id", "run_date", "model", "overall_score"],
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "description": "Unique identifier for the benchmark run"
+              },
+              "run_date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 timestamp when the benchmark was run"
+              },
+              "batch_id": {
+                "type": "string",
+                "description": "Batch identifier this run belongs to"
+              },
+              "model": {
+                "type": "string",
+                "description": "Model identifier used for this run"
+              },
+              "specialist_enabled": {
+                "type": "boolean",
+                "description": "Whether this run used the specialist or was a baseline run"
+              },
+              "suite": {
+                "type": "string",
+                "description": "Test suite name"
+              },
+              "scenario": {
+                "type": "string",
+                "description": "Scenario name"
+              },
+              "tier": {
+                "type": "string",
+                "description": "Tier/level of the test (e.g., 'L0', 'L1')"
+              },
+              "agent": {
+                "type": "string",
+                "description": "Agent type used (e.g., 'anthropic', 'openrouter')"
+              },
+              "overall_score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Aggregated score across all evaluators (0-1)"
+              },
+              "evaluations": {
+                "type": "object",
+                "description": "Individual evaluator scores",
+                "patternProperties": {
+                  "^[a-z0-9-_]+$": {
+                    "type": "object",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Score for this evaluator (0-1)"
+                      },
+                      "passed": {
+                        "type": "boolean",
+                        "description": "Whether this evaluator passed"
+                      },
+                      "error": {
+                        "type": "string",
+                        "description": "Error message if the evaluator failed"
+                      }
+                    }
+                  }
+                }
+              },
+              "telemetry": {
+                "type": "object",
+                "description": "Telemetry data for this run",
+                "properties": {
+                  "duration_ms": {
+                    "type": "number",
+                    "description": "Total run duration in milliseconds"
+                  },
+                  "token_usage": {
+                    "type": "object",
+                    "properties": {
+                      "prompt_tokens": { "type": "number" },
+                      "completion_tokens": { "type": "number" },
+                      "total_tokens": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "comparison": {
+          "type": "object",
+          "description": "Comparison metrics between baseline and specialist runs",
+          "properties": {
+            "baseline_avg_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Average score across all baseline (non-specialist) runs"
+            },
+            "specialist_avg_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Average score across all specialist runs"
+            },
+            "improvement": {
+              "type": "number",
+              "description": "Absolute improvement (specialist_avg - baseline_avg)"
+            },
+            "improvement_pct": {
+              "type": "number",
+              "description": "Percentage improvement ((specialist_avg - baseline_avg) / baseline_avg * 100)"
+            },
+            "models_compared": {
+              "type": "array",
+              "description": "Per-model comparison breakdowns",
+              "items": {
+                "type": "object",
+                "required": ["model", "baseline_score"],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "Model identifier"
+                  },
+                  "baseline_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Score when run without specialist"
+                  },
+                  "specialist_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Score when run with specialist"
+                  },
+                  "improvement": {
+                    "type": "number",
+                    "description": "Absolute improvement for this model"
+                  },
+                  "improvement_pct": {
+                    "type": "number",
+                    "description": "Percentage improvement for this model"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "snapshot_metadata": {
+      "type": "object",
+      "description": "Metadata about when and how this snapshot was created",
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this snapshot was minted"
+        },
+        "minted_by": {
+          "type": "string",
+          "description": "System or user that created this snapshot"
+        },
+        "template_version": {
+          "type": "string",
+          "description": "Version of the source template used to create this snapshot"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes or context about this snapshot"
+        }
+      }
+    }
+  },
+
+  "additionalProperties": false
+}
