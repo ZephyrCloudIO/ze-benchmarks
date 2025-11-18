@@ -50,7 +50,10 @@ export function createTitle() {
 }
 
 // LLM Judge display function
-export function displayLLMJudgeScores(result: { scores?: Record<string, any>; evaluator_results?: Array<{ name: string; details?: string }> }) {
+export function displayLLMJudgeScores(
+  result: { scores?: Record<string, any>; evaluator_results?: Array<{ name: string; details?: string }> },
+  scenario?: { llm_judge?: { categories?: string[] } }
+) {
   const llmJudgeScore = (result.scores as any)['LLMJudgeEvaluator'];
   const evaluatorResults = (result as any).evaluator_results;
 
@@ -69,30 +72,13 @@ export function displayLLMJudgeScores(result: { scores?: Record<string, any>; ev
     if (parsedDetails.scores && Array.isArray(parsedDetails.scores)) {
       console.log(`\n${chalk.bold.underline('LLM Judge Detailed Scores')}`);
       console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-      console.log(`│ ${chalk.bold('Category'.padEnd(20))} ${chalk.bold('Score'.padEnd(8))} ${chalk.bold('Weight'.padEnd(8))} ${chalk.bold('Status'.padEnd(15))} │`);
+      console.log(`│ ${chalk.bold('Category'.padEnd(40))} ${chalk.bold('Score'.padEnd(8))} ${chalk.bold('Status'.padEnd(15))} │`);
       console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
 
-      const weights: Record<string, number> = {
-        'dependency_quality': 25,
-        'safety_stability': 20,
-        'best_practices': 15,
-        'monorepo_coordination': 15,
-        'technical_execution': 10,
-        'communication_transparency': 10,
-        'long_term_maintainability': 5
-      };
+      // Get category names from scenario configuration
+      const categoryNames = scenario?.llm_judge?.categories || [];
 
-      const expectedCategories = [
-        'dependency_quality',
-        'safety_stability',
-        'best_practices',
-        'monorepo_coordination',
-        'technical_execution',
-        'communication_transparency',
-        'long_term_maintainability',
-        'overall_integrity'
-      ];
-
+      // Build score map from LLM response
       const scoreMap = new Map();
       parsedDetails.scores.forEach((score: any) => {
         if (score.category && score.score !== undefined) {
@@ -100,21 +86,33 @@ export function displayLLMJudgeScores(result: { scores?: Record<string, any>; ev
         }
       });
 
-      expectedCategories.forEach(category => {
-        const score = scoreMap.get(category);
-        const weight = weights[category] || 0;
+      // Helper to slugify category text (same logic as in llm-judge.ts)
+      const slugifyCategory = (categoryText: string): string => {
+        const name = categoryText.split(':')[0].split('(')[0].trim();
+        return name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+      };
+
+      // Display each category with its score
+      categoryNames.forEach((categoryText) => {
+        const categoryKey = slugifyCategory(categoryText);
+        const score = scoreMap.get(categoryKey);
+
+        // Extract just the category name (before the weight/description)
+        const categoryName = categoryText.split(':')[0].split('(')[0].trim();
+        const displayName = categoryName.length > 40 ? categoryName.substring(0, 37) + '...' : categoryName;
 
         if (score) {
           const percent = (score.score / 5) * 100;
           const color = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
           const status = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'Excellent' : percent >= SCORE_THRESHOLDS.GOOD ? 'Good' : 'Needs Work';
           const statusColor = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
 
-          console.log(`│ ${chalk.cyan(categoryName.padEnd(20))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
+          console.log(`│ ${chalk.cyan(displayName.padEnd(40))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
         } else {
-          const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-          console.log(`│ ${chalk.red(categoryName.padEnd(20))} ${chalk.red('N/A'.padEnd(8))} ${chalk.gray((weight + '%').padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
+          console.log(`│ ${chalk.red(displayName.padEnd(40))} ${chalk.red('N/A'.padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
         }
       });
 

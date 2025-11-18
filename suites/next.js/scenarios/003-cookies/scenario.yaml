@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server Action Implementation (Weight: 30%): Correct 'use server' directive, proper async function, form data handling. Score 1-5: 1=broken server action, 5=perfect implementation"
+    - "Cookie Management (Weight: 30%): Correct use of cookies() API from next/headers, proper set/get/delete operations. Score 1-5: 1=incorrect cookie handling, 5=robust cookie operations"
+    - "Form Handling & Validation (Weight: 20%): Proper form submission, data validation, error handling. Score 1-5: 1=broken forms, 5=excellent validation"
+    - "Code Quality & Security (Weight: 15%): Secure operations, clean code, proper TypeScript types. Score 1-5: 1=insecure/messy, 5=secure and clean"
+    - "Overall Implementation (Weight: 5%): Completeness, reliability, Next.js best practices. Score 1-5: 1=non-functional, 5=production-ready"

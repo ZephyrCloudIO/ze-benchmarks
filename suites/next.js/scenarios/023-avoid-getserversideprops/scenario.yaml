@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "App Router Migration (35%): Uses App Router server components instead of Pages Router getServerSideProps. Score 1-5: 1=uses getServerSideProps, 5=modern server components"
+    - "Next.js Evolution Understanding (30%): Recognizes that getServerSideProps is Pages Router legacy and App Router offers better patterns. Score 1-5: 1=outdated approach, 5=current best practices"
+    - "Streaming & Suspense (20%): Leverages App Router features like streaming, suspense, and partial prerendering. Score 1-5: 1=blocking SSR, 5=progressive rendering"
+    - "Code Organization (10%): Simplifies architecture by colocating data fetching with components. Score 1-5: 1=separated concerns, 5=colocated and clean"
+    - "Functionality (5%): Implementation works correctly and delivers the same or better user experience. Score 1-5: 1=broken, 5=fully working"

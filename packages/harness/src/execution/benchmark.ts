@@ -506,7 +506,7 @@ export async function executeBenchmark(
 		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
 		// Show detailed LLM Judge scores if available
-		displayLLMJudgeScores(result);
+		displayLLMJudgeScores(result, scenarioCfg);
 	}
 
 	// Print telemetry in table format

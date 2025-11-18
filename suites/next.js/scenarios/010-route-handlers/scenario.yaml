@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Route Handler Implementation (Weight: 35%): Evaluates correct implementation of Next.js route handlers with proper HTTP method handling (GET, POST, PUT, DELETE). Score 1-5: 1=incorrect or missing route handlers, 5=fully functional route handlers with proper method handling"
+    - "Request/Response Processing (Weight: 30%): Assesses proper handling of request data (headers, body, query params) and response formatting (JSON, status codes). Score 1-5: 1=improper data handling or response format, 5=correct request parsing and response structure"
+    - "Error Handling & Validation (Weight: 20%): Evaluates implementation of error handling, input validation, and appropriate error responses. Score 1-5: 1=no error handling, 5=comprehensive error handling with proper status codes"
+    - "TypeScript & Type Safety (Weight: 10%): Assesses use of proper TypeScript types for requests, responses, and route handler signatures. Score 1-5: 1=no types or incorrect types, 5=fully typed with proper Next.js types"
+    - "Code Organization & Best Practices (Weight: 5%): Evaluates file structure, naming conventions, and adherence to Next.js App Router conventions for route handlers. Score 1-5: 1=poor organization, 5=follows Next.js best practices"

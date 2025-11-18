@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Parallel Routes Structure (Weight: 35%): Evaluates correct implementation of parallel routes using slot convention (@folder) and proper layout configuration. Score 1-5: 1=incorrect or missing slot structure, 5=proper parallel routes with correct slot naming"
+    - "Layout Implementation (Weight: 30%): Assesses parent layout that receives and renders multiple slots simultaneously. Score 1-5: 1=layout doesn't support slots, 5=layout properly accepts and renders all parallel slots"
+    - "Route Independence & Loading (Weight: 20%): Evaluates independent navigation and loading states for each parallel route. Score 1-5: 1=routes not independent, 5=each route loads and navigates independently"
+    - "Default Routes & Fallbacks (Weight: 10%): Assesses implementation of default.tsx files for handling unmatched parallel routes. Score 1-5: 1=missing defaults causing errors, 5=proper default routes for all slots"
+    - "TypeScript & Props Typing (Weight: 5%): Evaluates proper typing of layout props that receive parallel route slots. Score 1-5: 1=no types for slots, 5=fully typed layout with slot props"

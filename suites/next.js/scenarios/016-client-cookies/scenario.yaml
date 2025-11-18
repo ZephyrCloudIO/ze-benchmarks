@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Client-Side Cookie Management (Weight: 35%): Evaluates proper use of client-side cookie APIs (document.cookie or cookie libraries) in client components. Score 1-5: 1=incorrect cookie handling, 5=proper client-side cookie operations"
+    - "Cookie Read/Write Operations (Weight: 30%): Assesses correct implementation of reading, writing, and deleting cookies from client components. Score 1-5: 1=cookies not functional, 5=all cookie operations working correctly"
+    - "State Synchronization (Weight: 20%): Evaluates synchronization between cookie values and React state, including proper useEffect usage. Score 1-5: 1=no synchronization, 5=proper state sync with cookies"
+    - "Cookie Security & Best Practices (Weight: 10%): Assesses implementation of cookie security attributes and best practices (HttpOnly awareness, SameSite, Secure). Score 1-5: 1=no security considerations, 5=proper security attributes"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of cookie values and helper functions. Score 1-5: 1=no types or incorrect types, 5=fully typed cookie operations"

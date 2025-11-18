@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "generateStaticParams Implementation (Weight: 35%): Correctly exports and implements generateStaticParams function to generate static paths at build time. Score 1-5: 1=missing or incorrect function, 5=perfect implementation returning correct param objects"
+    - "Static Route Generation (Weight: 30%): Successfully generates all required static routes with proper parameter structure matching dynamic segments. Score 1-5: 1=no routes generated or incorrect structure, 5=all routes generated with correct params"
+    - "Build-Time Data Fetching (Weight: 20%): Properly fetches data at build time within generateStaticParams for SSG optimization. Score 1-5: 1=runtime fetching or no data, 5=optimal build-time data fetching"
+    - "Dynamic Route Integration (Weight: 10%): Correctly integrates generateStaticParams with dynamic route segments ([slug], [id], etc.) in App Router. Score 1-5: 1=broken dynamic routes, 5=seamless dynamic route integration"
+    - "Performance Optimization (Weight: 5%): Demonstrates understanding of SSG benefits and implements for optimal performance (pre-rendering, caching). Score 1-5: 1=no optimization awareness, 5=expert performance optimization"

@@ -267,9 +267,22 @@ ${this.buildJsonFormatExample(scenario.llm_judge?.categories || [])}
       .join('\n\n');
   }
 
+  private slugifyCategory(categoryText: string): string {
+    // Extract category name before the first ":" or "("
+    const name = categoryText.split(':')[0].split('(')[0].trim();
+    // Convert to lowercase and replace spaces/special chars with underscores
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
+  }
+
   private buildJsonFormatExample(categories: string[]): string {
     return categories
-      .map((_, index) => `    {"category": "category_${index + 1}", "score": 1-5, "reasoning": "detailed explanation"}`)
+      .map((category) => {
+        const slug = this.slugifyCategory(category);
+        return `    {"category": "${slug}", "score": 1-5, "reasoning": "detailed explanation"}`;
+      })
       .join(',\n');
   }
 

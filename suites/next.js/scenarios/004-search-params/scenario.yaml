@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Async SearchParams Handling (Weight: 35%): Correctly implements Next.js 15's async searchParams API in server components, properly awaiting the searchParams promise and handling the async nature. Score 1-5: 1=missing or incorrect async handling, 5=perfect async implementation with proper await"
+    - "Data Passing to Client Components (Weight: 30%): Successfully extracts search parameters and passes them as props to client components, maintaining proper server/client boundary. Score 1-5: 1=no data passing or broken, 5=clean prop passing with correct types"
+    - "URL Parameter Parsing (Weight: 20%): Accurately parses and validates URL search parameters, handling missing or invalid values appropriately. Score 1-5: 1=no parsing or crashes, 5=robust parsing with validation"
+    - "Component Architecture (Weight: 10%): Properly structures server and client components with correct 'use client' directives and component separation. Score 1-5: 1=incorrect component types, 5=optimal architecture"
+    - "Error Handling (Weight: 5%): Implements appropriate error handling for missing or malformed search parameters. Score 1-5: 1=no error handling, 5=comprehensive error handling"

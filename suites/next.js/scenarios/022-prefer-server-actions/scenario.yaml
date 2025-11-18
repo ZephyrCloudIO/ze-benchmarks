@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server Actions Usage (35%): Uses 'use server' directive and server actions for mutations instead of API routes. Score 1-5: 1=uses API routes, 5=proper server actions"
+    - "Modern Next.js Patterns (30%): Adopts Next.js 13+ App Router patterns with server actions for form submissions and data mutations. Score 1-5: 1=legacy patterns, 5=modern App Router patterns"
+    - "Type Safety & Developer Experience (20%): Leverages end-to-end type safety and simplified data flow that server actions provide. Score 1-5: 1=loose types, 5=full type safety"
+    - "Architecture Simplicity (10%): Reduces boilerplate by eliminating separate API route files for simple mutations. Score 1-5: 1=unnecessary complexity, 5=streamlined architecture"
+    - "Implementation Correctness (5%): Server actions work correctly with proper error handling and validation. Score 1-5: 1=broken, 5=robust implementation"

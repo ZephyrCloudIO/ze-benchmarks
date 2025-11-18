@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server Actions Export Pattern (Weight: 35%): Evaluates proper export of server actions from separate files with 'use server' directive. Score 1-5: 1=incorrect export pattern, 5=proper modular server actions with correct exports"
+    - "Server Action Implementation (Weight: 30%): Assesses correct implementation of async server actions with proper error handling. Score 1-5: 1=non-functional actions, 5=fully functional async server actions"
+    - "Module Organization & Reusability (Weight: 20%): Evaluates organization of server actions in separate modules for reusability across components. Score 1-5: 1=poor organization, 5=well-organized reusable action modules"
+    - "Data Mutation & Revalidation (Weight: 10%): Assesses proper data mutations and use of revalidatePath/revalidateTag after actions. Score 1-5: 1=no revalidation, 5=proper cache revalidation after mutations"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of server action parameters, return types, and FormData handling. Score 1-5: 1=no types or incorrect types, 5=fully typed server actions with proper types"

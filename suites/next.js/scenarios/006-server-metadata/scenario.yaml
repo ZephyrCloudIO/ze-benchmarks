@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Static Metadata API Usage (Weight: 35%): Correctly exports static metadata object using Next.js Metadata API with proper structure and types. Score 1-5: 1=missing or incorrectly structured metadata, 5=complete metadata export with all required fields"
+    - "SEO Metadata Completeness (Weight: 30%): Includes comprehensive SEO metadata including title, description, keywords, Open Graph tags, and Twitter cards. Score 1-5: 1=minimal or missing SEO data, 5=complete SEO optimization with all tags"
+    - "Metadata Type Correctness (Weight: 20%): Uses correct TypeScript Metadata types from Next.js and follows API specification exactly. Score 1-5: 1=incorrect types or structure, 5=perfect type compliance"
+    - "Server Component Integration (Weight: 10%): Properly implements metadata in server components following Next.js App Router conventions. Score 1-5: 1=wrong component type or location, 5=optimal server component setup"
+    - "Metadata Best Practices (Weight: 5%): Follows metadata best practices including character limits, proper formatting, and accessibility considerations. Score 1-5: 1=ignores best practices, 5=exemplary metadata implementation"

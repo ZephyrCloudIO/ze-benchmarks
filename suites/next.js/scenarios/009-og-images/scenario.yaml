@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "OG Image Generation Setup (Weight: 35%): Correctly implements Next.js OG image generation using ImageResponse API and proper file structure (opengraph-image.tsx). Score 1-5: 1=missing or broken OG image setup, 5=perfect implementation with correct exports"
+    - "Image Content and Layout (Weight: 30%): Creates well-designed Open Graph image with appropriate content, styling, and dimensions (1200x630). Score 1-5: 1=no content or incorrect dimensions, 5=professional layout with optimal size"
+    - "Dynamic OG Images (Weight: 20%): Generates dynamic OG images based on route params or data, personalizing images for different pages. Score 1-5: 1=static only, 5=fully dynamic with data integration"
+    - "Social Media Metadata Integration (Weight: 10%): Properly links OG images with metadata API, ensuring correct og:image tags and social media preview. Score 1-5: 1=no metadata integration, 5=complete social media optimization"
+    - "Typography and Assets (Weight: 5%): Uses custom fonts, images, or other assets in OG images correctly with proper loading. Score 1-5: 1=basic text only, 5=rich design with custom assets"

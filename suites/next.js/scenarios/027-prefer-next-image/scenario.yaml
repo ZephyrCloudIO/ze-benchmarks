@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Next.js Image Component (35%): Uses next/image instead of plain img tags for image optimization. Score 1-5: 1=uses <img>, 5=proper Image component"
+    - "Optimization Features (30%): Leverages automatic optimization, lazy loading, modern formats, and responsive images. Score 1-5: 1=no optimization, 5=full optimization"
+    - "Performance & Core Web Vitals (20%): Improves LCP, prevents layout shift with proper sizing, and reduces bandwidth. Score 1-5: 1=poor metrics, 5=excellent metrics"
+    - "Configuration (10%): Uses appropriate props like priority, fill, sizes, or quality based on use case. Score 1-5: 1=missing props, 5=optimal configuration"
+    - "Implementation Quality (5%): Images load correctly with proper fallbacks and accessibility. Score 1-5: 1=broken images, 5=production-ready"

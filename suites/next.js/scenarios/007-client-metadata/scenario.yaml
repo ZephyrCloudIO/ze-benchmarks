@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "React 19 JSX Metadata Implementation (Weight: 35%): Correctly uses React 19's direct JSX metadata features (title, meta tags) within client components. Score 1-5: 1=incorrect or missing JSX metadata, 5=perfect React 19 metadata implementation"
+    - "Dynamic Metadata Updates (Weight: 30%): Successfully updates metadata dynamically based on client-side state or props, demonstrating React 19's runtime metadata capabilities. Score 1-5: 1=static only or broken updates, 5=smooth dynamic metadata changes"
+    - "Client Component Setup (Weight: 20%): Properly configures client components with 'use client' directive and integrates metadata within client rendering context. Score 1-5: 1=incorrect component type, 5=optimal client component structure"
+    - "React 19 Features Knowledge (Weight: 10%): Demonstrates understanding of React 19's new metadata capabilities and differences from traditional Next.js Metadata API. Score 1-5: 1=no understanding of React 19 features, 5=expert use of latest React capabilities"
+    - "Metadata Tag Completeness (Weight: 5%): Includes appropriate metadata tags (title, description, viewport, etc.) using React 19 JSX syntax. Score 1-5: 1=minimal tags, 5=comprehensive metadata coverage"

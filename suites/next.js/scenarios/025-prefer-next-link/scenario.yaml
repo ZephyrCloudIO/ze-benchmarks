@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Next.js Link Component Usage (35%): Uses next/link instead of plain anchor tags for internal navigation. Score 1-5: 1=uses <a> tags, 5=proper Link component"
+    - "Client-Side Navigation (30%): Enables SPA-like navigation without full page reloads and prefetching. Score 1-5: 1=full page reloads, 5=smooth client navigation"
+    - "Performance Optimization (20%): Leverages automatic prefetching and code splitting that Link provides. Score 1-5: 1=slow navigation, 5=instant navigation"
+    - "API Understanding (10%): Uses Link correctly with proper props and understands when to use vs avoid it. Score 1-5: 1=misuse or confusion, 5=expert usage"
+    - "Implementation Correctness (5%): Navigation works correctly and maintains expected behavior. Score 1-5: 1=broken links, 5=perfect functionality"

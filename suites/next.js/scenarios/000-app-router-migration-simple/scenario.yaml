@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Migration Correctness (Weight: 30%): Accurate conversion from Pages Router to App Router structure, proper file organization (page.tsx, layout.tsx). Score 1-5: 1=incorrect structure, 5=perfect migration"
+    - "Data Fetching Conversion (Weight: 25%): Proper transformation of getServerSideProps/getStaticProps to Server Components or server actions. Score 1-5: 1=broken data fetching, 5=optimal patterns"
+    - "Routing & API Migration (Weight: 20%): Correct migration of dynamic routes, API routes to route handlers. Score 1-5: 1=routing broken, 5=seamless routing"
+    - "Code Quality & Best Practices (Weight: 15%): Clean code, proper use of 'use client' directives, App Router conventions. Score 1-5: 1=poor quality, 5=exemplary"
+    - "Overall Migration Success (Weight: 10%): Completeness, functionality preservation, no regressions. Score 1-5: 1=non-functional, 5=flawless migration"
