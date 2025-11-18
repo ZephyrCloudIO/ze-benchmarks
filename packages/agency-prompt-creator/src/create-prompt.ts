@@ -37,7 +37,7 @@ export function createPrompt(
   const { userPrompt, model, taskType: providedTaskType, context = {} } = options;
 
   // Step 1: Detect or use provided task type
-  const taskType = providedTaskType || detectTaskType(userPrompt);
+  const taskType = providedTaskType || detectTaskType(userPrompt, template);
 
   // Step 2: Select appropriate prompt from template
   const { config, usedModelSpecific } = selectPrompt(

@@ -5,6 +5,7 @@
 
 /**
  * Task types that can be detected from user prompts
+ * Built-in types are always available, but templates can define custom types
  */
 export type TaskType =
   | 'project_setup'
@@ -14,7 +15,8 @@ export type TaskType =
   | 'refactoring'
   | 'testing'
   | 'documentation'
-  | 'default';
+  | 'default'
+  | string; // Allow custom task types from templates
 
 /**
  * Persona definition for a specialist

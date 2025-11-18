@@ -71,6 +71,14 @@ export {
   SUBSTITUTION_TOOL,
 } from './llm-substitution.js';
 
+// Schema validation
+export {
+  SpecialistTemplateSchema,
+  readAndValidateTemplate,
+  safeReadTemplate,
+  type SpecialistTemplate as SpecialistTemplateFromSchema,
+} from './schema-analyzer.js';
+
 // Types
 export type {
   TaskType,
