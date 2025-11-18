@@ -7,13 +7,14 @@ Zephyr Bench is a comprehensive benchmark for evaluating coding agents on real s
 ## How the System Works
 
 ### Architecture Overview
-The system consists of five main components:
+The system consists of six main components:
 
 1. **Harness** (`packages/harness/`) - CLI interface and execution engine
 2. **Agent Adapters** (`packages/agent-adapters/`) - Integration with different AI providers
 3. **Evaluators** (`packages/evaluators/`) - Automated testing and evaluation logic
 4. **Worker API** (`apps/worker/`) - Cloudflare Worker with D1 database for data storage
 5. **Web Dashboard** (`apps/benchmark-report/`) - React-based UI for viewing results
+6. **Specialist Mint** (`packages/specialist-mint/`) - Create specialist snapshots from benchmark results
 
 ### Execution Flow
 1. **CLI** scans available suites and scenarios
@@ -32,6 +33,7 @@ The system consists of five main components:
 - **Web Dashboard**: React-based results viewer at `localhost:3000`
 - **Comprehensive Evaluators**: Build, lint, typecheck, dependency analysis
 - **Failure Detection**: Detailed error logging and categorization
+- **Specialist Snapshots**: Create versioned specialist definitions with benchmark metrics
 
 ## Quick Setup
 
@@ -217,6 +219,71 @@ pnpm compare-batches
 # View batch details
 pnpm batch-details <batch-id>
 ```
+
+## Creating Specialist Snapshots
+
+You can create specialist snapshots that combine templates with benchmark results in two ways:
+
+### Option 1: Integrated Workflow (Recommended)
+
+Run benchmarks and automatically mint snapshots in one command:
+
+```bash
+# Start Worker (required)
+pnpm worker:dev
+
+# Run benchmarks with automatic snapshot minting
+pnpm bench update-deps nx-pnpm-monorepo \
+  --tier L1 \
+  --agent anthropic \
+  --iterations 3 \
+  --mint-template templates/my-specialist.json5 \
+  --mint-output ./snapshots
+
+# This will:
+# 1. Run the benchmark 3 times
+# 2. Store all runs in a batch
+# 3. Automatically mint a snapshot with the results
+```
+
+### Option 2: Manual Workflow
+
+Separate benchmark running from snapshot minting:
+
+```bash
+# 1. Start Worker (required)
+pnpm worker:dev
+
+# 2. Run benchmarks and note the batch ID
+pnpm bench update-deps nx-pnpm-monorepo --batch-id my_batch
+# Output: Created batch: my_batch
+
+# 3. Create specialist snapshot from results
+pnpm mint:snapshot \
+  <path-to-template.json5> \
+  --batch-id my_batch \
+  --output ./snapshots
+
+# 4. Enrich template with LLM-generated metadata (optional)
+pnpm mint:enrich <path-to-template.json5>
+```
+
+### New CLI Options
+
+- `--iterations <n>` - Run benchmark multiple times (useful for statistical confidence)
+- `--mint-template <path>` - Automatically mint snapshot after benchmarks complete
+- `--mint-output <path>` - Output directory for snapshots (default: ./snapshots)
+- `--batch-id <id>` - Custom batch ID for grouping runs
+
+### Specialist Mint Package
+
+The `@ze/specialist-mint` package (`packages/specialist-mint/`) provides tools for:
+- **Minting snapshots**: Combine specialist templates with benchmark results
+- **Template enrichment**: Use LLMs to generate documentation metadata
+- **Schema validation**: Ensure templates and snapshots meet specifications
+- **Version management**: Auto-increment snapshot IDs and track versions
+
+See `packages/specialist-mint/README.md` for detailed documentation.
 
 ## Contributing
 
