@@ -16,14 +16,6 @@ async function showInteractiveMenu() {
 	// Check environment variables for interactive mode
 	await validateEnvironment();
 
-	// Handle Ctrl+C gracefully
-	process.on('SIGINT', () => {
-		console.log(); // New line after ^C
-		cancel('Operation cancelled.');
-		outro(chalk.yellow('Goodbye!'));
-		process.exit(0);
-	});
-
 	console.log(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' Interactive Mode '));
 

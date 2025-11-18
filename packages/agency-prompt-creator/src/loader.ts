@@ -74,27 +74,48 @@ async function loadTemplateRecursive(
     return template;
   }
 
-  // Load parent template
-  const parentPath = template.from;
-  const parentBaseDir = dirname(resolvedPath);
-  const parent = await loadTemplateRecursive(
-    parentPath,
-    parentBaseDir,
-    cache,
-    inheritanceChain
-  );
+  // Try to load parent template, fail gracefully if not found
+  try {
+    // Load parent template
+    const parentPath = template.from;
+    const parentBaseDir = dirname(resolvedPath);
+    const parent = await loadTemplateRecursive(
+      parentPath,
+      parentBaseDir,
+      cache,
+      inheritanceChain
+    );
 
-  // Merge parent and child
-  const merged = mergeTemplates(parent, template);
+    // Merge parent and child
+    const merged = mergeTemplates(parent, template);
 
-  // Remove the 'from' attribute from merged result
-  delete merged.from;
+    // Remove the 'from' attribute from merged result
+    delete merged.from;
 
-  // Cache and return
-  cache.set(resolvedPath, merged);
-  inheritanceChain.delete(resolvedPath);
+    // Cache and return
+    cache.set(resolvedPath, merged);
+    inheritanceChain.delete(resolvedPath);
 
-  return merged;
+    return merged;
+  } catch (error) {
+    // Parent template not found or failed to load - use template without inheritance
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[Template Loader] Parent template '${template.from}' not found or failed to load: ${errorMessage}`
+    );
+    console.warn(
+      `[Template Loader] Continuing without inheritance for: ${resolvedPath}`
+    );
+
+    // Remove the invalid 'from' reference
+    delete template.from;
+
+    // Cache and return the template as-is
+    cache.set(resolvedPath, template);
+    inheritanceChain.delete(resolvedPath);
+
+    return template;
+  }
 }
 
 /**
