@@ -238,16 +238,25 @@ ${commandResultsSection}
 
 ## Evaluation Instructions
 
-You are an expert code reviewer evaluating an AI agent's performance. Evaluate the agent across these ${scenario.llm_judge?.categories?.length || 0} categories:
+You are an expert code reviewer evaluating an AI agent's performance. **BE EXTREMELY CRITICAL AND RIGOROUS** in your evaluation. A score of 5.0 should be reserved for absolutely perfect, flawless implementations that exemplify best practices in every way.
+
+Evaluate the agent across these ${scenario.llm_judge?.categories?.length || 0} categories:
 
 ${this.buildCategoriesSection(scenario.llm_judge?.categories || [])}
 
-**Scoring Guidelines:**
-- 1: Poor/Incorrect - Significant issues, violations, or failures
-- 2: Below Average - Some issues, partial compliance
-- 3: Average - Functional but not optimal
-- 4: Good - Solid performance with minor issues
-- 5: Excellent - Exemplary performance, best practices
+**Scoring Guidelines - BE RUTHLESS:**
+- **5: PERFECT** - Absolutely flawless implementation. Zero issues. Exemplary code quality. Industry best practices followed exactly. Would be used as a reference example. **VERY RARE.**
+- **4: Excellent** - Minor cosmetic issues only (formatting, variable naming). Core implementation is sound and follows best practices. No functional problems.
+- **3: Good/Acceptable** - Functional and mostly correct, but has notable issues: suboptimal patterns, missing edge cases, or minor bugs. Works but not production-ready without improvements.
+- **2: Below Average** - Significant problems: incorrect patterns, security issues, broken functionality, or fundamental misunderstandings. Requires substantial rework.
+- **1: Poor/Failing** - Completely incorrect, non-functional, or dangerous. Violates fundamental principles. Would cause serious problems in production.
+
+**CRITICAL EVALUATION CRITERIA:**
+- Do NOT give a 5 unless the implementation is genuinely perfect with zero room for improvement
+- Be harsh on antipatterns, security issues, performance problems, and outdated practices
+- Deduct points for missing error handling, poor type safety, or inadequate testing considerations
+- A "working" solution that has flaws should get 3 or below, not 4-5
+- Reserve 4-5 scores for code you would confidently deploy to production without changes
 
 **Output JSON format:**
 {

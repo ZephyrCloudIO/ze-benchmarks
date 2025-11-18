@@ -41,15 +41,22 @@ oracle:
 
 # LLM Judge Configuration (Optional)
 # AI-powered evaluation using language models
+# REQUIRED: Define custom evaluation categories tailored to your scenario
+# Each category will be evaluated on a 1-5 scale and averaged equally
 llm_judge:
   enabled: true
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  # Categories: Array of evaluation criteria (each scored 1-5)
+  # Include weight percentages in the category text if desired
+  # Example format: "Category Name (Weight: 25%): Description and scoring guidance"
   categories:
-    - "Category 1: Describe what aspect you're evaluating here"
-    - "Category 2: Another aspect to evaluate"
-    - "Category 3: Yet another evaluation dimension"
+    - "Code Correctness (Weight: 30%): Implementation accuracy, proper API usage, no bugs. Score 1-5: 1=broken code, 5=perfect implementation"
+    - "Best Practices (Weight: 25%): Following framework conventions, clean code patterns. Score 1-5: 1=violates standards, 5=exemplary practices"
+    - "Technical Execution (Weight: 20%): Proper use of tools, correct commands, error handling. Score 1-5: 1=incorrect execution, 5=robust implementation"
+    - "Documentation & Communication (Weight: 15%): Clear explanations, proper comments. Score 1-5: 1=no documentation, 5=comprehensive docs"
+    - "Overall Quality (Weight: 10%): Holistic assessment combining all aspects. Score 1-5: 1=failure, 5=exceptional success"
 
 # Scoring Weights (Optional)
 # Customize how different evaluators contribute to the final score
