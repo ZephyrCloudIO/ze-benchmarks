@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import type { Env, SubmitResultsPayload } from '../types';
 import { jsonResponse } from '../utils/response';
 import * as schema from '../db/schema';
@@ -13,6 +14,31 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
     }
 
     const db = drizzle(env.DB);
+
+    // Ensure batch exists if batchId is provided
+    if (payload.batchId) {
+      try {
+        // Check if batch exists
+        const existingBatch = await db.select()
+          .from(schema.batchRuns)
+          .where(eq(schema.batchRuns.batchId, payload.batchId))
+          .limit(1);
+
+        // If batch doesn't exist, create it
+        if (existingBatch.length === 0) {
+          await db.insert(schema.batchRuns).values({
+            batchId: payload.batchId,
+            createdAt: new Date(),
+            totalRuns: 0,
+            successfulRuns: 0
+          });
+          console.log(`Auto-created batch: ${payload.batchId}`);
+        }
+      } catch (batchError: any) {
+        console.error('Failed to ensure batch exists:', batchError);
+        // Continue anyway - the foreign key constraint will catch it if there's still an issue
+      }
+    }
 
     // Insert benchmark run
     // Build values object conditionally to handle missing columns
