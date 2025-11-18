@@ -779,9 +779,20 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     // 2. Get task prompt content
-    const taskPromptContent = this.getPromptById(selection.taskPromptId);
+    let taskPromptContent = this.getPromptById(selection.taskPromptId);
     if (!taskPromptContent) {
-      throw new Error(`Task prompt not found: ${selection.taskPromptId}`);
+      // Try to fallback to default if model-specific not found
+      const parts = selection.taskPromptId.split('.');
+      if (parts.length >= 4 && parts[1] === 'model_specific') {
+        // Try default version: "migration.model_specific.claude-sonnet-4.5.systemPrompt" -> "migration.default.systemPrompt"
+        const fallbackId = `${parts[0]}.default.${parts[3]}`;
+        console.log(`[SpecialistAdapter] Task prompt not found: ${selection.taskPromptId}, trying fallback: ${fallbackId}`);
+        taskPromptContent = this.getPromptById(fallbackId);
+      }
+      
+      if (!taskPromptContent) {
+        throw new Error(`Task prompt not found: ${selection.taskPromptId} (also tried fallback)`);
+      }
     }
 
     // 3. Build context for substitution
@@ -1289,7 +1300,35 @@ The following documentation resources are most relevant to your task:
       const modelKey = parts[2];
       const promptKey = parts[3];
       const taskPrompts = (this.template.prompts as any)[taskType];
-      return taskPrompts?.model_specific?.[modelKey]?.[promptKey] || null;
+      
+      if (!taskPrompts) {
+        console.log(`[SpecialistAdapter] Task type "${taskType}" not found in template. Available tasks: ${Object.keys(this.template.prompts || {}).filter(k => k !== 'default' && k !== 'model_specific' && k !== 'prompt_strategy').join(', ')}`);
+        return null;
+      }
+      
+      // Try model-specific first
+      const modelSpecificPrompt = taskPrompts?.model_specific?.[modelKey]?.[promptKey];
+      if (modelSpecificPrompt) {
+        return modelSpecificPrompt;
+      }
+      
+      // Debug: Log what models are available
+      if (taskPrompts.model_specific) {
+        const availableModels = Object.keys(taskPrompts.model_specific);
+        console.log(`[SpecialistAdapter] Model "${modelKey}" not found in model_specific. Available models: ${availableModels.join(', ')}`);
+      } else {
+        console.log(`[SpecialistAdapter] No model_specific section found for task "${taskType}"`);
+      }
+      
+      // Fallback to default if model-specific not found
+      const defaultPrompt = taskPrompts?.default?.[promptKey];
+      if (defaultPrompt) {
+        console.log(`[SpecialistAdapter] Model-specific prompt not found for ${promptId}, falling back to default`);
+        return defaultPrompt;
+      }
+      
+      console.log(`[SpecialistAdapter] Default prompt also not found. Available keys in default: ${taskPrompts.default ? Object.keys(taskPrompts.default).join(', ') : 'none'}`);
+      return null;
     }
 
     return null;

@@ -4,7 +4,6 @@
 {
   schema_version: "0.0.1",
   name: "foundations-engineer",
-  from: "@sgws-web/memory-safe",
   displayName: "Foundations Engineer",
   version: "0.0.10",
   license: "MIT",

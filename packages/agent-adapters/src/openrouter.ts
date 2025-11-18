@@ -40,7 +40,7 @@ export class OpenRouterAdapter implements AgentAdapter {
   private readonly client: OpenAI;
   private readonly DEFAULT_MAX_ITERATIONS = 50;
   private readonly DEFAULT_MAX_TOKENS = 8192;
-  private readonly DEFAULT_MODEL = "minimax/minimax-m2:free";
+  private readonly DEFAULT_MODEL = "openai/gpt-5";
   private readonly model: string;
   private readonly modelSource: 'parameter' | 'environment' | 'default';
   private pricingCache: Map<string, ModelPricing> = new Map();

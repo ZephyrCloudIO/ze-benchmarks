@@ -27,7 +27,8 @@ async function showInteractiveMenu() {
 		const action = await select({
 			message: 'What would you like to do?',
 			options: [
-				{ value: 'benchmark', label: 'Run Benchmarks' },
+				{ value: 'benchmark-specialist', label: 'Run Benchmarks (Specialists)', hint: 'Recommended: Use pre-configured specialist templates' },
+				{ value: 'benchmark-direct', label: 'Run Benchmarks (Direct Agents)', hint: 'Use base agents directly (openrouter, anthropic, etc.)' },
 				{ value: 'history', label: 'History' },
 				{ value: 'statistics', label: 'Statistics' },
 				{ value: 'new-suite', label: 'Create New Suite' },
@@ -39,8 +40,11 @@ async function showInteractiveMenu() {
 		});
 
 		switch (action) {
-			case 'benchmark':
-				await runInteractiveBenchmark();
+			case 'benchmark-specialist':
+				await runInteractiveBenchmark('specialist');
+				break;
+			case 'benchmark-direct':
+				await runInteractiveBenchmark('direct');
 				break;
 			case 'history':
 				await runInteractiveHistoryMenu();

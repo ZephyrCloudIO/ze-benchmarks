@@ -1,7 +1,8 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { select, multiselect, isCancel, cancel, text } from '@clack/prompts';
 import chalk from 'chalk';
+import JSON5 from 'json5';
 import { BenchmarkLogger } from '@ze/worker-client';
 import { OpenRouterAPI } from '../lib/openrouter-api.ts';
 import { log } from '@clack/prompts';
@@ -45,6 +46,199 @@ export async function executeWithConcurrency<T>(
 // ============================================================================
 // MULTIPLE BENCHMARKS EXECUTION
 // ============================================================================
+
+export async function executeMultipleBenchmarksWithSpecialists(
+	suites: string[],
+	scenarios: string[],
+	tiers: string[],
+	specialists: string[]
+) {
+	// Initialize batch tracking
+	const logger = BenchmarkLogger.getInstance();
+	const batchId = await logger.startBatch();
+
+	// Calculate total combinations
+	const combinations: Array<{
+		suite: string;
+		scenario: string;
+		tier: string;
+		specialist: string;
+	}> = [];
+
+	for (const suite of suites) {
+		for (const scenario of scenarios) {
+			const availableTiers = getAvailableTiers(suite, scenario);
+			const availableTierValues = availableTiers.map(t => t.value);
+			const validTiers = tiers.filter(tier => availableTierValues.includes(tier));
+
+			if (validTiers.length === 0) {
+				console.log(chalk.yellow(`⚠ Skipping ${suite}/${scenario}: no valid tiers`));
+				continue;
+			}
+
+			for (const tier of validTiers) {
+				for (const specialist of specialists) {
+					combinations.push({ suite, scenario, tier, specialist });
+				}
+			}
+		}
+	}
+
+	// Smart concurrency
+	const useParallel = combinations.length >= 3;
+	let concurrency = combinations.length <= 5 ? 2 : combinations.length <= 15 ? 3 : 5;
+
+	console.log(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s) with specialists:`));
+	if (useParallel) {
+		console.log(chalk.gray(`Parallel execution with concurrency: ${concurrency}`));
+	}
+
+	// Execute warmup once per unique suite/scenario
+	const uniqueScenarios = new Set(combinations.map(c => `${c.suite}/${c.scenario}`));
+	if (uniqueScenarios.size > 0) {
+		console.log(chalk.blue('\n🔥 Running warmup phase for scenarios...'));
+		for (const scenarioKey of uniqueScenarios) {
+			const [suite, scenario] = scenarioKey.split('/');
+			try {
+				const scenarioCfg = loadScenario(suite, scenario);
+				const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, createAgentAdapter, true);
+				if (!warmupResult.success) {
+					console.log(chalk.yellow(`⚠️  Warmup for ${scenarioKey}: ${warmupResult.error || 'failed'}`));
+				} else {
+					console.log(chalk.green(`✓ Warmup completed for ${scenarioKey}`));
+				}
+			} catch (error) {
+				console.log(chalk.yellow(`⚠️  Warmup error for ${scenarioKey}: ${error instanceof Error ? error.message : String(error)}`));
+			}
+		}
+		console.log();
+	}
+
+	// Track batch statistics
+	const startTime = Date.now();
+
+	// Execute benchmarks
+	if (useParallel) {
+		await executeWithConcurrency(
+			combinations,
+			concurrency,
+			async (combo, i) => {
+				const { suite, scenario, tier, specialist } = combo;
+				console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${specialist}`)}`);
+				await executeBenchmark(
+					suite,
+					scenario,
+					tier,
+					undefined,  // agent is undefined - specialist will auto-detect
+					undefined,  // model is undefined - specialist has preferred model
+					batchId,
+					true,       // quiet mode
+					specialist, // specialist parameter
+					true        // skip warmup (already done)
+				);
+			}
+		);
+	} else {
+		for (let i = 0; i < combinations.length; i++) {
+			const { suite, scenario, tier, specialist } = combinations[i];
+			console.log(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${specialist}`)}`);
+			await executeBenchmark(
+				suite,
+				scenario,
+				tier,
+				undefined,  // agent is undefined - specialist will auto-detect
+				undefined,  // model is undefined - specialist has preferred model
+				batchId,
+				true,       // quiet mode
+				specialist, // specialist parameter
+				true        // skip warmup (already done)
+			);
+		}
+	}
+
+	// Complete batch and show summary
+	const endTime = Date.now();
+	const duration = endTime - startTime;
+	const batchStats = await logger.getBatchDetails(batchId);
+
+	let successfulRuns = 0;
+	let totalScore = 0;
+	let totalWeightedScore = 0;
+
+	if (batchStats) {
+		successfulRuns = await logger.getBatchSuccessfulRunsCount(batchId);
+		const scoreStats = await logger.getBatchScoreStats(batchId);
+		totalScore = scoreStats.avgScore || 0;
+		totalWeightedScore = scoreStats.avgWeightedScore || 0;
+	}
+
+	await logger.completeBatch(batchId, {
+		totalRuns: combinations.length,
+		successfulRuns,
+		avgScore: totalScore,
+		avgWeightedScore: totalWeightedScore,
+		metadata: {
+			suites,
+			scenarios,
+			tiers,
+			specialists,
+			executionMode: 'specialist',
+			duration
+		}
+	});
+
+	// Show summary
+	const analytics = await logger.getBatchAnalytics(batchId);
+
+	console.log('\n' + chalk.bold.underline('Batch Summary'));
+	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+	console.log(`│ ${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 8))}...`);
+	console.log(`│ ${chalk.bold('Mode:')} ${chalk.cyan('Specialists')}`);
+	console.log(`│ ${chalk.bold('Total Runs:')} ${combinations.length}`);
+	console.log(`│ ${chalk.bold('Completed:')} ${successfulRuns} (${combinations.length > 0 ? ((successfulRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
+
+	const failedRuns = combinations.length - successfulRuns;
+	if (failedRuns > 0) {
+		console.log(`│ ${chalk.bold('Failed:')} ${chalk.red(failedRuns)} (${combinations.length > 0 ? ((failedRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
+	}
+
+	console.log(`│ ${chalk.bold('Avg Score:')} ${combinations.length > 0 ? (totalWeightedScore / combinations.length).toFixed(4) : '0.0000'} / 10.0`);
+	console.log(`│ ${chalk.bold('Duration:')} ${(duration / 1000).toFixed(2)}s`);
+	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+
+	// Show suite breakdown if analytics available
+	if (analytics && analytics.suiteBreakdown && analytics.suiteBreakdown.length > 0) {
+		console.log(`\n${chalk.bold.underline('Suite Breakdown')}`);
+		analytics.suiteBreakdown.forEach((suite: { suite: string; scenario: string; runs: number; successfulRuns: number; avgWeightedScore: number }) => {
+			const successRate = suite.runs > 0 ? ((suite.successfulRuns / suite.runs) * 100).toFixed(0) : 0;
+			console.log(`  ${chalk.cyan(suite.suite)}/${suite.scenario}: ${suite.avgWeightedScore?.toFixed(2) || 0}/10 ${chalk.gray(`(${successRate}% success, ${suite.runs} runs)`)}`);
+		});
+	}
+
+	// Show agent performance (specialists in this case)
+	if (analytics && analytics.agentBreakdown && analytics.agentBreakdown.length > 0) {
+		console.log(`\n${chalk.bold.underline('Specialist Performance')}`);
+		analytics.agentBreakdown.forEach((agent: any, index: number) => {
+			const rank = index + 1;
+			const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
+			const scoreColor = (agent.avgWeightedScore || 0) >= 9 ? 'green' : (agent.avgWeightedScore || 0) >= 7 ? 'yellow' : 'red';
+			console.log(`  ${rankDisplay} ${chalk.cyan(agent.agent)}: ${chalk[scoreColor]((agent.avgWeightedScore || 0).toFixed(2))}/10 ${chalk.gray(`(${agent.successfulRuns || 0}/${agent.totalRuns || 0} runs)`)}`);
+		});
+	}
+
+	// Show failed runs if any
+	if (analytics && analytics.runs) {
+		const failedRunsList = analytics.runs.filter((run: any) => run.status === 'failed');
+		if (failedRunsList.length > 0) {
+			console.log(`\n${chalk.bold.underline(chalk.red('Failed Runs'))}`);
+			failedRunsList.forEach((run: any) => {
+				console.log(`  ${chalk.red('✗')} ${run.suite}/${run.scenario} (${run.tier}) ${run.agent} - ${run.error || 'Unknown error'}`);
+			});
+		}
+	}
+
+	console.log('\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s) with specialists!`));
+}
 
 export async function executeMultipleBenchmarks(
 	suites: string[],
@@ -280,8 +474,32 @@ export async function executeMultipleBenchmarks(
 // INTERACTIVE BENCHMARK
 // ============================================================================
 
-export async function runInteractiveBenchmark() {
+export async function runInteractiveBenchmark(executionMode?: 'specialist' | 'direct') {
 	console.log(chalk.bold.underline('Demo: Benchmarking AI Agents:'));
+
+	// If execution mode not provided, ask user to choose
+	if (!executionMode) {
+		executionMode = await select({
+			message: 'Choose execution mode:',
+			options: [
+				{
+					value: 'specialist',
+					label: 'Specialists (Recommended)',
+					hint: 'Use pre-configured specialist templates for specific tasks'
+				},
+				{
+					value: 'direct',
+					label: 'Direct Agents',
+					hint: 'Use base agents directly (openrouter, anthropic, etc.)'
+				}
+			]
+		}) as 'specialist' | 'direct';
+
+		if (isCancel(executionMode)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+	}
 
 	// Get available suites and scenarios
 	const root = findRepoRoot();
@@ -408,31 +626,72 @@ export async function runInteractiveBenchmark() {
 		? Array.from(availableTiersSet).sort()
 		: selectedTiers;
 
-	// Select agents (multiselect) - dynamically loaded
-	console.log('Loading available agents...');
-	const agentOptions = await getAvailableAgents();
-	console.log(`✅ Loaded ${agentOptions.length} agent options`);
+	// Now select agents/specialists based on execution mode (already selected at the start)
+	let agentsToUse: string[] = [];
+	let specialistsToUse: string[] = [];
+	let modelsToUse: (string | undefined)[] = [undefined];
 
-	const selectedAgents = await multiselect({
-		message: 'Choose agents:',
-		options: agentOptions,
-		required: true
-	});
+	if (executionMode === 'specialist') {
+		// Specialist mode
+		console.log('🔍 Loading available specialists...');
+		const specialistOptions = await getAvailableSpecialists();
 
-	if (isCancel(selectedAgents)) {
-		cancel('Operation cancelled.');
-		return;
+		if (specialistOptions.length === 0) {
+			log.warning('No specialists found in templates directory');
+			log.info('Add a specialist template to the templates/ directory first');
+			return;
+		}
+
+		console.log(`✅ Found ${specialistOptions.length} specialist(s)`);
+
+		const selectedSpecialists = await multiselect({
+			message: 'Choose specialists:',
+			options: [
+				{ value: '__ALL__', label: 'All specialists' },
+				...specialistOptions
+			],
+			required: true
+		});
+
+		if (isCancel(selectedSpecialists)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+
+		// Expand "All" selection
+		specialistsToUse = selectedSpecialists.includes('__ALL__')
+			? specialistOptions.map(s => s.value)
+			: selectedSpecialists;
+
+		console.log(`🎯 Selected specialists: ${specialistsToUse.join(', ')}`);
+
+	} else {
+		// Direct agent mode (existing code)
+		console.log('Loading available agents...');
+		const agentOptions = await getAvailableAgents();
+		console.log(`✅ Loaded ${agentOptions.length} agent options`);
+
+		const selectedAgents = await multiselect({
+			message: 'Choose agents:',
+			options: agentOptions,
+			required: true
+		});
+
+		if (isCancel(selectedAgents)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+
+		// Expand "All" selection
+		agentsToUse = selectedAgents.includes('__ALL__')
+			? ['echo', 'openrouter', 'anthropic', 'claude-code']
+			: selectedAgents;
+
+		console.log(`🎯 Selected agents: ${agentsToUse.join(', ')}`);
 	}
 
-	// Expand "All" selection
-	const agentsToUse = selectedAgents.includes('__ALL__')
-		? ['echo', 'openrouter', 'anthropic', 'claude-code']
-		: selectedAgents;
-
-	console.log(`🎯 Selected agents: ${agentsToUse.join(', ')}`);
-
-	// Ask for models if needed
-	let modelsToUse: (string | undefined)[] = [undefined];
+	// Ask for models if needed (only in direct agent mode)
+	if (executionMode === 'direct') {
 	const needsOpenRouterModels = agentsToUse.some(agent => agent === 'openrouter');
 	const needsAnthropicModels = agentsToUse.some(agent => agent === 'anthropic');
 	const needsClaudeCodeModels = agentsToUse.some(agent => agent === 'claude-code');
@@ -579,10 +838,15 @@ export async function runInteractiveBenchmark() {
 		modelsToUse = selectedModels;
 		console.log(`🎯 Selected Claude Code models: ${modelsToUse.join(', ')}`);
 	}
+	} // End of if (executionMode === 'direct')
 
-
-	// Calculate total combinations for automatic parallel decision
-	const totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
+	// Calculate total combinations based on execution mode
+	let totalCombinations: number;
+	if (executionMode === 'specialist') {
+		totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * specialistsToUse.length;
+	} else {
+		totalCombinations = suitesToUse.length * scenariosToUse.length * tiersToUse.length * agentsToUse.length * modelsToUse.length;
+	}
 
 	// Automatically determine parallel execution based on number of benchmarks
 	const useParallel = totalCombinations >= 3; // Enable parallel for 3+ benchmarks
@@ -606,23 +870,36 @@ export async function runInteractiveBenchmark() {
 	console.log(`   ${chalk.cyan('Suites:')} ${suitesToUse.join(', ')}`);
 	console.log(`   ${chalk.cyan('Scenarios:')} ${scenariosToUse.join(', ')}`);
 	console.log(`   ${chalk.cyan('Tiers:')} ${tiersToUse.join(', ')}`);
-	console.log(`   ${chalk.cyan('Agents:')} ${agentsToUse.join(', ')}`);
-	if (needsOpenRouterModels || needsAnthropicModels || needsClaudeCodeModels) {
-		console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
+	if (executionMode === 'specialist') {
+		console.log(`   ${chalk.cyan('Specialists:')} ${specialistsToUse.join(', ')}`);
+	} else {
+		console.log(`   ${chalk.cyan('Agents:')} ${agentsToUse.join(', ')}`);
+		if (modelsToUse.length > 0 && modelsToUse[0]) {
+			console.log(`   ${chalk.cyan('Models:')} ${modelsToUse.join(', ')}`);
+		}
 	}
 	console.log(`   ${chalk.cyan('Parallel execution:')} ${useParallel ? `Yes (concurrency: ${concurrency})` : 'No'}`);
 
 	// Show title before execution
 	console.log(chalk.cyan(createTitle()));
 
-	// Execute all benchmark combinations
-	await executeMultipleBenchmarks(
-		suitesToUse,
-		scenariosToUse,
-		tiersToUse,
-		agentsToUse,
-		modelsToUse
-	);
+	// Execute based on mode
+	if (executionMode === 'specialist') {
+		await executeMultipleBenchmarksWithSpecialists(
+			suitesToUse,
+			scenariosToUse,
+			tiersToUse,
+			specialistsToUse
+		);
+	} else {
+		await executeMultipleBenchmarks(
+			suitesToUse,
+			scenariosToUse,
+			tiersToUse,
+			agentsToUse,
+			modelsToUse
+		);
+	}
 }
 
 // ============================================================================
@@ -639,4 +916,60 @@ async function getAvailableAgents(): Promise<Array<{value: string, label: string
   ];
 
   return agents;
+}
+
+async function getAvailableSpecialists(): Promise<Array<{
+  value: string,
+  label: string,
+  description?: string
+}>> {
+  const specialists: Array<{value: string, label: string, description?: string}> = [];
+
+  // Load specialists from templates directory
+  const root = findRepoRoot();
+  const templatesPath = join(root, 'templates');
+
+  if (!existsSync(templatesPath)) {
+    return specialists;
+  }
+
+  // Read all JSON5 files in templates directory
+  const files = readdirSync(templatesPath).filter(file =>
+    file.endsWith('.json5') && file.includes('specialist')
+  );
+
+  for (const file of files) {
+    const filePath = join(templatesPath, file);
+
+    try {
+      const content = readFileSync(filePath, 'utf8');
+      const template = JSON5.parse(content);
+
+      // Extract specialist info from template
+      // Use template.name if available, otherwise extract from filename
+      // Filename format: "nextjs-specialist-template.json5" -> "nextjs-specialist"
+      let name = template.name;
+      if (!name) {
+        // Remove "-template.json5" suffix if present
+        name = file.replace(/-specialist-template\.json5$/, '-specialist');
+        // If still doesn't end with "-specialist", add it
+        if (!name.endsWith('-specialist')) {
+          name = name.replace(/-template\.json5$/, '') + '-specialist';
+        }
+      }
+      const displayName = template.displayName || name;
+      const purpose = template.persona?.purpose || 'Specialist template';
+
+      specialists.push({
+        value: name,
+        label: `${displayName} ${chalk.gray(`(${name})`)}`,
+        description: purpose
+      });
+    } catch (e) {
+      // Skip invalid JSON5 files
+      console.log(chalk.yellow(`⚠️  Failed to parse ${file}: ${e instanceof Error ? e.message : String(e)}`));
+    }
+  }
+
+  return specialists;
 }

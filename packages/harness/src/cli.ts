@@ -440,7 +440,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -530,7 +530,7 @@ async function run() {
 	}
 
 	// Execute the benchmark (agent can be undefined if specialist will auto-detect)
-	await executeBenchmark(suite, scenario, tier, agent, model, batchId, quiet, specialist, skipWarmup);
+	await executeBenchmark(suite, scenario, tier, agent, model, batchId, quiet, specialist, skipWarmup, llmJudgeOnly);
 }
 
 // Cleanup handlers

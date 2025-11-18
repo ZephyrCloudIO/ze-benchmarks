@@ -150,7 +150,7 @@ export class LLMJudgeEvaluator implements Evaluator {
     prompt: string
   ): Promise<JudgeResponse> {
     const model =
-      process.env.LLM_JUDGE_MODEL || "meta-llama/llama-3.1-8b-instruct";
+      process.env.LLM_JUDGE_MODEL || "openai/gpt-4o-mini";
     const temperature = parseFloat(process.env.LLM_JUDGE_TEMPERATURE || "0.1");
     const maxTokens = parseInt(process.env.LLM_JUDGE_MAX_TOKENS || "2000", 10);
 

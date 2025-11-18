@@ -67,7 +67,8 @@ export async function executeBenchmark(
 	batchId?: string,
 	quiet?: boolean,
 	specialist?: string,
-	skipWarmup?: boolean
+	skipWarmup?: boolean,
+	llmJudgeOnly: boolean = true
 ) {
 	// Initialize logger
 	const logger = BenchmarkLogger.getInstance();
@@ -375,7 +376,10 @@ export async function executeBenchmark(
 
 	// Stage 5: Evaluation
 	console.log(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
-	if (progress) updateProgress(progress, 5, 'Computing scores');
+	if (llmJudgeOnly) {
+		if (!quiet) console.log(chalk.blue('[Benchmark] Running LLM judge only (other evaluators skipped)'));
+	}
+	if (progress) updateProgress(progress, 5, llmJudgeOnly ? 'Computing LLM judge scores' : 'Computing scores');
 
 	try {
 		if (workspaceDir) {
@@ -401,7 +405,7 @@ export async function executeBenchmark(
 				diffSummary: diffArtifacts.diffSummary,
 				depsDelta: diffArtifacts.depsDelta,
 			};
-			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx);
+			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx, llmJudgeOnly);
 			result.scores = { ...result.scores, ...scoreCard };
 			result.totals = computeWeightedTotals(result.scores, scenarioCfg);
 			(result as any).evaluator_results = evaluatorResults;
