@@ -86,12 +86,18 @@ export function parseArgs(argv: string[]) {
 	const batchIdIndex = rest.indexOf('--batch-id');
 	const batchId = batchIdIndex !== -1 ? rest[batchIdIndex + 1] : undefined;
 
+	const enrichTemplateIndex = rest.indexOf('--enrich-template');
+	const enrichTemplate = enrichTemplateIndex !== -1 ? rest[enrichTemplateIndex + 1] : undefined;
+
+	const iterationsIndex = rest.indexOf('--iterations');
+	const iterations = iterationsIndex !== -1 ? parseInt(rest[iterationsIndex + 1], 10) || 1 : 1;
+
 	const skipWarmup = rest.includes('--skip-warmup');
 	const warmupOnly = rest.includes('--warmup-only');
 	const quiet = rest.includes('--quiet');
 	const llmJudgeOnly = rest.includes('--llm-judge-only');
 
-	return { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly } as const;
+	return { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } as const;
 }
 
 export function showHelp() {
@@ -119,6 +125,9 @@ export function showHelp() {
 	console.log(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
 	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
 	console.log(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
+	console.log(`  ${chalk.cyan('--batch-id')} <id>              Batch ID for grouping runs`);
+	console.log(`  ${chalk.cyan('--iterations')} <n>             Number of times to run benchmark (default: 1)`);
+	console.log(`  ${chalk.cyan('--enrich-template')} <path>     Template path to enrich after benchmarks`);
 	console.log(`  ${chalk.cyan('--skip-warmup')}                  Skip warmup phase (for parallel execution)`);
 	console.log(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
 	console.log(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);

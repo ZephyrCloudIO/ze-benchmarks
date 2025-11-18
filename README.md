@@ -222,33 +222,32 @@ pnpm batch-details <batch-id>
 
 ## Creating Specialist Snapshots
 
-You can create specialist snapshots that combine templates with benchmark results in two ways:
+You can create specialist snapshots that combine templates with benchmark results. The recommended workflow involves enriching templates with LLM-generated metadata after running benchmarks.
 
 ### Option 1: Integrated Workflow (Recommended)
 
-Run benchmarks and automatically mint snapshots in one command:
+Run benchmarks and automatically enrich templates in one command:
 
 ```bash
 # Start Worker (required)
 pnpm worker:dev
 
-# Run benchmarks with automatic snapshot minting
+# Run benchmarks with automatic template enrichment
 pnpm bench update-deps nx-pnpm-monorepo \
   --tier L1 \
-  --agent anthropic \
+  --specialist @zephyr-cloud/shadcn-specialist \
   --iterations 3 \
-  --mint-template templates/my-specialist.json5 \
-  --mint-output ./snapshots
+  --enrich-template templates/shadcn-specialist.json5
 
 # This will:
-# 1. Run the benchmark 3 times
+# 1. Run the benchmark 3 times with the specialist
 # 2. Store all runs in a batch
-# 3. Automatically mint a snapshot with the results
+# 3. Automatically enrich the template with LLM-generated metadata
 ```
 
 ### Option 2: Manual Workflow
 
-Separate benchmark running from snapshot minting:
+Separate benchmark running from template enrichment and snapshot minting:
 
 ```bash
 # 1. Start Worker (required)
@@ -258,21 +257,20 @@ pnpm worker:dev
 pnpm bench update-deps nx-pnpm-monorepo --batch-id my_batch
 # Output: Created batch: my_batch
 
-# 3. Create specialist snapshot from results
+# 3. Enrich template with LLM-generated metadata
+pnpm mint:enrich <path-to-template.json5>
+
+# 4. Create specialist snapshot from results
 pnpm mint:snapshot \
   <path-to-template.json5> \
   --batch-id my_batch \
   --output ./snapshots
-
-# 4. Enrich template with LLM-generated metadata (optional)
-pnpm mint:enrich <path-to-template.json5>
 ```
 
-### New CLI Options
+### CLI Options for Enrichment
 
+- `--enrich-template <path>` - Template path to enrich after benchmarks complete
 - `--iterations <n>` - Run benchmark multiple times (useful for statistical confidence)
-- `--mint-template <path>` - Automatically mint snapshot after benchmarks complete
-- `--mint-output <path>` - Output directory for snapshots (default: ./snapshots)
 - `--batch-id <id>` - Custom batch ID for grouping runs
 
 ### Specialist Mint Package

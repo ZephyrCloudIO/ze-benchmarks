@@ -440,7 +440,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -529,8 +529,63 @@ async function run() {
 		}
 	}
 
-	// Execute the benchmark (agent can be undefined if specialist will auto-detect)
-	await executeBenchmark(suite, scenario, tier, agent, model, batchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+	// Execute the benchmark (with iterations support)
+	const actualBatchId = batchId || `batch_${Date.now()}`;
+
+	if (iterations > 1 && !quiet) {
+		log.info(chalk.blue(`Running ${iterations} iterations with batch ID: ${actualBatchId}`));
+	}
+
+	// Run benchmark iterations
+	for (let i = 0; i < iterations; i++) {
+		if (iterations > 1 && !quiet) {
+			log.info(chalk.cyan(`\n--- Iteration ${i + 1}/${iterations} ---`));
+		}
+
+		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+	}
+
+	// After all iterations complete, enrich template if requested
+	if (enrichTemplate) {
+		if (!quiet) {
+			log.info(chalk.blue(`\n🔍 Enriching template: ${enrichTemplate}`));
+		}
+
+		try {
+			// Import enrichment function
+			const { enrichTemplate: enrichTemplateFunc } = await import('../../specialist-mint/src/enrich-template.js');
+
+			const result = await enrichTemplateFunc(enrichTemplate, {
+				provider: (process.env.ENRICHMENT_PROVIDER as 'openrouter' | 'anthropic') || 'openrouter',
+				model: process.env.ENRICHMENT_MODEL || 'anthropic/claude-3.5-haiku',
+				force: false,
+				timeoutMs: 30000,
+				concurrency: 3
+			});
+
+			if (!quiet) {
+				console.log(chalk.green('\n✅ Template enrichment completed!'));
+				console.log(chalk.gray(`   Enriched template: ${result.enrichedTemplatePath}`));
+				console.log(chalk.gray(`   Documents enriched: ${result.documentsEnriched}`));
+				console.log(chalk.gray(`   Documents skipped: ${result.documentsSkipped}`));
+
+				if (result.errors.length > 0) {
+					console.log(chalk.yellow(`   Errors: ${result.errors.length}`));
+					result.errors.forEach(err => {
+						console.log(chalk.yellow(`     - ${err}`));
+					});
+				}
+				console.log();
+			}
+		} catch (error) {
+			log.error(chalk.red('\n❌ Error enriching template:'));
+			console.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}`));
+			if (!quiet) {
+				console.log(chalk.yellow('\n💡 Tip: Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env'));
+			}
+			process.exit(1);
+		}
+	}
 }
 
 // Cleanup handlers
