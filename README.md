@@ -30,7 +30,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Worker configuration (already set for local development)
-ZE_BENCHMARKS_WORKER_URL=ZE_BENCHMARKS_WORKER_URL=https://bench-api-dev.zephyr-cloud.io
+ZE_BENCHMARKS_WORKER_URL=https://bench-api-dev.zephyr-cloud.io
 ZE_PUBLIC_API_URL=https://bench-api-dev.zephyr-cloud.io
 ZE_PUBLIC_VITE_WORKER_URL=https://bench-api-dev.zephyr-cloud.io
 ZE_BENCHMARKS_API_KEY=dev-local-key

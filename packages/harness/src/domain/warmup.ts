@@ -87,11 +87,14 @@ export async function executeWarmup(
 			// Create agent adapter
 			const agentAdapter = await createAgentAdapter(provider, model);
 
+			// Auto-inject control folder instruction
+			const controlInstruction = `\n\nIMPORTANT: When your task is complete, you MUST create a folder named 'control' in the workspace root. This folder is used by the harness to validate warmup completion.`;
+
 			// Build the request
 			const messages: Array<{ role: 'system' | 'user'; content: string }> = [
 				{
 					role: 'user' as const,
-					content: prompt
+					content: prompt + controlInstruction
 				}
 			];
 
