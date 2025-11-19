@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "useSearchParams Hook Usage (Weight: 35%): Evaluates correct implementation of useSearchParams hook from next/navigation in client components. Score 1-5: 1=incorrect hook usage, 5=proper useSearchParams implementation"
+    - "Query Parameter Extraction (Weight: 30%): Assesses accurate reading and parsing of URL search parameters using the hook. Score 1-5: 1=cannot read params, 5=correctly extracts all search parameters"
+    - "Dynamic URL Updates (Weight: 20%): Evaluates implementation of updating search parameters using router.push or similar methods. Score 1-5: 1=cannot update params, 5=proper param updates with URL sync"
+    - "Suspense Boundary & Loading (Weight: 10%): Assesses proper wrapping of components using useSearchParams in Suspense boundaries. Score 1-5: 1=missing Suspense causing errors, 5=proper Suspense implementation"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of search parameters and URLSearchParams usage. Score 1-5: 1=no types or incorrect types, 5=fully typed search params handling"

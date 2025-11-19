@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server-Side Data Fetching (35%): Uses Next.js server components, async components, or server-side fetching instead of client-side useEffect with fetch. Score 1-5: 1=client-side fetch in useEffect, 5=proper server-side fetching"
+    - "Anti-Pattern Avoidance (30%): Recognizes that fetch-in-useEffect is a React legacy pattern that Next.js improves upon. Score 1-5: 1=uses anti-pattern, 5=avoids anti-pattern completely"
+    - "Data Loading Strategy (20%): Implements proper loading states, error handling, and suspense boundaries where appropriate. Score 1-5: 1=poor UX, 5=excellent loading experience"
+    - "Performance Benefits (10%): Leverages server-side rendering for faster initial load and better SEO. Score 1-5: 1=slow client-side, 5=optimized server-side"
+    - "Implementation Quality (5%): Code is clean, follows Next.js conventions, and passes tests. Score 1-5: 1=broken or messy, 5=production-ready"

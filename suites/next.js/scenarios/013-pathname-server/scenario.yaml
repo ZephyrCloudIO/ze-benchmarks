@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server Component Implementation (Weight: 35%): Evaluates proper use of server components to access pathname without client-side hooks. Score 1-5: 1=incorrect use of client components, 5=proper server component with pathname access"
+    - "Headers API Usage (Weight: 30%): Assesses correct use of next/headers to extract pathname information on the server. Score 1-5: 1=incorrect or missing headers usage, 5=proper headers() function usage for pathname"
+    - "Pathname Extraction Logic (Weight: 20%): Evaluates accurate extraction and parsing of pathname from request headers. Score 1-5: 1=incorrect pathname logic, 5=accurate pathname extraction and handling"
+    - "Conditional Rendering Based on Path (Weight: 10%): Assesses implementation of conditional logic or UI changes based on current pathname. Score 1-5: 1=no conditional logic, 5=proper path-based conditional rendering"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of server components and pathname variables. Score 1-5: 1=no types or incorrect types, 5=fully typed with proper Next.js server types"

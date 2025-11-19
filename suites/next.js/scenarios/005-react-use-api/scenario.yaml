@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "React use() API Implementation (Weight: 35%): Correctly implements React's use() API to consume Promise data in client components, following experimental API patterns. Score 1-5: 1=incorrect or missing use() implementation, 5=perfect use() with proper Promise handling"
+    - "Promise Data Flow (Weight: 30%): Properly passes Promise from server to client component and unwraps it using use(), maintaining correct data flow. Score 1-5: 1=broken data flow, 5=seamless Promise passing and consumption"
+    - "Suspense Boundary Integration (Weight: 20%): Implements Suspense boundaries to handle loading states while Promises resolve in client components. Score 1-5: 1=no Suspense or incorrect usage, 5=optimal Suspense placement with fallbacks"
+    - "Concurrent Features Understanding (Weight: 10%): Demonstrates understanding of React concurrent features and how use() integrates with them. Score 1-5: 1=no understanding of concurrency, 5=expert use of concurrent patterns"
+    - "Type Safety (Weight: 5%): Maintains proper TypeScript types for Promises and resolved data throughout the component tree. Score 1-5: 1=no types or incorrect, 5=fully typed with proper Promise types"

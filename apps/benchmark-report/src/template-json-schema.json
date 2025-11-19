@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/shadcn-specialist.schema.json",
+  "title": "shadcn/ui Specialist Definition",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of this config schema (semantic versioning recommended)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Machine-readable name of the specialist"
+    },
+    "from": {
+      "type": "string",
+      "description": "Origin or base package of the specialist"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable name for UI display"
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of this specialist definition (semantic versioning recommended)"
+    },
+    "license": {
+      "type": "string",
+      "description": "License identifier (e.g. MIT, Apache-2.0)"
+    },
+    "availability": {
+      "type": "string",
+      "description": "Availability of this specialist (e.g. public, private)"
+    },
+    "maintainers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": ["name", "email"]
+      }
+    },
+    "persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "purpose": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tech_stack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["purpose", "values", "attributes", "tech_stack"]
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "shadcn-ui",
+              "tailwindcss-v4",
+              "vite-setup",
+              "nextjs-setup",
+              "component-theming",
+              "css-variables",
+              "path-aliases",
+              "radix-ui",
+              "component-installation",
+              "troubleshooting"
+            ]
+          }
+        },
+        "descriptions": {
+          "type": "object",
+          "description": "Map of capability tag -> human description",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "considerations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["tags", "descriptions", "considerations"]
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "subscription": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "purpose": {
+              "type": "string"
+            }
+          },
+          "required": ["required", "purpose"]
+        },
+        "available_tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "file_system",
+              "terminal",
+              "code_analysis",
+              "git",
+              "web_fetch"
+            ]
+          }
+        },
+        "mcps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            },
+            "required": ["name", "version", "permissions", "description", "required"]
+          }
+        }
+      },
+      "required": ["subscription", "available_tools", "mcps"]
+    },
+    "documentation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["official"]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "url", "description"]
+      }
+    },
+    "prompts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "spawnerPrompt": {
+              "type": "string"
+            }
+          },
+          "required": ["spawnerPrompt"]
+        },
+        "project_setup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "systemPrompt": {
+                  "type": "string"
+                }
+              },
+              "required": ["systemPrompt"]
+            }
+          },
+          "required": ["default"]
+        },
+        "component_add": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "systemPrompt": {
+                  "type": "string"
+                }
+              },
+              "required": ["systemPrompt"]
+            }
+          },
+          "required": ["default"]
+        },
+        "troubleshoot": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "systemPrompt": {
+                  "type": "string"
+                }
+              },
+              "required": ["systemPrompt"]
+            }
+          },
+          "required": ["default"]
+        },
+        "theme_setup": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "systemPrompt": {
+                  "type": "string"
+                }
+              },
+              "required": ["systemPrompt"]
+            },
+            "model_specific": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "systemPrompt": {
+                    "type": "string"
+                  }
+                },
+                "required": ["systemPrompt"]
+              },
+              "properties": {
+                "anthropic/claude-sonnet-4.5": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "systemPrompt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["systemPrompt"]
+                }
+              }
+            }
+          },
+          "required": ["default"]
+        },
+        "prompt_strategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fallback": {
+              "type": "string"
+            },
+            "model_detection": {
+              "type": "string",
+              "enum": ["auto"]
+            },
+            "allow_override": {
+              "type": "boolean"
+            },
+            "interpolation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "style": {
+                  "type": "string",
+                  "enum": ["mustache"]
+                },
+                "escape_html": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["style", "escape_html"]
+            }
+          },
+          "required": ["fallback", "model_detection", "allow_override", "interpolation"]
+        }
+      },
+      "required": [
+        "default",
+        "project_setup",
+        "component_add",
+        "troubleshoot",
+        "theme_setup",
+        "prompt_strategy"
+      ]
+    },
+    "spawnable_sub_agent_specialists": {
+      "type": "array",
+      "description": "Optional nested specialist definitions",
+      "items": {
+        "type": "object",
+        "description": "Structure is intentionally unconstrained to allow extension",
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "from",
+    "displayName",
+    "version",
+    "license",
+    "availability",
+    "maintainers",
+    "persona",
+    "capabilities",
+    "dependencies",
+    "documentation",
+    "prompts",
+    "spawnable_sub_agent_specialists"
+  ]
+}

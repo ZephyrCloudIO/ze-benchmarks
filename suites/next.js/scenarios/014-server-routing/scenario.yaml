@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server-Side Routing Implementation (Weight: 35%): Evaluates correct implementation of server-side routing patterns including redirects and rewrites. Score 1-5: 1=incorrect routing implementation, 5=proper server-side routing with Next.js APIs"
+    - "Dynamic Route Handling (Weight: 30%): Assesses handling of dynamic segments, route parameters, and server-side route resolution. Score 1-5: 1=dynamic routes not working, 5=proper dynamic route handling with params"
+    - "Redirect & Rewrite Logic (Weight: 20%): Evaluates use of redirect() and rewrite functions for server-side navigation control. Score 1-5: 1=incorrect or missing redirects, 5=proper redirect/rewrite implementation"
+    - "Route Middleware & Protection (Weight: 10%): Assesses implementation of middleware or route guards for server-side route protection. Score 1-5: 1=no route protection, 5=proper middleware or route guards"
+    - "File-System Routing Convention (Weight: 5%): Evaluates adherence to Next.js App Router file-system based routing conventions. Score 1-5: 1=incorrect file structure, 5=follows Next.js routing conventions"

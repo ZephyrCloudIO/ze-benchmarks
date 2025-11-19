@@ -1,6 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc } from 'drizzle-orm';
-import type { Env } from '../types';
 import { jsonResponse } from '../utils/response';
 import * as schema from '../db/schema';
 import { convertBenchmarkRunFields, convertEvaluationFields, convertTelemetryFields } from '../utils/field-converters';

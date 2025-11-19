@@ -25,7 +25,7 @@ export class OpenRouterAPI {
   constructor(apiKey: string) {
     // Debug: Log environment variable
     console.log(`[env] OpenRouterAPI - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
-    
+
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey
@@ -42,7 +42,7 @@ export class OpenRouterAPI {
       // Debug: Log environment variable usage
       const apiKey = process.env.OPENROUTER_API_KEY;
       console.log(`[env] OpenRouterAPI.getModelsWithToolSupport - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
-      
+
       // Fetch models from OpenRouter API
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         headers: {
@@ -51,7 +51,7 @@ export class OpenRouterAPI {
       });
 
       const data: OpenRouterModelsResponse = await response.json();
-      
+
       // Filter models that support tool calling
       const toolSupportedModels = data.data.filter(model => 
         model.supported_parameters?.includes('tools') || 

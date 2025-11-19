@@ -18,24 +18,20 @@
     "db:migrate:staging": "wrangler d1 migrations apply ze-benchmarks-staging --env staging --remote",
     "db:migrate:production": "wrangler d1 migrations apply ze-benchmarks-prod --env production --remote",
     "db:studio": "drizzle-kit studio",
-    "db:sync-from-prod": "./scripts/sync-from-production.sh",
-    "sync": "tsx scripts/sync.ts"
+    "db:sync-from-prod": "./scripts/sync-from-production.sh"
   },
   "dependencies": {
-    "better-sqlite3": "^12.4.1",
     "drizzle-orm": "^0.36.0",
     "itty-router": "^4.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "better-sqlite3",
       "core-js",
       "esbuild"
     ]
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240000.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.14.10",
     "drizzle-kit": "^0.28.0",
     "tsx": "^4.20.6",

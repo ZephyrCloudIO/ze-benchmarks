@@ -1,4 +1,5 @@
 import type { EvaluationContext, Evaluator, EvaluatorResult, ScoreCard } from './types.ts';
+import chalk from 'chalk';
 
 import { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
 import { InstallEvaluator } from './evaluators/install.ts';
@@ -6,21 +7,42 @@ import { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
 import { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 import { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 import { TestEvaluator } from './evaluators/test.ts';
+import { FileStructureEvaluator } from './evaluators/file-structure.ts';
+import { ConfigAccuracyEvaluator } from './evaluators/config-accuracy.ts';
+import { DependencyProximityEvaluator } from './evaluators/dependency-proximity.ts';
 
 export async function runEvaluators(
 	ctx: EvaluationContext,
+	llmJudgeOnly?: boolean,
 ): Promise<{ results: EvaluatorResult[]; scoreCard: ScoreCard }> {
-	const evaluators: Evaluator[] = [
-		new InstallEvaluator(),
-		new TestEvaluator(),
-		new PackageManagerEvaluator(),
-		new DependencyTargetsEvaluator(),
-		new IntegrityGuardEvaluator(),
-	];
+	const evaluators: Evaluator[] = [];
 
-	// Add LLM judge if enabled
-	if (shouldEnableLLMJudge(ctx.scenario)) {
-		evaluators.push(new LLMJudgeEvaluator());
+	// If llmJudgeOnly is true, only run LLM judge
+	if (llmJudgeOnly) {
+		console.log(chalk.blue('[Evaluators] LLM judge only mode: Skipping other evaluators'));
+		if (shouldEnableLLMJudge(ctx.scenario)) {
+			evaluators.push(new LLMJudgeEvaluator());
+		} else {
+			console.log(chalk.yellow('[Evaluators] ⚠️  LLM judge only requested but LLM judge is not enabled in scenario'));
+			console.log(chalk.gray('[Evaluators]   Enable it by setting llm_judge.enabled: true in scenario.yaml'));
+		}
+	} else {
+		// Run all evaluators
+		evaluators.push(
+			new InstallEvaluator(),
+			new TestEvaluator(),
+			new PackageManagerEvaluator(),
+			new DependencyTargetsEvaluator(),
+			new IntegrityGuardEvaluator(),
+			new FileStructureEvaluator(),
+			new ConfigAccuracyEvaluator(),
+			new DependencyProximityEvaluator(),
+		);
+
+		// Add LLM judge if enabled
+		if (shouldEnableLLMJudge(ctx.scenario)) {
+			evaluators.push(new LLMJudgeEvaluator());
+		}
 	}
 
 	const results: EvaluatorResult[] = [];
@@ -32,14 +54,22 @@ export async function runEvaluators(
 		}
 	}
 
-	const scoreCard: ScoreCard = {
-		install_success: results.find((result) => result.name === 'InstallEvaluator')?.score ?? 0,
-		tests_nonregression: results.find((result) => result.name === 'TestEvaluator')?.score ?? 0,
-		manager_correctness: results.find((result) => result.name === 'PackageManagerEvaluator')?.score ?? 0,
-		dependency_targets: results.find((result) => result.name === 'DependencyTargetsEvaluator')?.score ?? 0,
-		integrity_guard: results.find((result) => result.name === 'IntegrityGuardEvaluator')?.score ?? 0,
-		llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
-	};
+	// Build scoreCard - if llmJudgeOnly, only include LLM judge score
+	const scoreCard: ScoreCard = llmJudgeOnly
+		? {
+				llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
+			}
+		: {
+				install_success: results.find((result) => result.name === 'InstallEvaluator')?.score ?? 0,
+				tests_nonregression: results.find((result) => result.name === 'TestEvaluator')?.score ?? 0,
+				manager_correctness: results.find((result) => result.name === 'PackageManagerEvaluator')?.score ?? 0,
+				dependency_targets: results.find((result) => result.name === 'DependencyTargetsEvaluator')?.score ?? 0,
+				integrity_guard: results.find((result) => result.name === 'IntegrityGuardEvaluator')?.score ?? 0,
+				file_structure: results.find((result) => result.name === 'FileStructureEvaluator')?.score ?? 0,
+				config_accuracy: results.find((result) => result.name === 'ConfigAccuracyEvaluator')?.score ?? 0,
+				dependency_proximity: results.find((result) => result.name === 'DependencyProximityEvaluator')?.score ?? 0,
+				llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
+			};
 
 	return { results, scoreCard };
 }
@@ -62,4 +92,7 @@ export { IntegrityGuardEvaluator } from './evaluators/integrity-guard.ts';
 export { LLMJudgeEvaluator } from './evaluators/llm-judge.ts';
 export { PackageManagerEvaluator } from './evaluators/package-manager.ts';
 export { TestEvaluator } from './evaluators/test.ts';
+export { FileStructureEvaluator } from './evaluators/file-structure.ts';
+export { ConfigAccuracyEvaluator } from './evaluators/config-accuracy.ts';
+export { DependencyProximityEvaluator } from './evaluators/dependency-proximity.ts';
 

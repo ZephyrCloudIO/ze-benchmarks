@@ -1,0 +1,84 @@
+#!/usr/bin/env node
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import JSON5 from 'json5';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Initialize AJV with JSON Schema draft-07 support
+const ajv = new Ajv({
+  strict: false, // Allow JSON5 features
+  allErrors: true,
+  verbose: true,
+});
+addFormats(ajv);
+
+// Helper to load and parse JSON5 files
+function loadJSON5(filePath: string): any {
+  const content = readFileSync(filePath, 'utf-8');
+  return JSON5.parse(content);
+}
+
+// Load schemas
+const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.json5');
+const snapshotSchemaPath = join(__dirname, 'schemas', 'snapshot.schema.json5');
+
+const templateSchema = loadJSON5(templateSchemaPath);
+const snapshotSchema = loadJSON5(snapshotSchemaPath);
+
+// Compile schemas
+const validateTemplate = ajv.compile(templateSchema);
+const validateSnapshot = ajv.compile(snapshotSchema);
+
+// Test files - both are snapshots since they include benchmarks
+const exampleFiles = {
+  shadcnSnapshot: join(__dirname, '..', '..', 'starting_from_outcome', 'shadcn-specialist.json5'),
+  nxSnapshot: join(__dirname, '..', '..', 'generic_nx_snapshot_example.json5'),
+};
+
+console.log('🔍 Validating Specialist Schemas\n');
+console.log('Note: Both example files are snapshots (include benchmarks section)\n');
+
+// Validate shadcn snapshot
+console.log('📄 Validating Snapshot: shadcn-specialist.json5');
+const shadcnSnapshot = loadJSON5(exampleFiles.shadcnSnapshot);
+const isShadcnValid = validateSnapshot(shadcnSnapshot);
+
+if (isShadcnValid) {
+  console.log('✅ shadcn-specialist validation passed!\n');
+} else {
+  console.log('❌ shadcn-specialist validation failed:');
+  console.log(JSON.stringify(validateSnapshot.errors, null, 2));
+  console.log();
+}
+
+// Validate nx snapshot
+console.log('📄 Validating Snapshot: generic_nx_snapshot_example.json5');
+const nxSnapshot = loadJSON5(exampleFiles.nxSnapshot);
+const isNxValid = validateSnapshot(nxSnapshot);
+
+if (isNxValid) {
+  console.log('✅ generic_nx_snapshot validation passed!\n');
+} else {
+  console.log('❌ generic_nx_snapshot validation failed:');
+  console.log(JSON.stringify(validateSnapshot.errors, null, 2));
+  console.log();
+}
+
+// Summary
+console.log('📊 Summary:');
+console.log(`shadcn-specialist.json5: ${isShadcnValid ? '✅ Valid' : '❌ Invalid'}`);
+console.log(`generic_nx_snapshot_example.json5: ${isNxValid ? '✅ Valid' : '❌ Invalid'}`);
+
+// Exit with error code if validation failed
+if (!isShadcnValid || !isNxValid) {
+  process.exit(1);
+}
+
+console.log('\n🎉 All snapshot schemas validated successfully!');
+console.log('\nNote: Template schema can be used for specialists without benchmarks.');
+console.log('The template schema validates all required fields and is a subset of the snapshot schema.');

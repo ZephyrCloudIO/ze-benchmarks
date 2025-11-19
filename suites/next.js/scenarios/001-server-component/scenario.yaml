@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Server Component Implementation (Weight: 35%): Correct async component, proper data fetching without client-side hooks. Score 1-5: 1=uses client hooks incorrectly, 5=perfect RSC"
+    - "Data Fetching Patterns (Weight: 30%): Efficient server-side data fetching, proper error handling, caching strategies. Score 1-5: 1=inefficient/broken, 5=optimal patterns"
+    - "Code Structure & Organization (Weight: 20%): Clean component structure, proper TypeScript types, separation of concerns. Score 1-5: 1=messy code, 5=well-organized"
+    - "Performance & Best Practices (Weight: 10%): SEO-friendly, efficient rendering, no unnecessary client components. Score 1-5: 1=poor performance, 5=optimized"
+    - "Overall Implementation Quality (Weight: 5%): Completeness, reliability, adherence to Next.js patterns. Score 1-5: 1=broken, 5=production-ready"

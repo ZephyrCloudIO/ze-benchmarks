@@ -1,33 +1,34 @@
-import { Router } from 'itty-router';
+import { IRequest, Router } from 'itty-router';
 import { corsHeaders, handleCors } from './middleware/cors';
 import { errorHandler } from './middleware/error';
 import { authenticate } from './middleware/auth';
-import type { Env } from './types';
 import * as runsApi from './api/runs';
 import * as batchesApi from './api/batches';
 import * as statsApi from './api/stats';
 import * as submitApi from './api/submit';
 
-const router = Router();
+type CF = [env: Env, ctx: ExecutionContext];
+
+const router = Router<IRequest, CF>();
 
 // CORS preflight
 router.options('*', handleCors);
 
 // Public read endpoints (no auth required)
-router.get('/api/runs', (request: Request, env: Env) => runsApi.listRuns(request, env));
-router.get('/api/runs/:runId', (request: Request, env: Env) => runsApi.getRunDetails(request, env));
-router.get('/api/runs/:runId/evaluations', (request: Request, env: Env) => runsApi.getRunEvaluations(request, env));
-router.get('/api/runs/:runId/telemetry', (request: Request, env: Env) => runsApi.getRunTelemetry(request, env));
+router.get('/api/runs', runsApi.listRuns);
+router.get('/api/runs/:runId', runsApi.getRunDetails);
+router.get('/api/runs/:runId/evaluations', runsApi.getRunEvaluations);
+router.get('/api/runs/:runId/telemetry', runsApi.getRunTelemetry);
 
-router.get('/api/batches', (request: Request, env: Env) => batchesApi.listBatches(request, env));
-router.get('/api/batches/:batchId', (request: Request, env: Env) => batchesApi.getBatchDetails(request, env));
+router.get('/api/batches', batchesApi.listBatches);
+router.get('/api/batches/:batchId', batchesApi.getBatchDetails);
 
-router.get('/api/stats', (request: Request, env: Env) => statsApi.getGlobalStats(request, env));
-router.get('/api/stats/agents', (request: Request, env: Env) => statsApi.getAgentStats(request, env));
+router.get('/api/stats', statsApi.getGlobalStats);
+router.get('/api/stats/agents', statsApi.getAgentStats);
 
 // Protected write endpoints (requires authentication)
-router.post('/api/results', authenticate, (request: Request, env: Env) => submitApi.submitResults(request, env));
-router.post('/api/results/batch', authenticate, (request: Request, env: Env) => submitApi.submitBatchResults(request, env));
+router.post('/api/results', authenticate, submitApi.submitResults);
+router.post('/api/results/batch', authenticate, submitApi.submitBatchResults);
 
 // Health check
 router.get('/health', () =>

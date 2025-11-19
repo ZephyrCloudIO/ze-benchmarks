@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Next.js Font Optimization (35%): Uses next/font/google or next/font/local instead of external font links or @import. Score 1-5: 1=external links, 5=proper next/font"
+    - "Performance Benefits (30%): Eliminates network requests to Google Fonts, self-hosts fonts, and prevents layout shift. Score 1-5: 1=slow font loading, 5=optimized loading"
+    - "Zero Layout Shift (20%): Properly implements font loading to prevent FOUT/FOIT and maintains size-adjust. Score 1-5: 1=visible layout shift, 5=no shift"
+    - "Configuration & Usage (10%): Correctly configures font weights, subsets, and applies className or style variable. Score 1-5: 1=misconfigured, 5=optimal setup"
+    - "Implementation Correctness (5%): Fonts render correctly across the application. Score 1-5: 1=broken fonts, 5=perfect rendering"

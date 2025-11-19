@@ -1,0 +1,45 @@
+{
+  "name": "@ze/specialist-mint",
+  "version": "2.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "specialist-mint": "./dist/cli.js",
+    "mint-snapshot": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src/schemas"
+  ],
+  "scripts": {
+    "dev:docs": "pnpm --filter docs dev",
+    "build": "rslib build && npm run copy-schemas",
+    "copy-schemas": "mkdir -p dist/schemas && cp src/schemas/*.json5 dist/schemas/",
+    "dev": "rslib build --watch",
+    "test": "rstest",
+    "validate-schemas": "tsx src/validate-schemas.ts",
+    "mint:snapshot": "tsx src/cli.ts mint:snapshot"
+  },
+  "dependencies": {
+    "@ze/worker-client": "workspace:*",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "json5": "^2.2.3",
+    "openai": "^6.8.1"
+  },
+  "devDependencies": {
+    "@rslib/core": "^0.17.2",
+    "@rstest/core": "^0.6.5",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

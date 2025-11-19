@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Client-Server Boundary (Weight: 35%): Evaluates proper separation between client and server components, including 'use client' directive usage and component architecture. Score 1-5: 1=incorrect boundary separation, 5=clear client/server separation with proper directives"
+    - "Form Implementation & Handling (Weight: 30%): Assesses form creation, submission handling, and data flow between client and server components. Score 1-5: 1=non-functional form, 5=fully functional form with proper data handling"
+    - "Server Actions Integration (Weight: 20%): Evaluates use of server actions for form submission and proper async/await patterns. Score 1-5: 1=no server actions or incorrect usage, 5=proper server action implementation"
+    - "State Management & UX (Weight: 10%): Assesses loading states, form validation, error messages, and user feedback during submission. Score 1-5: 1=no user feedback, 5=comprehensive UX with loading states and validation"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of form data, server actions, and component props. Score 1-5: 1=no types or incorrect types, 5=fully typed with proper form data types"

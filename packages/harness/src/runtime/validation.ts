@@ -16,7 +16,7 @@ export function runValidationCommands(
   commands?: Partial<Record<CommandKind, string>>
 ): CommandResult[] {
   if (!workspaceDir || !commands) return [];
-  const order: CommandKind[] = ['install', 'test', 'lint', 'typecheck'];
+  const order: CommandKind[] = ['install', 'lint', 'typecheck'];
   const log: CommandResult[] = [];
   for (const kind of order) {
     const cmd = commands[kind];

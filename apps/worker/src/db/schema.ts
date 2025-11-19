@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 
 export const batchRuns = sqliteTable('batch_runs', {
   batchId: text('batchId').primaryKey(),
@@ -28,6 +28,7 @@ export const benchmarkRuns = sqliteTable('benchmark_runs', {
   weightedScore: real('weighted_score'),
   isSuccessful: integer('is_successful', { mode: 'boolean' }).default(false),
   successMetric: real('success_metric'),
+  specialistEnabled: integer('specialist_enabled', { mode: 'boolean' }).default(false),
   metadata: text('metadata'),
 }, (table) => ({
   suiteScenarioIdx: index('idx_runs_suite_scenario').on(table.suite, table.scenario),
@@ -58,7 +59,39 @@ export const runTelemetry = sqliteTable('run_telemetry', {
   costUsd: real('cost_usd'),
   durationMs: integer('duration_ms'),
   workspaceDir: text('workspace_dir'),
+  promptSent: text('prompt_sent'),
 });
+
+// Relationships
+export const batchRunsRelations = relations(batchRuns, ({ many }) => ({
+  benchmarkRuns: many(benchmarkRuns),
+}));
+
+export const benchmarkRunsRelations = relations(benchmarkRuns, ({ one, many }) => ({
+  batchRun: one(batchRuns, {
+    fields: [benchmarkRuns.batchId],
+    references: [batchRuns.batchId],
+  }),
+  evaluationResults: many(evaluationResults),
+  telemetry: one(runTelemetry, {
+    fields: [benchmarkRuns.runId],
+    references: [runTelemetry.runId],
+  }),
+}));
+
+export const evaluationResultsRelations = relations(evaluationResults, ({ one }) => ({
+  benchmarkRun: one(benchmarkRuns, {
+    fields: [evaluationResults.runId],
+    references: [benchmarkRuns.runId],
+  }),
+}));
+
+export const runTelemetryRelations = relations(runTelemetry, ({ one }) => ({
+  benchmarkRun: one(benchmarkRuns, {
+    fields: [runTelemetry.runId],
+    references: [benchmarkRuns.runId],
+  }),
+}));
 
 // Export types
 export type BatchRun = typeof batchRuns.$inferSelect;

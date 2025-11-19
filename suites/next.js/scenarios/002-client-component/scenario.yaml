@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Client Component Correctness (Weight: 35%): Proper 'use client' directive, correct use of useState/useEffect hooks. Score 1-5: 1=missing directive or broken, 5=perfect client component"
+    - "State Management Implementation (Weight: 30%): Clean state handling, proper event handlers, reactive updates. Score 1-5: 1=broken state logic, 5=robust state management"
+    - "Interactivity & UX (Weight: 20%): Smooth user interactions, proper form handling, responsive behavior. Score 1-5: 1=non-functional, 5=excellent UX"
+    - "Code Quality & Structure (Weight: 10%): Clean code, proper TypeScript types, component organization. Score 1-5: 1=messy, 5=well-structured"
+    - "Overall Implementation (Weight: 5%): Completeness, reliability, following React/Next.js patterns. Score 1-5: 1=broken, 5=production-ready"

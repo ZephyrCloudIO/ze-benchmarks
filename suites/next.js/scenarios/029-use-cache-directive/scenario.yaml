@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Cache Directive Usage (35%): Uses 'use cache' directive for appropriate functions to enable Next.js caching. Score 1-5: 1=no caching, 5=proper cache directive"
+    - "Caching Strategy (30%): Identifies which operations benefit from caching and applies directive appropriately. Score 1-5: 1=wrong targets, 5=optimal caching strategy"
+    - "Performance Impact (20%): Reduces redundant computations and API calls through effective caching. Score 1-5: 1=repeated work, 5=efficient caching"
+    - "Cache Invalidation Awareness (10%): Understands when cached data should be revalidated or invalidated. Score 1-5: 1=stale data issues, 5=proper freshness"
+    - "Implementation Quality (5%): Caching works correctly and improves application performance. Score 1-5: 1=broken or counterproductive, 5=significant improvement"

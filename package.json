@@ -3,13 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/worker-client run build && pnpm --filter @ze/harness run build",
+    "build": "pnpm --filter ze-evaluator run build && pnpm --filter @ze/worker-client run build && pnpm --filter @ze/harness run build && pnpm --filter @ze/specialist-mint run build",
     "build:evals": "pnpm --filter ze-evaluator run build",
     "build:adapters": "pnpm --filter @ze/agent-adapters run build",
     "build:worker-client": "pnpm --filter @ze/worker-client run build",
+    "build:mint": "pnpm --filter @ze/specialist-mint run build",
     "harness": "tsx packages/harness/src/cli.ts",
     "cli": "tsx packages/harness/src/cli.ts",
     "bench": "tsx packages/harness/src/cli.ts",
+    "mint:snapshot": "pnpm --filter @ze/specialist-mint run mint:snapshot",
+    "mint:enrich": "tsx packages/specialist-mint/src/cli.ts enrich:template",
     "dash:build": "pnpm --filter benchmark-report run build",
     "dash:dev": "pnpm --filter benchmark-report run dev",
     "worker:dev": "pnpm --filter ze-benchmarks-worker run dev",
@@ -17,17 +20,29 @@
     "worker:sync": "pnpm --filter ze-benchmarks-worker run db:sync-from-prod",
     "worker:deploy-dev": "pnpm --filter ze-benchmarks-worker run deploy:dev",
     "worker:deploy-staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
-    "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production"
+    "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production",
+    "start:report": "pnpm --filter benchmark-report run dev",
+    "bench:run": "tsx scripts/run-all-models.ts",
+    "bench:compare": "tsx scripts/compare-batches.ts",
+    "export:prompts": "tsx scripts/export-batch-prompts.ts",
+    "validate:prompts": "tsx scripts/validate-prompts.ts",
+    "clear:db": "tsx scripts/clear-database.ts",
+    "workflow:iterate": "tsx scripts/workflow-iterate.ts"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.0",
     "@types/cli-progress": "^3.11.6",
     "@types/figlet": "^1.7.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "jsdom": "^27.2.0",
     "next": "^14.2.0",
     "tsx": "^4.20.6",
-    "vitest": "^2.0.0"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.9"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -41,6 +56,8 @@
     "chalk": "^5.6.2",
     "cli-progress": "^3.12.0",
     "dotenv": "^16.4.5",
-    "figlet": "^1.9.3"
+    "figlet": "^1.9.3",
+    "json5": "^2.2.3",
+    "yaml": "^2.8.1"
   }
 }

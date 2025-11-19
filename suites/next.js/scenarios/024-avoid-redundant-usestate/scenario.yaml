@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Derived State Recognition (35%): Identifies when state can be computed from props or other state instead of using redundant useState. Score 1-5: 1=redundant state, 5=properly derived values"
+    - "React Best Practices (30%): Avoids state synchronization anti-patterns and unnecessary useEffect for derived values. Score 1-5: 1=sync issues, 5=clean derivation"
+    - "Code Efficiency (20%): Uses direct computation, useMemo for expensive calculations, or simple variables instead of state. Score 1-5: 1=wasteful state, 5=optimal approach"
+    - "Maintainability (10%): Reduces potential for bugs from state getting out of sync with source data. Score 1-5: 1=bug-prone, 5=single source of truth"
+    - "Implementation Quality (5%): Solution is correct, clean, and follows React idioms. Score 1-5: 1=broken or confusing, 5=idiomatic React"

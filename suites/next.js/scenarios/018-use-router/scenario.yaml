@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "useRouter Hook Implementation (Weight: 35%): Evaluates correct use of useRouter hook from next/navigation in client components. Score 1-5: 1=incorrect hook or import, 5=proper useRouter from next/navigation"
+    - "Navigation Methods (Weight: 30%): Assesses implementation of router methods (push, replace, back, forward, refresh) for client-side navigation. Score 1-5: 1=navigation not working, 5=all navigation methods working correctly"
+    - "Programmatic Navigation Logic (Weight: 20%): Evaluates proper use of programmatic navigation in response to user actions or conditions. Score 1-5: 1=poor navigation logic, 5=appropriate programmatic navigation"
+    - "Route Prefetching (Weight: 10%): Assesses understanding and use of Next.js automatic prefetching with router.push. Score 1-5: 1=no prefetch awareness, 5=proper prefetch usage"
+    - "TypeScript & Type Safety (Weight: 5%): Evaluates proper typing of router instance and navigation parameters. Score 1-5: 1=no types or incorrect types, 5=fully typed router usage"

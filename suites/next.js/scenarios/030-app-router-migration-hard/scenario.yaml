@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Migration Accuracy (Weight: 35%): Complete migration from pages/ to app/ directory, all routes properly converted, no broken functionality. Score 1-5: 1=incomplete/broken migration, 5=perfect migration with zero issues"
+    - "App Router Patterns (Weight: 30%): Correct use of layouts, loading.tsx, error.tsx, route handlers, and other App Router features. Score 1-5: 1=incorrect patterns, 5=exemplary App Router usage"
+    - "Breaking Changes Handling (Weight: 20%): Proper resolution of API changes, removed features, and deprecated patterns. Score 1-5: 1=unhandled breaking changes, 5=all breaking changes properly addressed"
+    - "Code Quality & Organization (Weight: 10%): Clean file structure, proper TypeScript types, maintainable code. Score 1-5: 1=messy/poor quality, 5=production-ready organization"
+    - "Performance & Best Practices (Weight: 5%): Leverages App Router performance features, proper data fetching, optimization. Score 1-5: 1=poor performance, 5=optimally implemented"

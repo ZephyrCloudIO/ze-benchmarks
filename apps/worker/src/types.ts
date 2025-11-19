@@ -17,10 +17,11 @@ export interface SubmitResultsPayload {
   completedAt: string;
   totalScore?: number;
   weightedScore?: number;
-  isSuccessful: boolean;
+  isSuccessful?: boolean;
   successMetric?: number;
+  specialistEnabled?: boolean;
   metadata?: Record<string, any>;
-  evaluations: Array<{
+  evaluations?: Array<{
     evaluatorName: string;
     score: number;
     maxScore: number;
@@ -33,5 +34,6 @@ export interface SubmitResultsPayload {
     costUsd?: number;
     durationMs?: number;
     workspaceDir?: string;
+    promptSent?: string;
   };
 }

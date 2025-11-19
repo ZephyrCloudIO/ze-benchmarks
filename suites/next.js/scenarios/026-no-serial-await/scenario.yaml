@@ -31,3 +31,9 @@ llm_judge:
   model: "anthropic/claude-3.5-sonnet"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Parallel Execution (35%): Uses Promise.all, Promise.allSettled, or concurrent patterns instead of serial awaits for independent operations. Score 1-5: 1=serial awaits, 5=parallel execution"
+    - "Performance Impact Understanding (30%): Recognizes that serial awaits cause unnecessary waiting and slow page loads. Score 1-5: 1=slow sequential, 5=fast parallel"
+    - "Async Pattern Mastery (20%): Correctly identifies which operations are independent and can run concurrently. Score 1-5: 1=poor analysis, 5=optimal concurrency"
+    - "Error Handling (10%): Implements proper error handling for parallel operations using try-catch or Promise.allSettled. Score 1-5: 1=poor error handling, 5=robust error handling"
+    - "Code Quality (5%): Solution is clean, readable, and maintains correct behavior. Score 1-5: 1=confusing or broken, 5=clear and correct"
