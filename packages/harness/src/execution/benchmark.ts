@@ -30,13 +30,6 @@ import { TABLE_WIDTH, SCORE_THRESHOLDS } from '../lib/constants.ts';
 // Get workspace root for specialist template resolution
 const workspaceRoot = findWorkspaceRoot(process.cwd());
 
-// Additional constants (keeping the ones not in constants.ts)
-const ADDITIONAL_THRESHOLDS = {
-	EXCELLENT: 90,
-	GOOD: 70,
-	NEEDS_WORK: 60
-} as const;
-
 /**
  * Execute a complete benchmark run
  *
@@ -342,6 +335,25 @@ export async function executeBenchmark(
 			}
 			const promptSent = JSON.stringify(messagesForLogging);
 
+			// Debug: Log promptSent details
+			console.log(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
+			console.log(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
+			console.log(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
+			if (messagesForLogging.length > 0) {
+				messagesForLogging.forEach((msg, idx) => {
+					console.log(chalk.magenta(`  Message ${idx + 1}: role=${msg.role}, content_length=${msg.content?.length || 0} chars`));
+					if (msg.role === 'system' && msg.content) {
+						console.log(chalk.magenta(`    System prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+					}
+					if (msg.role === 'user' && msg.content) {
+						console.log(chalk.magenta(`    User prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+					}
+				});
+			}
+			console.log(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
+			console.log(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
+			console.log(chalk.magenta('🔍 END DEBUG: promptSent\n'));
+
 			// Show summary after agent completes
 			console.log(chalk.gray(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`));
 
@@ -515,6 +527,11 @@ export async function executeBenchmark(
 		const modelStr = model ? ` [${model}]` : '';
 		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
 		console.log(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
+		
+		// Still show LLM Judge table even in quiet mode (it's important information)
+		if (result.scores) {
+			displayLLMJudgeScores(result, scenarioCfg);
+		}
 		return;
 	}
 

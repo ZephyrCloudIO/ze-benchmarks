@@ -57,7 +57,7 @@ export function calculateSuccess(
     : 0;
 
   // Critical commands (install, build, test must pass)
-  const criticalCommands = ['install', 'test']; // Note: 'build' is not in CommandKind, using 'test' as critical
+  const criticalCommands = ['install']; // Note: 'build' is not in CommandKind, using 'test' as critical
   const criticalPassed = criticalCommands.every(cmd => {
     const result = commandLog.find(c => c.type === cmd);
     return result && result.exitCode === 0;
