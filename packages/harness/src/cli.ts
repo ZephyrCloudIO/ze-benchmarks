@@ -440,7 +440,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, batchId, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -529,12 +529,20 @@ async function run() {
 		}
 	}
 
-	// Execute the benchmark (with iterations support)
-	const actualBatchId = batchId || `batch_${Date.now()}`;
+	// Initialize batch tracking (same as interactive mode)
+	const logger = BenchmarkLogger.getInstance();
+	
+	// Always create new batch using proper format (batch-{timestamp}-{random})
+	const actualBatchId = await logger.startBatch();
 
 	if (iterations > 1 && !quiet) {
 		log.info(chalk.blue(`Running ${iterations} iterations with batch ID: ${actualBatchId}`));
+	} else if (!quiet) {
+		log.info(chalk.gray(`Batch ID: ${actualBatchId}`));
 	}
+
+	// Track results for batch completion
+	const startTime = Date.now();
 
 	// Run benchmark iterations
 	for (let i = 0; i < iterations; i++) {
@@ -543,6 +551,38 @@ async function run() {
 		}
 
 		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+	}
+
+	// Complete batch with statistics
+	try {
+		// Get batch statistics from the database
+		const batchStats = await logger.getBatchDetails(actualBatchId);
+		if (batchStats) {
+			const successfulRuns = await logger.getBatchSuccessfulRunsCount(actualBatchId);
+			const scoreStats = await logger.getBatchScoreStats(actualBatchId);
+			
+			await logger.completeBatch(actualBatchId, {
+				totalRuns: iterations,
+				successfulRuns: successfulRuns,
+				avgScore: scoreStats.avgScore || 0,
+				avgWeightedScore: scoreStats.avgWeightedScore || 0,
+				metadata: {
+					suite,
+					scenario,
+					tier,
+					agent: agent || (specialist ? 'auto-detect' : 'echo'),
+					model,
+					specialist,
+					iterations,
+					duration: Date.now() - startTime
+				}
+			});
+		}
+	} catch (error) {
+		// Log but don't fail - batch completion is best effort
+		if (!quiet) {
+			log.warn(chalk.yellow(`Failed to complete batch: ${error instanceof Error ? error.message : String(error)}`));
+		}
 	}
 
 	// After all iterations complete, enrich template if requested

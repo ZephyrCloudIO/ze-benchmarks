@@ -79,6 +79,29 @@ export async function executeBenchmark(
 	const agentDisplay = agent || 'auto-detect'; // For display purposes throughout the function
 	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
+	
+	// Store run data locally to avoid race conditions in parallel execution
+	// We'll collect telemetry and evaluations locally and pass them to completeRun
+	const runData = {
+		runId,
+		batchId,
+		suite,
+		scenario,
+		tier,
+		agent: agentName,
+		model,
+		startedAt: new Date().toISOString(),
+	};
+	const telemetryData: any = {
+		toolCalls: 0,
+		tokensIn: 0,
+		tokensOut: 0,
+		costUsd: 0,
+		durationMs: 0,
+		workspaceDir: undefined as string | undefined,
+		promptSent: undefined as string | undefined,
+	};
+	const evaluationsData: any[] = [];
 
 	// Timeout watchdog based on scenario timeout_minutes (default 60)
 	let timeoutId: NodeJS.Timeout | null = null;
@@ -200,6 +223,8 @@ export async function executeBenchmark(
 
 			// Update the logged agent name with the actual adapter name
 			// (for specialists, this will be "specialist:template-name:base-adapter")
+			agentName = agentAdapter.name; // Update local runData too
+			runData.agent = agentName; // Update for completeRun
 			logger.updateAgent(agentAdapter.name, runId);
 
 			// Show selected model info - ALWAYS for OpenRouter
@@ -327,17 +352,15 @@ export async function executeBenchmark(
 			result.telemetry.cost_usd = response.costUsd || 0;
 			result.telemetry.toolCalls = response.toolCalls ?? 0;
 
-			// Log telemetry to database
+			// Store telemetry locally (for parallel execution safety)
 			const duration = Date.now() - startTime;
-			logger.logTelemetry(
-				response.toolCalls ?? 0,
-				response.tokensIn || 0,
-				response.tokensOut || 0,
-				response.costUsd || 0,
-				duration,
-				workspaceDir,
-				promptSent
-			);
+			telemetryData.toolCalls = response.toolCalls ?? 0;
+			telemetryData.tokensIn = response.tokensIn || 0;
+			telemetryData.tokensOut = response.tokensOut || 0;
+			telemetryData.costUsd = response.costUsd || 0;
+			telemetryData.durationMs = duration;
+			telemetryData.workspaceDir = workspaceDir;
+			telemetryData.promptSent = promptSent;
 
 			// Log oracle usage if available
 			if (oracle) {
@@ -412,14 +435,14 @@ export async function executeBenchmark(
 			(result as any).diff_summary = diffArtifacts.diffSummary;
 			(result as any).deps_delta = diffArtifacts.depsDelta;
 
-			// Log evaluation results to database
+			// Store evaluation results locally (for parallel execution safety)
 			for (const evalResult of evaluatorResults) {
-				logger.logEvaluation(
-					evalResult.name,
-					evalResult.score,
-					1.0, // max score
-					evalResult.details
-				);
+				evaluationsData.push({
+					evaluatorName: evalResult.name,
+					score: evalResult.score,
+					maxScore: 1.0,
+					details: evalResult.details,
+				});
 			}
 
 			// Show evaluator summary
@@ -448,19 +471,34 @@ export async function executeBenchmark(
 	const testResults = extractTestResults(commandLog);
 	const testResultsJson = testResults ? JSON.stringify(testResults) : undefined;
 
-	logger.completeRun(
+	// Use new signature to avoid race conditions in parallel execution
+	// Pass all data directly instead of relying on this.currentRun
+	logger.completeRun({
+		runId: runData.runId,
+		batchId: runData.batchId,
+		suite: runData.suite,
+		scenario: runData.scenario,
+		tier: runData.tier,
+		agent: runData.agent,
+		model: runData.model,
+		status: 'completed',
+		startedAt: runData.startedAt,
+		completedAt: new Date().toISOString(),
 		totalScore,
-		result.totals?.weighted,
-		{
-			diffSummary: diffArtifacts.diffSummary,
-			depsDelta: diffArtifacts.depsDelta,
-			oracleQuestions: (result as any).oracle_questions
-		},
+		weightedScore: result.totals?.weighted,
 		isSuccessful,
 		successMetric,
-		packageManager,
-		testResultsJson
-	);
+		specialistEnabled: !!specialist,
+		metadata: {
+			diffSummary: diffArtifacts.diffSummary,
+			depsDelta: diffArtifacts.depsDelta,
+			oracleQuestions: (result as any).oracle_questions,
+			...(packageManager && { packageManager }),
+			...(testResultsJson && { testResults: testResultsJson }),
+		},
+		evaluations: evaluationsData,
+		telemetry: telemetryData,
+	});
 
 	// Stage 6: Results
 	if (progress) updateProgress(progress, 6, 'Preparing results');
@@ -488,28 +526,8 @@ export async function executeBenchmark(
 	console.log(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
 	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
-	// Print evaluation breakdown in table format
+	// Show detailed LLM Judge scores if available
 	if (result.scores) {
-		console.log(`\n${chalk.bold.underline('Evaluation Breakdown')}`);
-		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-		console.log(`│ ${chalk.bold('Evaluator'.padEnd(25))} ${chalk.bold('Score'.padEnd(10))} ${chalk.bold('Status'.padEnd(15))} │`);
-		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-
-		Object.entries(result.scores).forEach(([name, score]) => {
-			const percent = (score as number) * 100;
-		const color = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
-		const status = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'Excellent' : percent >= SCORE_THRESHOLDS.GOOD ? 'Good' : 'Needs Work';
-		const statusColor = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
-
-			// Special handling for LLM Judge Evaluator
-			const displayName = name === 'LLMJudgeEvaluator' ? 'LLM Judge' : name;
-
-			console.log(`│ ${chalk.cyan(displayName.padEnd(25))} ${chalk[color](score.toFixed(4).padEnd(10))} ${chalk[statusColor](status.padEnd(15))} │`);
-		});
-
-		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
-
-		// Show detailed LLM Judge scores if available
 		displayLLMJudgeScores(result, scenarioCfg);
 	}
 

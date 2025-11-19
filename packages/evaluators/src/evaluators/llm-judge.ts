@@ -211,7 +211,7 @@ export class LLMJudgeEvaluator implements Evaluator {
     const model =
       process.env.LLM_JUDGE_MODEL || "openai/gpt-4o-mini";
     const temperature = parseFloat(process.env.LLM_JUDGE_TEMPERATURE || "0.1");
-    const maxTokens = parseInt(process.env.LLM_JUDGE_MAX_TOKENS || "2000", 10);
+    const maxTokens = parseInt(process.env.LLM_JUDGE_MAX_TOKENS || "120000", 10);
 
     console.log(chalk.blue(`[LLMJudgeEvaluator] Using model: ${model}`));
     console.log(chalk.gray(`[LLMJudgeEvaluator] Temperature: ${temperature}, Max tokens: ${maxTokens}`));

@@ -51,7 +51,8 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	suites: string[],
 	scenarios: string[],
 	tiers: string[],
-	specialists: string[]
+	specialists: string[],
+	enrichTemplate?: string
 ) {
 	// Initialize batch tracking
 	const logger = BenchmarkLogger.getInstance();
@@ -238,6 +239,45 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	}
 
 	console.log('\n' + chalk.green('✓') + chalk.bold(` Completed all ${combinations.length} benchmark(s) with specialists!`));
+
+	// Enrich template if requested
+	if (enrichTemplate) {
+		console.log(chalk.blue(`\n🔍 Enriching template: ${enrichTemplate}`));
+
+		try {
+			// Resolve specialist name to template path
+			const root = findRepoRoot();
+			const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+			const templatePath = resolveSpecialistTemplatePath(enrichTemplate, root);
+
+			// Import enrichment function
+			const { enrichTemplate: enrichTemplateFunc } = await import('../../../specialist-mint/src/enrich-template.js');
+
+			const result = await enrichTemplateFunc(templatePath, {
+				provider: (process.env.ENRICHMENT_PROVIDER as 'openrouter' | 'anthropic') || 'openrouter',
+				model: process.env.ENRICHMENT_MODEL || 'anthropic/claude-3.5-haiku',
+				force: false,
+				timeoutMs: 30000,
+				concurrency: 3
+			});
+
+			console.log(chalk.green('\n✅ Template enrichment completed!'));
+			console.log(chalk.gray(`   Enriched template: ${result.enrichedTemplatePath}`));
+			console.log(chalk.gray(`   Documents enriched: ${result.documentsEnriched}`));
+			console.log(chalk.gray(`   Documents skipped: ${result.documentsSkipped}`));
+
+			if (result.errors.length > 0) {
+				console.log(chalk.yellow(`   Errors: ${result.errors.length}`));
+				result.errors.forEach((err: { index: number; error: string }) => {
+					console.log(chalk.yellow(`     - [${err.index + 1}] ${err.error}`));
+				});
+			}
+		} catch (error) {
+			console.error(chalk.red('\n❌ Error enriching template:'));
+			console.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}`));
+			console.log(chalk.yellow('\n💡 Tip: Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env'));
+		}
+	}
 }
 
 export async function executeMultipleBenchmarks(
@@ -880,6 +920,54 @@ export async function runInteractiveBenchmark(executionMode?: 'specialist' | 'di
 	}
 	console.log(`   ${chalk.cyan('Parallel execution:')} ${useParallel ? `Yes (concurrency: ${concurrency})` : 'No'}`);
 
+	// Ask about template enrichment (only for specialist mode)
+	let enrichTemplate: string | undefined = undefined;
+	if (executionMode === 'specialist' && specialistsToUse.length > 0) {
+		const shouldEnrich = await select({
+			message: 'Enrich template after benchmarks complete?',
+			options: [
+				{ value: 'no', label: 'No', hint: 'Skip template enrichment' },
+				{ value: 'yes', label: 'Yes', hint: 'Enrich template with LLM-generated metadata' }
+			]
+		}) as string;
+
+		if (isCancel(shouldEnrich)) {
+			cancel('Operation cancelled.');
+			return;
+		}
+
+		if (shouldEnrich === 'yes') {
+			// If only one specialist selected, use it automatically
+			if (specialistsToUse.length === 1) {
+				enrichTemplate = specialistsToUse[0];
+				console.log(`🎯 Will enrich template: ${enrichTemplate}`);
+			} else {
+				// Multiple specialists - ask which one to enrich
+				const specialistOptions = await getAvailableSpecialists();
+				const availableSpecialists = specialistOptions.filter(s => 
+					specialistsToUse.includes(s.value)
+				);
+
+				const selectedEnrichSpecialist = await select({
+					message: 'Which specialist template to enrich?',
+					options: availableSpecialists.map(s => ({
+						value: s.value,
+						label: s.label,
+						hint: s.description
+					}))
+				}) as string;
+
+				if (isCancel(selectedEnrichSpecialist)) {
+					cancel('Operation cancelled.');
+					return;
+				}
+
+				enrichTemplate = selectedEnrichSpecialist;
+				console.log(`🎯 Will enrich template: ${enrichTemplate}`);
+			}
+		}
+	}
+
 	// Show title before execution
 	console.log(chalk.cyan(createTitle()));
 
@@ -889,7 +977,8 @@ export async function runInteractiveBenchmark(executionMode?: 'specialist' | 'di
 			suitesToUse,
 			scenariosToUse,
 			tiersToUse,
-			specialistsToUse
+			specialistsToUse,
+			enrichTemplate
 		);
 	} else {
 		await executeMultipleBenchmarks(

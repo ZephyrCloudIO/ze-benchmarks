@@ -90,8 +90,13 @@ export async function enrichTemplate(
 
   console.log(chalk.gray(`   Template: ${template.name} v${template.version}`));
 
+  // Extract specialist name from template path or use template name
+  // e.g., templates/nextjs-specialist-template.json5 -> nextjs-specialist
+  const templateBasename = basename(resolvedTemplatePath, '.json5');
+  const specialistName = templateBasename.replace(/-template$/, '') || template.name;
+
   // Always generate new enriched template with incremented number
-  const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, template.version);
+  const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, template.version, specialistName);
   console.log(chalk.gray(`   Output: ${enrichedPath}`));
 
   // Initialize LLM client
@@ -348,12 +353,12 @@ function extractTaskTypes(template: SpecialistTemplate): string[] {
  * Get enriched template path with incremental numbering
  *
  * NEW STRUCTURE:
- * - Original: starting_from_outcome/shadcn-specialist-template.json5
- * - Enriched: starting_from_outcome/enriched/0.0.5/enriched-001.json5
- *             starting_from_outcome/enriched/0.0.5/enriched-002.json5
+ * - Original: templates/nextjs-specialist-template.json5
+ * - Enriched: templates/enriched/0.0.1/nextjs-specialist.enriched.001.json5
+ *             templates/enriched/0.0.1/nextjs-specialist.enriched.002.json5
  *             ... (always increment, never overwrite)
  */
-function getEnrichedTemplatePath(templatePath: string, version: string): string {
+function getEnrichedTemplatePath(templatePath: string, version: string, specialistName: string): string {
   const dir = dirname(templatePath);
   const enrichedDir = join(dir, 'enriched', version);
 
@@ -361,15 +366,19 @@ function getEnrichedTemplatePath(templatePath: string, version: string): string 
   if (!existsSync(enrichedDir)) {
     mkdirSync(enrichedDir, { recursive: true });
     // First enrichment for this version
-    return join(enrichedDir, 'enriched-001.json5');
+    return join(enrichedDir, `${specialistName}.enriched.001.json5`);
   }
 
-  // Find highest numbered enriched file
+  // Find highest numbered enriched file for this specialist
+  // Escape special regex characters in specialist name
+  const escapedName = specialistName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const filePattern = new RegExp(`^${escapedName}\\.enriched\\.(\\d+)\\.json5$`);
+  
   const files = readdirSync(enrichedDir);
   const enrichedFiles = files
-    .filter(f => f.match(/^enriched-(\d+)\.json5$/))
+    .filter(f => filePattern.test(f))
     .map(f => {
-      const match = f.match(/^enriched-(\d+)\.json5$/);
+      const match = f.match(filePattern);
       return match ? parseInt(match[1], 10) : 0;
     })
     .filter(n => n > 0);
@@ -382,5 +391,5 @@ function getEnrichedTemplatePath(templatePath: string, version: string): string 
   // Format with leading zeros (e.g., 001, 002, 010)
   const formattedNumber = String(nextNumber).padStart(3, '0');
 
-  return join(enrichedDir, `enriched-${formattedNumber}.json5`);
+  return join(enrichedDir, `${specialistName}.enriched.${formattedNumber}.json5`);
 }

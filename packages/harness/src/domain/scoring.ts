@@ -17,14 +17,14 @@ export function computeWeightedTotals(
 	scenarioCfg: { rubric_overrides?: { weights?: Record<string, number> } },
 ) {
 	const baseWeights: Record<string, number> = {
-		install_success: 0,
-		tests_nonregression: 0,
-		manager_correctness: 0,
-		dependency_targets: 0,
-		integrity_guard: 0,
-		file_structure: 0,
-		config_accuracy: 0,
-		dependency_proximity: 0,
+		install_success: 0, // TODO: Add this back in
+		tests_nonregression: 0, // TODO: Add this back in
+		manager_correctness: 0, // TODO: Add this back in
+		dependency_targets: 0, // TODO: Add this back in
+		integrity_guard: 0, // TODO: Add this back in
+		file_structure: 0, // TODO: Add this back in
+		config_accuracy: 0, // TODO: Add this back in
+		dependency_proximity: 0, // TODO: Add this back in
 		llm_judge: 1.0, // Only LLM judge contributes to the score
 	};
 
@@ -72,17 +72,9 @@ export function calculateSuccess(
   const llmJudgeScore = scores.llm_judge || 0;
 
   // Weighted metric (from scenario.yaml or default)
-  const weights = scenario.success_weights || {
-    validation: 0.4,
-    evaluators: 0.3,
-    llm_judge: 0.3
-  };
+  // Since we are using only LLM as a judge, make the success metric simply the LLM judge score
+  const successMetric = llmJudgeScore;
 
-  const successMetric = (
-    validationScore * weights.validation +
-    evaluatorScore * weights.evaluators +
-    llmJudgeScore * weights.llm_judge
-  );
 
   // Success criteria: critical commands must pass AND success metric >= 0.7
   const isSuccessful = criticalPassed && successMetric >= 0.7;
