@@ -204,6 +204,22 @@ export class OpenRouterAdapter implements AgentAdapter {
         });
       }
 
+      // Log tools being sent to the API
+      if (apiRequest.tools && apiRequest.tools.length > 0) {
+        console.log(chalk.cyan(`[OpenRouterAdapter] ========== TOOLS SENT TO API ==========`));
+        console.log(chalk.cyan(`[OpenRouterAdapter] Number of tools: ${apiRequest.tools.length}`));
+        apiRequest.tools.forEach((tool: any, idx: number) => {
+          const toolName = tool.function?.name || tool.name || 'unknown';
+          console.log(chalk.cyan(`[OpenRouterAdapter]   ${idx + 1}. ${toolName}`));
+          if (tool.function?.description) {
+            console.log(chalk.gray(`[OpenRouterAdapter]      Description: ${tool.function.description.substring(0, 80)}...`));
+          }
+        });
+        console.log(chalk.cyan(`[OpenRouterAdapter] ======================================`));
+      } else {
+        console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  No tools provided in API request`));
+      }
+
       try {
         const response = await this.client.chat.completions.create(apiRequest);
 
@@ -213,17 +229,25 @@ export class OpenRouterAdapter implements AgentAdapter {
         }
 
         // Log the full response for debugging
+        console.log(chalk.cyan(`[OpenRouterAdapter] ========== API RESPONSE ==========`));
         console.log(chalk.gray(`[OpenRouterAdapter] Response finish_reason: ${response.choices[0]?.finish_reason}`));
         console.log(chalk.gray(`[OpenRouterAdapter] Message content: ${message.content ? `${message.content.length} chars` : 'null/empty'}`));
         if (message.content) {
-          console.log(chalk.gray(`[OpenRouterAdapter] Full content:\n${message.content}`));
+          console.log(chalk.gray(`[OpenRouterAdapter] Content preview: ${message.content.substring(0, 200)}${message.content.length > 200 ? '...' : ''}`));
         } else {
           console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  Agent returned empty content with finish_reason=${response.choices[0]?.finish_reason}`));
         }
         console.log(chalk.gray(`[OpenRouterAdapter] Tool calls present: ${!!message.tool_calls}`));
         if (message.tool_calls) {
-          console.log(chalk.gray(`[OpenRouterAdapter] Number of tool calls: ${message.tool_calls.length}`));
+          console.log(chalk.green(`[OpenRouterAdapter] ✓ Agent requested ${message.tool_calls.length} tool call(s):`));
+          message.tool_calls.forEach((tc: any, idx: number) => {
+            console.log(chalk.green(`[OpenRouterAdapter]   ${idx + 1}. ${tc.function?.name || 'unknown'}`));
+            console.log(chalk.gray(`[OpenRouterAdapter]      Arguments: ${tc.function?.arguments || 'none'}`));
+          });
+        } else {
+          console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  No tool calls in response`));
         }
+        console.log(chalk.cyan(`[OpenRouterAdapter] ====================================`));
 
         totalInputTokens += response.usage?.prompt_tokens || 0;
         totalOutputTokens += response.usage?.completion_tokens || 0;
@@ -415,7 +439,10 @@ export class OpenRouterAdapter implements AgentAdapter {
       if (handler) {
         console.log(chalk.blue(`[OpenRouterAdapter] Executing tool: ${toolName}`));
         try {
-          const input = JSON.parse(toolCall.function.arguments || '{}');
+          const rawArguments = toolCall.function.arguments || '{}';
+          console.log(chalk.cyan(`[OpenRouterAdapter] Tool arguments (raw): ${rawArguments}`));
+          const input = JSON.parse(rawArguments);
+          console.log(chalk.cyan(`[OpenRouterAdapter] Tool arguments (parsed): ${JSON.stringify(input, null, 2)}`));
           resultContent = await handler(input);
           console.log(chalk.green(`[OpenRouterAdapter] ✓ ${toolName} completed`));
         } catch (error) {

@@ -1,0 +1,48 @@
+id: mcp-example-file
+suite: figma-analysis
+title: "Analyze MCP Example Figma File"
+description: |
+  Analyze the MCP Example Figma design file and extract comprehensive design specifications.
+  
+  The agent should:
+  - Fetch the Figma file using the fetchFigmaFile tool
+  - Extract all design tokens (colors, typography, spacing, shadows)
+  - Identify and document component structures
+  - Analyze layout patterns and responsive behavior
+  - Provide accessibility audit
+  - Generate structured component specifications
+  
+  Success criteria:
+  - All design tokens extracted and organized
+  - Component hierarchy clearly documented
+  - Layout patterns identified
+  - Accessibility considerations noted
+  - Implementation guidance provided
+
+artifact:
+  type: figma
+  figma_file_id: "6vcQXB7D6W5auK4J0b5JUO"  # MCP-EXAMPLE-FILE
+
+workspace:
+  required: false  # No code repository needed for artifact analysis
+
+validation:
+  required: false  # Skip validation commands for artifact scenarios
+
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-3.5-sonnet"
+  temperature: 0.1
+  max_tokens: 4000
+  categories:
+    - "Design Token Extraction Accuracy (Weight: 25%): Correctly identifies and extracts all design tokens including colors, typography, spacing, shadows, and other properties with accurate values"
+    - "Component Analysis Completeness (Weight: 25%): Thoroughly identifies all components, documents their structure, variants, states, and relationships"
+    - "Layout Pattern Recognition (Weight: 20%): Accurately identifies layout structures, grid systems, responsive patterns, and spacing relationships"
+    - "Accessibility Evaluation (Weight: 15%): Properly evaluates accessibility considerations including color contrast, semantic structure, and ARIA needs"
+    - "Structured Output Quality (Weight: 10%): Organizes information clearly, uses consistent naming, and provides well-structured specifications"
+    - "Implementation Guidance (Weight: 5%): Provides actionable, clear guidance for implementing the design system"
+
+rubric_overrides:
+  weights:
+    llm_judge: 1.0  # Only LLM judge for artifact scenarios
+

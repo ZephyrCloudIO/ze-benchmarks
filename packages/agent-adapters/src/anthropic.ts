@@ -171,12 +171,17 @@ export class AnthropicAdapter implements AgentAdapter {
       let resultContent: string;
 
       if (handler) {
+        console.log(chalk.blue(`[AnthropicAdapter] Executing tool: ${toolUse.name}`));
         try {
+          console.log(chalk.cyan(`[AnthropicAdapter] Tool arguments: ${JSON.stringify(toolUse.input, null, 2)}`));
           resultContent = await handler(toolUse.input);
+          console.log(chalk.green(`[AnthropicAdapter] ✓ ${toolUse.name} completed`));
         } catch (error) {
+          console.error(chalk.red(`[AnthropicAdapter] ❌ Error in ${toolUse.name}:`), error);
           resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
         }
       } else {
+        console.warn(chalk.yellow(`[AnthropicAdapter] ⚠️  No handler found for tool: ${toolUse.name}`));
         resultContent = `Tool '${toolUse.name}' is not available`;
       }
 

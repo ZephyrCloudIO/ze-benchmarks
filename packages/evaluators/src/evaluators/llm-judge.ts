@@ -330,39 +330,52 @@ export class LLMJudgeEvaluator implements Evaluator {
   }
 
   private buildPrompt(ctx: EvaluationContext): string {
-    const { scenario, agentResponse, diffSummary, depsDelta, commandLog } = ctx;
+    const { scenario, agentResponse, diffSummary, depsDelta, commandLog, artifact } = ctx;
+    const isArtifactScenario = !!artifact || !!scenario.artifact;
 
     console.log(chalk.cyan('[LLMJudgeEvaluator] Building prompt sections...'));
     
     // Build context sections
-    const taskDescription = this.buildTaskDescription(scenario);
+    const taskDescription = this.buildTaskDescription(scenario, artifact);
     console.log(chalk.gray(`  - Task description: ${taskDescription.length} chars`));
     
     const agentResponseSection = this.buildAgentResponseSection(agentResponse);
     console.log(chalk.gray(`  - Agent response section: ${agentResponseSection.length} chars`));
     
-    const changesSection = this.buildChangesSection(diffSummary, depsDelta);
-    console.log(chalk.gray(`  - Changes section: ${changesSection.length} chars`));
+    // For artifact scenarios, skip code changes section
+    let changesSection = '';
+    if (!isArtifactScenario) {
+      changesSection = this.buildChangesSection(diffSummary, depsDelta);
+      console.log(chalk.gray(`  - Changes section: ${changesSection.length} chars`));
+    } else {
+      console.log(chalk.gray(`  - Changes section: skipped (artifact scenario)`));
+    }
     
-    const commandResultsSection = this.buildCommandResultsSection(commandLog);
-    console.log(chalk.gray(`  - Command results section: ${commandResultsSection.length} chars`));
+    // For artifact scenarios, skip command results or make optional
+    let commandResultsSection = '';
+    if (!isArtifactScenario) {
+      commandResultsSection = this.buildCommandResultsSection(commandLog);
+      console.log(chalk.gray(`  - Command results section: ${commandResultsSection.length} chars`));
+    } else {
+      console.log(chalk.gray(`  - Command results section: skipped (artifact scenario)`));
+    }
+
+    // Build artifact section if applicable
+    const artifactSection = isArtifactScenario ? this.buildArtifactSection(scenario, artifact) : '';
 
     // Combine into full prompt
     const prompt = `
 ${taskDescription}
+${artifactSection ? `\n${artifactSection}` : ''}
 
 ## Agent Response
 ${agentResponseSection}
-
-## Changes Made
-${changesSection}
-
-## Command Results
-${commandResultsSection}
+${changesSection ? `\n## Changes Made\n${changesSection}` : ''}
+${commandResultsSection ? `\n## Command Results\n${commandResultsSection}` : ''}
 
 ## Evaluation Instructions
 
-You are an expert code reviewer evaluating an AI agent's performance. **BE EXTREMELY CRITICAL AND RIGOROUS** in your evaluation. A score of 5.0 should be reserved for absolutely perfect, flawless implementations that exemplify best practices in every way.
+You are an expert ${isArtifactScenario ? 'design analyst and specialist evaluator' : 'code reviewer'} evaluating an AI agent's performance. **BE EXTREMELY CRITICAL AND RIGOROUS** in your evaluation. A score of 5.0 should be reserved for absolutely perfect, flawless ${isArtifactScenario ? 'analysis and extraction' : 'implementations'} that exemplify best practices in every way.
 
 Evaluate the agent across these ${scenario.llm_judge?.categories?.length || 0} categories:
 
@@ -419,22 +432,64 @@ ${this.buildJsonFormatExample(scenario.llm_judge?.categories || [])}
       .join(',\n');
   }
 
-  private buildTaskDescription(scenario: any): string {
-    return `## Task Description
+  private buildTaskDescription(scenario: any, artifact?: any): string {
+    const isArtifactScenario = !!artifact || !!scenario.artifact;
+    
+    let description = `## Task Description
 **Scenario**: ${scenario.id || "Unknown"}
 **Title**: ${scenario.title || "No title provided"}
-**Description**: ${scenario.description || "No description provided"}
+**Description**: ${scenario.description || "No description provided"}`;
 
-**Constraints**: ${
-      scenario.constraints
-        ? JSON.stringify(scenario.constraints, null, 2)
-        : "None specified"
+    if (isArtifactScenario && scenario.artifact) {
+      description += `\n\n**Artifact Type**: ${scenario.artifact.type}`;
+      if (scenario.artifact.figma_file_id) {
+        description += `\n**Figma File ID**: ${scenario.artifact.figma_file_id}`;
+      }
+      if (scenario.artifact.figma_file_key) {
+        description += `\n**Figma File Version**: ${scenario.artifact.figma_file_key}`;
+      }
     }
+
+    if (!isArtifactScenario) {
+      description += `\n\n**Constraints**: ${
+        scenario.constraints
+          ? JSON.stringify(scenario.constraints, null, 2)
+          : "None specified"
+      }
 **Targets**: ${
-      scenario.targets
-        ? JSON.stringify(scenario.targets, null, 2)
-        : "None specified"
-    }`;
+        scenario.targets
+          ? JSON.stringify(scenario.targets, null, 2)
+          : "None specified"
+      }`;
+    }
+
+    return description;
+  }
+
+  private buildArtifactSection(scenario: any, artifact?: any): string {
+    if (!artifact && !scenario.artifact) {
+      return '';
+    }
+
+    const artifactType = artifact?.type || scenario.artifact?.type;
+    let section = '## Artifact Context\n';
+    
+    if (artifactType === 'figma') {
+      section += `**Artifact Type**: Figma Design File\n`;
+      if (scenario.artifact?.figma_file_id) {
+        section += `**Figma File ID**: ${scenario.artifact.figma_file_id}\n`;
+        section += `**Note**: The agent should have fetched this file using the fetchFigmaFile tool.\n`;
+      }
+      section += `\nEvaluate the agent's ability to:\n`;
+      section += `- Extract design specifications accurately\n`;
+      section += `- Identify components, styles, and patterns\n`;
+      section += `- Apply specialist knowledge to analyze the design\n`;
+      section += `- Provide structured, actionable information\n`;
+    } else {
+      section += `**Artifact Type**: ${artifactType}\n`;
+    }
+
+    return section;
   }
 
   private buildAgentResponseSection(agentResponse?: string): string {
