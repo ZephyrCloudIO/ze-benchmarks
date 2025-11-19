@@ -316,9 +316,9 @@ export class SpecialistAdapter implements AgentAdapter {
    * Static version for use in factory method
    *
    * NEW STRUCTURE:
-   * - Original: starting_from_outcome/shadcn-specialist-template.json5
-   * - Enriched: starting_from_outcome/enriched/0.0.5/enriched-001.json5
-   *             starting_from_outcome/enriched/0.0.5/enriched-002.json5
+   * - Original: templates/nextjs-specialist-template.json5
+   * - Enriched: templates/enriched/0.0.1/nextjs-specialist.enriched.001.json5
+   *             templates/enriched/0.0.1/nextjs-specialist.enriched.002.json5
    *             ... (always use highest number)
    */
   private static resolveTemplatePathSync(templatePath: string): string {
@@ -395,9 +395,10 @@ export class SpecialistAdapter implements AgentAdapter {
 
   /**
    * Check if a path is an enriched template
+   * NEW FORMAT: {specialist-name}.enriched.{number}.json5
    */
   private static isEnrichedTemplatePath(path: string): boolean {
-    return path.includes('/enriched/') && path.includes('enriched-') && path.endsWith('.json5');
+    return path.includes('/enriched/') && path.includes('.enriched.') && path.endsWith('.json5');
   }
 
   /**
@@ -425,6 +426,9 @@ export class SpecialistAdapter implements AgentAdapter {
   /**
    * Get latest enriched template path for a given template path and version
    * Returns null if no enriched templates exist
+   * 
+   * NEW FORMAT: {specialist-name}.enriched.{number}.json5
+   * e.g., nextjs-specialist.enriched.001.json5
    */
   private static getLatestEnrichedTemplatePath(templatePath: string, version: string): string | null {
     const enrichedDir = SpecialistAdapter.getEnrichedDir(templatePath, version);
@@ -434,12 +438,21 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     try {
-      // Find all enriched-NNN.json5 files
+      // Extract specialist name from template path
+      // e.g., templates/nextjs-specialist-template.json5 -> nextjs-specialist
+      const templateBasename = basename(templatePath, '.json5');
+      const specialistName = templateBasename.replace(/-template$/, '');
+      
+      // Escape special regex characters in specialist name
+      const escapedName = specialistName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const filePattern = new RegExp(`^${escapedName}\\.enriched\\.(\\d+)\\.json5$`);
+      
+      // Find all {specialist-name}.enriched.{number}.json5 files
       const files = readdirSync(enrichedDir);
       const enrichedFiles = files
-        .filter(f => f.match(/^enriched-(\d+)\.json5$/))
+        .filter(f => filePattern.test(f))
         .map(f => {
-          const match = f.match(/^enriched-(\d+)\.json5$/);
+          const match = f.match(filePattern);
           return match ? { filename: f, number: parseInt(match[1], 10) } : null;
         })
         .filter((f): f is { filename: string; number: number } => f !== null)
