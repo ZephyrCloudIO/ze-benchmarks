@@ -1,0 +1,39 @@
+{
+  "experience": "homepage",
+  "version": 1.0,
+  "notifications": [
+    {
+      "title": "Performing Site Maintenance",
+      "content": [
+        "Today... Proof will be undergoing maintenance...",
+        "We apologize... Thank you!"
+      ],
+      "urgency": "warning",
+      "channel": "modal_warning_simple",
+      "expires": "2025-11-04T16:33:19+00:00",
+      "id": 12345
+    }
+  ],
+  "page": {
+    "theme": "dark",
+    "slot_layout": [
+      { "key": "merch", "order": 2 },
+      { "key": "engage", "order": 3 },
+      { "key": "hero", "order": 1 },
+      { "key": "pdp", "order": 4 }
+    ]
+  },
+  "slots": {
+    "hero": {
+      "background_color": "blue",
+      "custom_styles": {},
+      "components": {
+        "banner_v1": {
+          "headline_text": "Flavored vodka is cool again",
+          "primary_cta_text": "Check em out"
+        }
+      }
+    },
+    "merch": { "graphql_aem_url": "https://aem.com/custom-url?p=1&q=vodka" }
+  }
+}

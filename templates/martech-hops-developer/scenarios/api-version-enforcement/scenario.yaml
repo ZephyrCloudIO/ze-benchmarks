@@ -1,0 +1,68 @@
+id: ZE_hops_api_version_enforcement
+suite: hops-api-version-enforcement
+reference_path: "./version-test"
+title: "Enforce API fields in HOPS Response"
+description: |
+  This benchmark tests the agent's ability to ensure every HOPS API response includes the required fields, as required by the contract. The agent must update the Lambda/API code so that all responses, regardless of input, contain the required fields in the JSON response.
+
+  Success criteria:
+  - All API responses include a top-level "version" field (e.g., "version": "1.0.0")
+  - All API responses include a top-level "version" field (e.g., "version": "1.0.0")
+  - All API responses include a top-level "notifications" field with an array as the value
+  - All API responses include a top-level "page" field
+  - All API responses include a top-level "slots" field
+  - The value of the version field is static and matches the provided specification
+  - The field is present even if the input data is missing or malformed
+  - The response structure matches the provided oracle answer
+
+workspace:
+  node: "20.x"
+  manager: auto
+  managers_allowed: [ npm ]
+  workspaces: none
+
+constraints:
+  managers_allowed: [ npm ]
+
+warmup:
+  enabled: true
+  timeout_minutes: 10
+  working_dir: "./version-test"
+
+  type: "agent"
+  agent:
+    provider: "openrouter"
+    model: "anthropic/claude-sonnet-4.5"
+    prompt: |
+      Make a request to the HOPS API and capture the JSON response. Save the output as response.json.
+
+validation:
+  commands:
+    # install: "npm install"
+    # build: "echo 'No build step required'"
+    test: "cat response.json"
+oracle:
+  answers_file: "./oracle-answers.json"
+
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-3.5-sonnet"
+  temperature: 0.1
+  max_tokens: 3000
+  categories:
+    - "Response Format: Does the output always include a top-level 'version' field with the correct value?"
+    - "Determinism: Is the field present regardless of input?"
+    - "Correctness: Does the output match the oracle answer exactly?"
+
+rubric_overrides:
+  weights:
+    # Critical: Output must match oracle answer
+    install_success: 4.5
+    file_structure: 3.5
+    config_accuracy: 4.0
+    manager_correctness: 3.5
+    dependency_proximity: 3.0
+    llm_judge: 1.5
+    integrity_guard: 1.5
+    dependency_targets: 1.5
+    tests_nonregression: 0.5
