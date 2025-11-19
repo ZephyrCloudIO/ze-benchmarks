@@ -32,7 +32,7 @@ export async function runInteractiveHistory() {
 		}) as number;
 
 		// Execute history command
-		const runHistory = logger.getRunHistory(limit);
+		const runHistory = await logger.getRunHistory({ limit });
 
 		if (runHistory.length === 0) {
 			log.warning('No benchmark runs found');
@@ -86,7 +86,7 @@ export async function runInteractiveBatchHistory() {
 		}) as number;
 
 		// Execute batch history command
-		const batchHistory = logger.getBatchHistory(limit);
+		const batchHistory = await logger.getBatchHistory(limit);
 
 		if (batchHistory.length === 0) {
 			log.warning('No batch runs found');
