@@ -1,6 +1,7 @@
 // shadcn/ui v3 Specialist - Generated for outcome-driven persona validation
 // This specialist template was created by crawling documentation and analyzing the shadcn/ui repository
 {
+  "$schema": "/Users/shanewalker/Developer/Zephyr/ze-benchmarks/packages/specialist-mint/src/schemas/template.schema.jsonc",
   "schema_version": "0.0.1",
   "name": "shadcn-specialist",
   "displayName": "shadcn/ui Expert",
@@ -189,5 +190,5 @@
       }
     }
   },
-  "spawnable_sub_agent_specialists": [],
+  "spawnable_sub_agent_specialists": []
 }

@@ -1,6 +1,7 @@
 // Next.js Specialist - For testing specialist preferred models integration
 // This specialist template is designed for Next.js App Router development and migrations
 {
+  "$schema": "/Users/shanewalker/Developer/Zephyr/ze-benchmarks/packages/specialist-mint/src/schemas/template.schema.jsonc",
   "schema_version": "0.0.1",
   "name": "nextjs-specialist",
   "displayName": "Next.js App Router Expert",
