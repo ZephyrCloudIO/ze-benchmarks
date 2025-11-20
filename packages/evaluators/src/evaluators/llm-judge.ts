@@ -530,7 +530,7 @@ ${agentResponse}
   private countPromptTokens(prompt: string): number {
     // Count tokens in the full prompt including system message
     const systemMessage =
-      "You are an expert code reviewer. Analyze the provided code changes and agent response, then provide structured scores (1-5) across multiple categories. Always respond with valid JSON.";
+      "provide structured scores (1-5) across multiple categories. Always respond with valid JSON.";
     const fullPrompt = systemMessage + "\n\n" + prompt;
     return countTokens(fullPrompt);
   }
