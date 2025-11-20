@@ -53,6 +53,12 @@ llm_judge:
   model: "meta-llama/llama-3.1-8b-instruct"
   temperature: 0.1
   max_tokens: 2000
+  categories:
+    - "Dependency Update Correctness (30%): Accurately updates required dependencies (typescript >=5.5 <6, nx ~20.0) and optional targets (eslint ^9) to specified versions. Score 1-5: 1=incorrect versions, 5=all targets met"
+    - "Constraint Compliance (25%): Respects blocklist (webpack pinned by Nx), performs namespace migrations (xterm → @xterm/xterm), and maintains companion version alignment (@types/node with node, @types/react with react). Score 1-5: 1=violates constraints, 5=perfect compliance"
+    - "Monorepo Handling (20%): Properly handles pnpm workspace structure and Nx monorepo conventions, uses correct workspace commands (pnpm -w -r). Score 1-5: 1=breaks monorepo structure, 5=exemplary monorepo practices"
+    - "Breaking Changes Strategy (15%): Handles major version bumps safely, tests for regressions, and maintains compatibility with Nx tooling. Score 1-5: 1=breaks build/tests, 5=seamless upgrades"
+    - "Package Manager Correctness (10%): Uses pnpm correctly for workspace operations, maintains lockfile integrity, and follows pnpm best practices. Score 1-5: 1=incorrect commands, 5=optimal pnpm usage"
   
 rubric_overrides:
   weights:

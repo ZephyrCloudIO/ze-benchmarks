@@ -222,7 +222,7 @@ export class LLMJudgeEvaluator implements Evaluator {
         {
           role: "system",
           content:
-            "You are an expert code reviewer. Analyze the provided code changes and agent response, then provide structured scores (1-5) across multiple categories. Always respond with valid JSON."
+            " then provide structured scores (1-5) across multiple categories. Always respond with valid JSON."
         },
         {
           role: "user",
