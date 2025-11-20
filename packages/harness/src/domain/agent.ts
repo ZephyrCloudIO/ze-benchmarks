@@ -146,23 +146,26 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 	// Strip namespace prefix if present (e.g., @zephyr-cloud/)
 	const templateName = specialistName.replace(/^@[^/]+\//, '');
 
-	// Construct template path relative to workspace root
-	const templatePath = `templates/${templateName}-template.json5`;
-	const absolutePath = resolve(workspaceRoot, templatePath);
-
-	// Verify template exists
-	if (!existsSync(absolutePath)) {
-		throw new Error(
-			`Specialist template not found: ${templatePath}\n` +
-			`  Specialist: ${specialistName}\n` +
-			`  Expected path: ${absolutePath}\n` +
-			`  Tip: Ensure the template file exists in starting_from_outcome/`
-		);
+	// Try both .jsonc and .json5 extensions (prefer .jsonc)
+	const extensions = ['.jsonc', '.json5'];
+	for (const ext of extensions) {
+		const templatePath = `templates/${templateName}-template${ext}`;
+		const absolutePath = resolve(workspaceRoot, templatePath);
+		
+		if (existsSync(absolutePath)) {
+			return absolutePath;
+		}
 	}
 
-	// Return absolute path to avoid cwd-related issues when harness is spawned
-	// from different directories (similar to mint:snapshot fix)
-	return absolutePath;
+	// If neither exists, throw error with both paths
+	const jsoncPath = resolve(workspaceRoot, `templates/${templateName}-template.jsonc`);
+	const json5Path = resolve(workspaceRoot, `templates/${templateName}-template.json5`);
+	throw new Error(
+		`Specialist template not found: ${specialistName}\n` +
+		`  Tried: ${jsoncPath}\n` +
+		`  Tried: ${json5Path}\n` +
+		`  Tip: Ensure the template file exists in templates/`
+	);
 }
 
 export async function createAgentAdapter(agentName?: string, model?: string, specialistName?: string, workspaceRoot?: string): Promise<AgentAdapter> {

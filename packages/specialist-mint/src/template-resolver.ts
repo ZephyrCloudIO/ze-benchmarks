@@ -53,13 +53,17 @@ export function resolveTemplatePath(
  */
 export function getEnrichedTemplatePath(templatePath: string, version: string): string {
   const dir = dirname(templatePath);
-  const base = basename(templatePath, '.json5');
+  // Support both .json5 and .jsonc extensions
+  const base = templatePath.endsWith('.jsonc')
+    ? basename(templatePath, '.jsonc')
+    : basename(templatePath, '.json5');
 
   // Remove '-template' suffix if present
   const nameWithoutTemplate = base.endsWith('-template')
     ? base.slice(0, -'-template'.length)
     : base;
 
+  // Use .json5 extension for enriched templates (maintains consistency)
   return resolve(dir, `${nameWithoutTemplate}-template.enriched-${version}.json5`);
 }
 
@@ -67,7 +71,7 @@ export function getEnrichedTemplatePath(templatePath: string, version: string): 
  * Check if a path is an enriched template
  */
 export function isEnrichedTemplatePath(path: string): boolean {
-  return path.includes('.enriched-') && path.endsWith('.json5');
+  return path.includes('.enriched-') && (path.endsWith('.json5') || path.endsWith('.jsonc'));
 }
 
 /**

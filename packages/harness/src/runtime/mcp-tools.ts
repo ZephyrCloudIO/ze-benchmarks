@@ -3,6 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
 import { z } from 'zod';
+import { createFigmaResponseSummary } from './figma-tools.js';
 
 /**
  * MCP Server Configuration
@@ -15,6 +16,7 @@ export interface MCPServerConfig {
 	url?: string; // For HTTP transport
 	transport?: 'stdio' | 'http' | 'sse';
 	required?: boolean;
+	allowedTools?: string[];
 }
 
 /**
@@ -26,6 +28,10 @@ class MCPClientWrapper {
 	private initialized = false;
 
 	constructor(private config: MCPServerConfig) {}
+
+	getConfig(): MCPServerConfig {
+		return this.config;
+	}
 
 	async connect(): Promise<void> {
 		if (this.client) {
@@ -187,8 +193,9 @@ function createMCPToolHandler(
 			}
 
 			// Convert MCP result content to string
+			let contentString = '';
 			if (result.content && result.content.length > 0) {
-				return result.content
+				contentString = result.content
 					.map((c: any) => {
 						if (c.type === 'text') {
 							return c.text;
@@ -196,9 +203,79 @@ function createMCPToolHandler(
 						return JSON.stringify(c, null, 2);
 					})
 					.join('\n');
+			} else {
+				return 'Tool executed successfully (no output)';
 			}
 
-			return 'Tool executed successfully (no output)';
+			// Always create summaries for Figma file responses to reduce token usage and prevent API errors
+			// OpenRouter and most APIs have limits on message size
+			const MAX_RESPONSE_SIZE = 500000; // ~500KB to leave room for conversation context
+			
+			// For figma_get_file, always create a summary (even if response is small)
+			if (toolName === 'figma_get_file') {
+				try {
+					const jsonData = JSON.parse(contentString);
+					if (jsonData.document) {
+						console.log(chalk.blue(`[MCP] Creating summary for figma_get_file response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
+						const summary = createFigmaResponseSummary(jsonData);
+						console.log(chalk.green(`[MCP] ✓ Created summary (${summary.length} chars, ${(summary.length / 1024).toFixed(2)} KB)`));
+						return summary;
+					}
+				} catch (e) {
+					console.log(chalk.yellow(`[MCP] ⚠️  Could not parse figma_get_file response as JSON, returning as-is`));
+				}
+			}
+			
+			// For other large responses, check size and summarize/truncate if needed
+			if (contentString.length > MAX_RESPONSE_SIZE) {
+				console.log(chalk.yellow(`[MCP] ⚠️  Tool ${toolName} returned very large response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
+				console.log(chalk.yellow(`[MCP] ⚠️  Truncating to prevent API errors...`));
+				
+				// Try to parse as JSON and create a summary if possible
+				try {
+					const jsonData = JSON.parse(contentString);
+					
+					// For other Figma-related tools, try to create a summary
+					if (toolName.startsWith('figma_') && jsonData) {
+						// Create a simple summary structure
+						const summary = {
+							_summary: true,
+							_originalSize: contentString.length,
+							_data: Object.keys(jsonData).reduce((acc: any, key: string) => {
+								const value = jsonData[key];
+								if (Array.isArray(value)) {
+									acc[key] = {
+										_count: value.length,
+										_samples: value.slice(0, 10)
+									};
+								} else if (typeof value === 'object' && value !== null) {
+									acc[key] = {
+										_keys: Object.keys(value).slice(0, 20),
+										_count: Object.keys(value).length
+									};
+								} else {
+									acc[key] = value;
+								}
+								return acc;
+							}, {}),
+							_note: `Response summarized: original size was ${contentString.length} characters. Showing summary structure.`
+						};
+						const summaryString = JSON.stringify(summary, null, 2);
+						console.log(chalk.green(`[MCP] ✓ Created summary (${summaryString.length} chars, ${(summaryString.length / 1024).toFixed(2)} KB)`));
+						return summaryString;
+					}
+					
+					// For other large JSON responses, truncate and add note
+					const truncated = contentString.substring(0, MAX_RESPONSE_SIZE - 500);
+					return truncated + `\n\n... [Response truncated: original size was ${contentString.length} characters. Showing first ${MAX_RESPONSE_SIZE - 500} characters.]`;
+				} catch (e) {
+					// Not JSON, just truncate
+					const truncated = contentString.substring(0, MAX_RESPONSE_SIZE - 200);
+					return truncated + `\n\n... [Response truncated: original size was ${contentString.length} characters. Showing first ${MAX_RESPONSE_SIZE - 200} characters.]`;
+				}
+			}
+
+			return contentString;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error(chalk.red(`[MCP] Tool ${toolName} error: ${errorMessage}`));
@@ -220,6 +297,7 @@ export function resolveMCPConfig(mcpDef: {
 	permissions?: string[];
 	description?: string;
 	required?: boolean;
+	allowed_tools?: string[];
 }): MCPServerConfig {
 	const name = mcpDef.name.toLowerCase();
 
@@ -273,6 +351,7 @@ export function resolveMCPConfig(mcpDef: {
 			args: ['-y', mcpDef.name],
 			transport: 'stdio',
 			required: mcpDef.required ?? false,
+		allowedTools: mcpDef.allowed_tools,
 		};
 	}
 
@@ -283,6 +362,7 @@ export function resolveMCPConfig(mcpDef: {
 		env: serverConfig.env,
 		transport: 'stdio',
 		required: mcpDef.required ?? false,
+		allowedTools: mcpDef.allowed_tools,
 	};
 }
 
@@ -329,6 +409,12 @@ export async function loadMCPTools(
 
 	for (const [serverName, clientWrapper] of clients.entries()) {
 		try {
+			const config = clientWrapper.getConfig();
+			const allowedToolsSet =
+				config.allowedTools && config.allowedTools.length > 0
+					? new Set(config.allowedTools)
+					: null;
+
 			const mcpTools = await clientWrapper.getTools();
 
 			if (!quiet) {
@@ -336,15 +422,26 @@ export async function loadMCPTools(
 			}
 
 			for (const mcpTool of mcpTools) {
+				if (allowedToolsSet && !allowedToolsSet.has(mcpTool.name)) {
+					if (!quiet) {
+						console.log(
+							chalk.gray(
+								`[MCP]   - Skipping ${mcpTool.name} (not in allowed list for ${serverName})`,
+							),
+						);
+					}
+					continue;
+				}
 				const toolDef = convertMCPToolToDefinition(mcpTool);
 				tools.push(toolDef);
 
 				// Create handler with server name prefix to avoid conflicts
 				const handlerName = `${serverName}_${mcpTool.name}`;
-				handlers.set(handlerName, createMCPToolHandler(clientWrapper, mcpTool.name));
+				const handler = createMCPToolHandler(clientWrapper, mcpTool.name);
+				handlers.set(handlerName, handler);
 
 				// Also register without prefix for convenience (last one wins if conflicts)
-				handlers.set(mcpTool.name, createMCPToolHandler(clientWrapper, mcpTool.name));
+				handlers.set(mcpTool.name, handler);
 
 				if (!quiet) {
 					console.log(chalk.gray(`[MCP]   - ${mcpTool.name} (from ${serverName})`));

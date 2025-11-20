@@ -210,6 +210,13 @@
               "required": {
                 "type": "boolean",
                 "description": "Whether this MCP is required or optional"
+            },
+            "allowed_tools": {
+              "type": "array",
+              "description": "Optional whitelist of MCP tool names exposed to the agent (e.g., ['figma_get_me', 'figma_get_file'])",
+              "items": {
+                "type": "string"
+              }
               }
             }
           }

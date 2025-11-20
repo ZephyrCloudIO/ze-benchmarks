@@ -91,8 +91,10 @@ export async function enrichTemplate(
   console.log(chalk.gray(`   Template: ${template.name} v${template.version}`));
 
   // Extract specialist name from template path or use template name
-  // e.g., templates/nextjs-specialist-template.json5 -> nextjs-specialist
-  const templateBasename = basename(resolvedTemplatePath, '.json5');
+  // e.g., templates/nextjs-specialist-template.json5 or .jsonc -> nextjs-specialist
+  const templateBasename = resolvedTemplatePath.endsWith('.jsonc')
+    ? basename(resolvedTemplatePath, '.jsonc')
+    : basename(resolvedTemplatePath, '.json5');
   const specialistName = templateBasename.replace(/-template$/, '') || template.name;
 
   // Always generate new enriched template with incremented number

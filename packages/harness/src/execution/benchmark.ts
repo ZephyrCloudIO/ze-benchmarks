@@ -126,7 +126,7 @@ export async function executeBenchmark(
 		const nodeId = scenarioCfg.artifact.figma_file_key; // Could be node ID if provided
 		
 		// Add artifact context to the prompt
-		const artifactContext = `\n\n## Artifact Information\n\n**Figma File ID**: ${fileId}${nodeId ? `\n**Node ID**: ${nodeId}` : ''}\n\nUse the \`fetchFigmaFile\` tool with file_id: "${fileId}"${nodeId ? ` and node_ids: "${nodeId}"` : ''} to fetch the design file.\n`;
+		const artifactContext = `\n\n## Artifact Information\n\n**Figma File ID**: ${fileId}${nodeId ? `\n**Node ID**: ${nodeId}` : ''}\n\nUse the \`figma_get_file\` MCP tool with file_id: "${fileId}"${nodeId ? ` and node_ids: "${nodeId}"` : ''} to fetch the design file.\n`;
 		promptContent = promptContent + artifactContext;
 		
 		if (!quiet) {
@@ -338,18 +338,8 @@ export async function executeBenchmark(
 					}
 				}
 
-				// Add artifact-specific tools
-				if (isArtifactScenario && scenarioCfg.artifact?.type === 'figma') {
-					const { createFigmaFetchTool, createFigmaFetchHandler } = await import('../runtime/figma-tools.ts');
-					const figmaTool = createFigmaFetchTool();
-					tools.push(figmaTool);
-					toolHandlers.set('fetchFigmaFile', createFigmaFetchHandler());
-					if (!quiet) {
-						console.log(chalk.blue('[Benchmark] Added Figma API tool for artifact access'));
-						console.log(chalk.gray(`[Benchmark] Figma tool definition: ${JSON.stringify(figmaTool, null, 2)}`));
-						console.log(chalk.gray(`[Benchmark] Available tools: ${tools.map(t => t.name).join(', ')}`));
-					}
-				}
+				// Note: For Figma artifacts, we rely on MCP tools (figma_get_file) from the specialist template
+				// The old custom fetchFigmaFile tool has been removed in favor of MCP tools
 
 				// Add MCP tools if specialist template defines them
 				let mcpClients: Map<string, any> | null = null;
@@ -437,19 +427,15 @@ export async function executeBenchmark(
 				if (!quiet) {
 					// Categorize tools for better visibility
 					const workspaceToolNames = workspaceDir ? getAllWorkspaceTools().map(t => t.name) : [];
-					const figmaToolNames = isArtifactScenario && scenarioCfg.artifact?.type === 'figma' ? ['fetchFigmaFile'] : [];
 					const mcpToolNames = tools
 						.map(t => t.name)
-						.filter(name => !workspaceToolNames.includes(name) && !figmaToolNames.includes(name) && name !== 'askUser');
+						.filter(name => !workspaceToolNames.includes(name) && name !== 'askUser');
 					
 					console.log(chalk.cyan(`[Benchmark] ========== TOOLS CONFIGURATION ==========`));
 					console.log(chalk.cyan(`[Benchmark] Total tools: ${tools.length}`));
 					console.log(chalk.cyan(`[Benchmark] Tool handlers: ${toolHandlers.size}`));
 					if (workspaceToolNames.length > 0) {
 						console.log(chalk.cyan(`[Benchmark] Workspace tools (${workspaceToolNames.length}): ${workspaceToolNames.join(', ')}`));
-					}
-					if (figmaToolNames.length > 0) {
-						console.log(chalk.cyan(`[Benchmark] Figma tools (${figmaToolNames.length}): ${figmaToolNames.join(', ')}`));
 					}
 					if (mcpToolNames.length > 0) {
 						console.log(chalk.green(`[Benchmark] MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(', ')}`));

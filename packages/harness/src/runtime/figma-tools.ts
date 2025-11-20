@@ -18,7 +18,7 @@ interface TokenExtraction {
  * Extracts key information while keeping response size manageable
  * Based on patterns from figmagic, figma-context-mcp, and figma-extractor2
  */
-function createFigmaResponseSummary(data: any): string {
+export function createFigmaResponseSummary(data: any): string {
 	const summary: string[] = [];
 	const tokens: TokenExtraction = {
 		colors: new Map(),
