@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { mkdirSync, existsSync } from 'fs';
 import { createServer } from 'net';
+import { logger } from '@ze/logger';
 
 // Constants
 const DEFAULT_PORT = 3000;
@@ -205,7 +206,7 @@ async function startDevServerProcess(reportDir: string, availablePort: number): 
       const errorOutput = data.toString();
       // Log critical errors only
       if (errorOutput.includes('error') || errorOutput.includes('Error')) {
-        console.error('Dev server error:', errorOutput.trim());
+        logger.execution.error('Dev server error:', errorOutput.trim());
       }
     });
     

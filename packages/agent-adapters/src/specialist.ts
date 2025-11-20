@@ -4,6 +4,9 @@ import JSON5 from 'json5';
 import { OpenAI } from 'openai';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
 import type { SpecialistTemplate, TaskType, ExtractedIntent, SpecialistSelection, DocumentationReference } from 'agency-prompt-creator';
+import { logger } from '@ze/logger';
+
+const log = logger.specialist;
 import {
   createPrompt,
   substituteTemplate,
@@ -138,7 +141,7 @@ export class SpecialistAdapter implements AgentAdapter {
       const resolvedPath = SpecialistAdapter.resolveTemplatePathSync(templatePath);
       
       // Load template using agency-prompt-creator (handles inheritance)
-      console.log('[SpecialistAdapter] Loading template with agency-prompt-creator:', resolvedPath);
+      log.debug('[SpecialistAdapter] Loading template with agency-prompt-creator:', resolvedPath);
       let template: SpecialistTemplate;
       
       try {
@@ -183,12 +186,12 @@ export class SpecialistAdapter implements AgentAdapter {
         );
       }
 
-      console.log('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
-      console.log('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
+      log.debug('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
+      log.debug('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
       
       // Debug: Log template prompts structure
-      console.log('[SpecialistAdapter] ========== TEMPLATE PROMPTS STRUCTURE ==========');
-      console.log('[SpecialistAdapter] Top-level prompt keys:', Object.keys(template.prompts || {}).join(', '));
+      log.debug('[SpecialistAdapter] ========== TEMPLATE PROMPTS STRUCTURE ==========');
+      log.debug('[SpecialistAdapter] Top-level prompt keys:', Object.keys(template.prompts || {}).join(', '));
       
       if (template.prompts) {
         // Log each task type
@@ -196,7 +199,7 @@ export class SpecialistAdapter implements AgentAdapter {
           if (key === 'default' || key === 'model_specific' || key === 'prompt_strategy') {
             continue;
           }
-          console.log(`[SpecialistAdapter] Task type "${key}":`, {
+          log.debug(`[SpecialistAdapter] Task type "${key}":`, {
             hasDefault: !!(value as any)?.default,
             hasModelSpecific: !!(value as any)?.model_specific,
             defaultKeys: (value as any)?.default ? Object.keys((value as any).default) : [],
@@ -205,11 +208,11 @@ export class SpecialistAdapter implements AgentAdapter {
           
           // Log model-specific structure for migration specifically
           if (key === 'migration' && (value as any)?.model_specific) {
-            console.log(`[SpecialistAdapter] Migration model_specific structure:`, JSON.stringify((value as any).model_specific, null, 2).substring(0, 1000));
+            log.debug(`[SpecialistAdapter] Migration model_specific structure:`, JSON.stringify((value as any).model_specific, null, 2).substring(0, 1000));
           }
         }
       }
-      console.log('[SpecialistAdapter] ================================================');
+      log.debug('[SpecialistAdapter] ================================================');
 
       // Create instance with pre-loaded template
       return new SpecialistAdapter(underlyingAdapter, templatePath, template);
@@ -249,7 +252,7 @@ export class SpecialistAdapter implements AgentAdapter {
       this.template = preLoadedTemplate;
     } else {
       // Fallback to sync loading for backward compatibility
-      console.warn('[SpecialistAdapter] Using synchronous template loading (deprecated). Use SpecialistAdapter.create() for async loading with inheritance support.');
+      log.warn('[SpecialistAdapter] Using synchronous template loading (deprecated). Use SpecialistAdapter.create() for async loading with inheritance support.');
       this.template = this.loadTemplateSync(templatePath);
     }
     
@@ -278,7 +281,7 @@ export class SpecialistAdapter implements AgentAdapter {
    */
   private loadTemplateSync(templatePath: string): SpecialistTemplate {
     try {
-      console.log('[SpecialistAdapter] Loading template synchronously (deprecated):', templatePath);
+      log.debug('[SpecialistAdapter] Loading template synchronously (deprecated):', templatePath);
 
       // Resolve template path (automatically use enriched version if available)
       const resolvedPath = this.resolveTemplatePath(templatePath);
@@ -286,8 +289,8 @@ export class SpecialistAdapter implements AgentAdapter {
       const contents = readFileSync(resolvedPath, 'utf-8');
       const template = JSON5.parse(contents) as SpecialistTemplate;
 
-      console.log('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
-      console.log('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
+      log.debug('[SpecialistAdapter] Template loaded:', template.name, 'version:', template.version);
+      log.debug('[SpecialistAdapter] Documentation entries:', template.documentation?.length || 0);
 
       // Basic validation
       if (!template.name || !template.prompts) {
@@ -326,7 +329,7 @@ export class SpecialistAdapter implements AgentAdapter {
 
     // If path is already an enriched template, use it
     if (SpecialistAdapter.isEnrichedTemplatePath(absolutePath)) {
-      console.log(`[SpecialistAdapter] Using explicitly specified enriched template: ${absolutePath}`);
+      log.debug(`[SpecialistAdapter] Using explicitly specified enriched template: ${absolutePath}`);
       return absolutePath;
     }
 
@@ -337,16 +340,16 @@ export class SpecialistAdapter implements AgentAdapter {
       const latestEnrichedPath = SpecialistAdapter.getLatestEnrichedTemplatePath(absolutePath, template.version);
 
       if (latestEnrichedPath) {
-        console.log(`[SpecialistAdapter] Using enriched template: ${latestEnrichedPath}`);
+        log.debug(`[SpecialistAdapter] Using enriched template: ${latestEnrichedPath}`);
         return latestEnrichedPath;
       } else {
-        console.warn(`[SpecialistAdapter] No enriched template found for version ${template.version}`);
-        console.warn(`[SpecialistAdapter] Expected location: ${SpecialistAdapter.getEnrichedDir(absolutePath, template.version)}`);
-        console.warn(`[SpecialistAdapter] Using original template. Run enrichment to generate enriched template.`);
+        log.warn(`[SpecialistAdapter] No enriched template found for version ${template.version}`);
+        log.warn(`[SpecialistAdapter] Expected location: ${SpecialistAdapter.getEnrichedDir(absolutePath, template.version)}`);
+        log.warn(`[SpecialistAdapter] Using original template. Run enrichment to generate enriched template.`);
       }
     } catch (error) {
       // If we can't read the template, fall back to original path
-      console.warn(`[SpecialistAdapter] Failed to check for enriched template:`, error instanceof Error ? error.message : 'Unknown error');
+      log.warn(`[SpecialistAdapter] Failed to check for enriched template:`, error instanceof Error ? error.message : 'Unknown error');
     }
 
     return absolutePath;
@@ -367,7 +370,7 @@ export class SpecialistAdapter implements AgentAdapter {
 
     // If path is already an enriched template, use it
     if (this.isEnrichedTemplatePath(absolutePath)) {
-      console.log(`[SpecialistAdapter] Using explicitly specified enriched template: ${absolutePath}`);
+      log.debug(`[SpecialistAdapter] Using explicitly specified enriched template: ${absolutePath}`);
       return absolutePath;
     }
 
@@ -378,16 +381,16 @@ export class SpecialistAdapter implements AgentAdapter {
       const latestEnrichedPath = this.getLatestEnrichedTemplatePath(absolutePath, template.version);
 
       if (latestEnrichedPath) {
-        console.log(`[SpecialistAdapter] Using enriched template: ${latestEnrichedPath}`);
+        log.debug(`[SpecialistAdapter] Using enriched template: ${latestEnrichedPath}`);
         return latestEnrichedPath;
       } else {
-        console.warn(`[SpecialistAdapter] No enriched template found for version ${template.version}`);
-        console.warn(`[SpecialistAdapter] Expected location: ${this.getEnrichedDir(absolutePath, template.version)}`);
-        console.warn(`[SpecialistAdapter] Using original template. Run enrichment to generate enriched template.`);
+        log.warn(`[SpecialistAdapter] No enriched template found for version ${template.version}`);
+        log.warn(`[SpecialistAdapter] Expected location: ${this.getEnrichedDir(absolutePath, template.version)}`);
+        log.warn(`[SpecialistAdapter] Using original template. Run enrichment to generate enriched template.`);
       }
     } catch (error) {
       // If we can't read the template, fall back to original path
-      console.warn(`[SpecialistAdapter] Failed to check for enriched template:`, error instanceof Error ? error.message : 'Unknown error');
+      log.warn(`[SpecialistAdapter] Failed to check for enriched template:`, error instanceof Error ? error.message : 'Unknown error');
     }
 
     return absolutePath;
@@ -494,7 +497,7 @@ export class SpecialistAdapter implements AgentAdapter {
     try {
       // Check validation mode - passthrough if pre-exported prompts
       if (this.isValidationMode(request)) {
-        console.log('[SpecialistAdapter] Validation mode: using pre-exported system prompt');
+        log.debug('[SpecialistAdapter] Validation mode: using pre-exported system prompt');
         return this.underlyingAdapter.send(request);
       }
 
@@ -504,67 +507,67 @@ export class SpecialistAdapter implements AgentAdapter {
         throw new Error('No user message found in request');
       }
 
-      console.log('[SpecialistAdapter] ========================================');
-      console.log('[SpecialistAdapter] Original user prompt:', userPrompt.substring(0, 200));
-      console.log('[SpecialistAdapter] ========================================');
+      log.debug('[SpecialistAdapter] ========================================');
+      log.debug('[SpecialistAdapter] Original user prompt:', userPrompt.substring(0, 200));
+      log.debug('[SpecialistAdapter] ========================================');
 
       // ========================================================================
       // STEP 3a: Extract Intent
       // ========================================================================
-      console.log('[SpecialistAdapter] Step 3a: Extracting intent...');
+      log.debug('[SpecialistAdapter] Step 3a: Extracting intent...');
       const intentStart = Date.now();
       const intent = await this.extractIntentWithLLM(userPrompt);
       const intentDuration = Date.now() - intentStart;
 
-      console.log('[SpecialistAdapter] Step 3a - Extracted intent:');
-      console.log('  Intent:', intent.intent);
-      console.log('  Primary goal:', intent.primaryGoal);
-      console.log('  Keywords:', intent.keywords.join(', '));
-      if (intent.framework) console.log('  Framework:', intent.framework);
-      if (intent.components) console.log('  Components:', intent.components.join(', '));
-      if (intent.packageManager) console.log('  Package manager:', intent.packageManager);
-      if (intent.features) console.log('  Features:', intent.features.join(', '));
-      console.log('  Duration:', intentDuration, 'ms');
+      log.debug('[SpecialistAdapter] Step 3a - Extracted intent:');
+      log.debug('  Intent:', intent.intent);
+      log.debug('  Primary goal:', intent.primaryGoal);
+      log.debug('  Keywords:', intent.keywords.join(', '));
+      if (intent.framework) log.debug('  Framework:', intent.framework);
+      if (intent.components) log.debug('  Components:', intent.components.join(', '));
+      if (intent.packageManager) log.debug('  Package manager:', intent.packageManager);
+      if (intent.features) log.debug('  Features:', intent.features.join(', '));
+      log.debug('  Duration:', intentDuration, 'ms');
 
       // ========================================================================
       // STEP 3b: Select Specialist Components
       // ========================================================================
-      console.log('[SpecialistAdapter] Step 3b: Selecting specialist components...');
+      log.debug('[SpecialistAdapter] Step 3b: Selecting specialist components...');
       const selectionStart = Date.now();
       const selection = await this.selectComponentsWithLLM(userPrompt, intent);
       const selectionDuration = Date.now() - selectionStart;
 
-      console.log('[SpecialistAdapter] Step 3b - Selected components:');
-      console.log('  Spawner prompt ID:', selection.spawnerPromptId);
-      console.log('  Task prompt ID:', selection.taskPromptId);
-      console.log('  Relevant tags:', selection.relevantTags.join(', '));
-      console.log('  Relevant tech stack:', selection.relevantTechStack.join(', '));
-      console.log('  Documentation count:', selection.documentation.length);
+      log.debug('[SpecialistAdapter] Step 3b - Selected components:');
+      log.debug('  Spawner prompt ID:', selection.spawnerPromptId);
+      log.debug('  Task prompt ID:', selection.taskPromptId);
+      log.debug('  Relevant tags:', selection.relevantTags.join(', '));
+      log.debug('  Relevant tech stack:', selection.relevantTechStack.join(', '));
+      log.debug('  Documentation count:', selection.documentation.length);
       if (selection.documentation.length > 0) {
-        console.log('  Documentation URLs:');
-        selection.documentation.forEach(doc => console.log('    -', doc.url));
+        log.debug('  Documentation URLs:');
+        selection.documentation.forEach(doc => log.debug('    -', doc.url));
       }
-      console.log('  Reasoning:', selection.reasoning);
-      console.log('  Duration:', selectionDuration, 'ms');
+      log.debug('  Reasoning:', selection.reasoning);
+      log.debug('  Duration:', selectionDuration, 'ms');
 
       // ========================================================================
       // STEP 3c: Create System Prompt
       // ========================================================================
-      console.log('[SpecialistAdapter] Step 3c: Creating system prompt...');
+      log.debug('[SpecialistAdapter] Step 3c: Creating system prompt...');
       const systemPrompt = await this.createSystemPrompt(userPrompt, intent, selection);
 
-      console.log('[SpecialistAdapter] Step 3c - System prompt created:');
-      console.log('  Length:', systemPrompt.length, 'characters');
-      console.log('  Contains CRITICAL marker:', systemPrompt.includes('⚠️ CRITICAL'));
-      console.log('  Contains documentation URLs:', systemPrompt.includes('http'));
-      console.log('  Preview (first 300 chars):', systemPrompt.substring(0, 300));
+      log.debug('[SpecialistAdapter] Step 3c - System prompt created:');
+      log.debug('  Length:', systemPrompt.length, 'characters');
+      log.debug('  Contains CRITICAL marker:', systemPrompt.includes('⚠️ CRITICAL'));
+      log.debug('  Contains documentation URLs:', systemPrompt.includes('http'));
+      log.debug('  Preview (first 300 chars):', systemPrompt.substring(0, 300));
 
       // ========================================================================
       // STEP 3d: Submit to LLM
       // ========================================================================
-      console.log('[SpecialistAdapter] Step 3d: Submitting to LLM...');
-      console.log('  User prompt (ORIGINAL, UNCHANGED):', userPrompt.substring(0, 100));
-      console.log('  System prompt length:', systemPrompt.length);
+      log.debug('[SpecialistAdapter] Step 3d: Submitting to LLM...');
+      log.debug('  User prompt (ORIGINAL, UNCHANGED):', userPrompt.substring(0, 100));
+      log.debug('  System prompt length:', systemPrompt.length);
 
       // Build request with:
       // - System prompt (from 3c)
@@ -592,9 +595,9 @@ export class SpecialistAdapter implements AgentAdapter {
         }
       };
 
-      console.log('[SpecialistAdapter] ========================================');
-      console.log('[SpecialistAdapter] Delegating to underlying adapter...');
-      console.log('[SpecialistAdapter] ========================================');
+      log.debug('[SpecialistAdapter] ========================================');
+      log.debug('[SpecialistAdapter] Delegating to underlying adapter...');
+      log.debug('[SpecialistAdapter] ========================================');
 
       return this.underlyingAdapter.send(modifiedRequest);
     } catch (error) {
@@ -718,7 +721,7 @@ export class SpecialistAdapter implements AgentAdapter {
     const cacheKey = createCacheKey(userPrompt + ':intent');
     const cached = this.llmCache.get(cacheKey);
     if (cached) {
-      console.log('[SpecialistAdapter] Using cached intent extraction');
+      log.debug('[SpecialistAdapter] Using cached intent extraction');
       return cached as ExtractedIntent;
     }
 
@@ -768,37 +771,37 @@ export class SpecialistAdapter implements AgentAdapter {
     const cacheKey = createCacheKey(userPrompt + ':selection');
     const cached = this.llmCache.get(cacheKey);
     if (cached) {
-      console.log('[SpecialistAdapter] Using cached component selection');
+      log.debug('[SpecialistAdapter] Using cached component selection');
       return cached as SpecialistSelection;
     }
 
     const prompt = buildComponentSelectionPrompt(userPrompt, intent, this.template);
     
     // Debug: Log what prompts are available for selection
-    console.log('[SpecialistAdapter] ========== COMPONENT SELECTION DEBUG ==========');
-    console.log('[SpecialistAdapter] Template prompts structure check:');
-    console.log('[SpecialistAdapter]   - Has prompts object:', !!this.template.prompts);
-    console.log('[SpecialistAdapter]   - Prompt keys:', Object.keys(this.template.prompts || {}).join(', '));
+    log.debug('[SpecialistAdapter] ========== COMPONENT SELECTION DEBUG ==========');
+    log.debug('[SpecialistAdapter] Template prompts structure check:');
+    log.debug('[SpecialistAdapter]   - Has prompts object:', !!this.template.prompts);
+    log.debug('[SpecialistAdapter]   - Prompt keys:', Object.keys(this.template.prompts || {}).join(', '));
     
     // Check migration specifically
     const migrationPrompts = (this.template.prompts as any)?.migration;
     if (migrationPrompts) {
-      console.log('[SpecialistAdapter] Migration prompts found:');
-      console.log('[SpecialistAdapter]   - Has default:', !!migrationPrompts.default);
-      console.log('[SpecialistAdapter]   - Has model_specific:', !!migrationPrompts.model_specific);
+      log.debug('[SpecialistAdapter] Migration prompts found:');
+      log.debug('[SpecialistAdapter]   - Has default:', !!migrationPrompts.default);
+      log.debug('[SpecialistAdapter]   - Has model_specific:', !!migrationPrompts.model_specific);
       if (migrationPrompts.model_specific) {
-        console.log('[SpecialistAdapter]   - Model-specific models:', Object.keys(migrationPrompts.model_specific).join(', '));
+        log.debug('[SpecialistAdapter]   - Model-specific models:', Object.keys(migrationPrompts.model_specific).join(', '));
         if (migrationPrompts.model_specific['claude-sonnet-4.5']) {
-          console.log('[SpecialistAdapter]   - claude-sonnet-4.5 keys:', Object.keys(migrationPrompts.model_specific['claude-sonnet-4.5']).join(', '));
-          console.log('[SpecialistAdapter]   - Has systemPrompt:', !!migrationPrompts.model_specific['claude-sonnet-4.5'].systemPrompt);
+          log.debug('[SpecialistAdapter]   - claude-sonnet-4.5 keys:', Object.keys(migrationPrompts.model_specific['claude-sonnet-4.5']).join(', '));
+          log.debug('[SpecialistAdapter]   - Has systemPrompt:', !!migrationPrompts.model_specific['claude-sonnet-4.5'].systemPrompt);
         } else {
-          console.log('[SpecialistAdapter]   - ⚠️ claude-sonnet-4.5 NOT FOUND in model_specific');
+          log.debug('[SpecialistAdapter]   - ⚠️ claude-sonnet-4.5 NOT FOUND in model_specific');
         }
       }
     } else {
-      console.log('[SpecialistAdapter] ⚠️ Migration prompts NOT FOUND in template');
+      log.debug('[SpecialistAdapter] ⚠️ Migration prompts NOT FOUND in template');
     }
-    console.log('[SpecialistAdapter] ================================================');
+    log.debug('[SpecialistAdapter] ================================================');
 
     try {
       const response = await Promise.race([
@@ -820,26 +823,26 @@ export class SpecialistAdapter implements AgentAdapter {
       }
 
       // Debug: Log raw LLM response
-      console.log('[SpecialistAdapter] ========== LLM COMPONENT SELECTION RESPONSE ==========');
-      console.log('[SpecialistAdapter] Raw tool call arguments:', toolCall.function.arguments);
+      log.debug('[SpecialistAdapter] ========== LLM COMPONENT SELECTION RESPONSE ==========');
+      log.debug('[SpecialistAdapter] Raw tool call arguments:', toolCall.function.arguments);
       try {
         const parsedArgs = typeof toolCall.function.arguments === 'string' 
           ? JSON.parse(toolCall.function.arguments)
           : toolCall.function.arguments;
-        console.log('[SpecialistAdapter] Parsed taskPromptId:', parsedArgs.taskPromptId);
-        console.log('[SpecialistAdapter] Parsed spawnerPromptId:', parsedArgs.spawnerPromptId);
+        log.debug('[SpecialistAdapter] Parsed taskPromptId:', parsedArgs.taskPromptId);
+        log.debug('[SpecialistAdapter] Parsed spawnerPromptId:', parsedArgs.spawnerPromptId);
       } catch (e) {
-        console.log('[SpecialistAdapter] Could not parse tool call arguments');
+        log.debug('[SpecialistAdapter] Could not parse tool call arguments');
       }
-      console.log('[SpecialistAdapter] =======================================================');
+      log.debug('[SpecialistAdapter] =======================================================');
       
       const selection = parseComponentSelectionResponse(toolCall.function.arguments, this.template);
       
       // Debug: Log parsed selection
-      console.log('[SpecialistAdapter] ========== PARSED SELECTION ==========');
-      console.log('[SpecialistAdapter] Selection taskPromptId:', selection.taskPromptId);
-      console.log('[SpecialistAdapter] Selection spawnerPromptId:', selection.spawnerPromptId);
-      console.log('[SpecialistAdapter] ====================================');
+      log.debug('[SpecialistAdapter] ========== PARSED SELECTION ==========');
+      log.debug('[SpecialistAdapter] Selection taskPromptId:', selection.taskPromptId);
+      log.debug('[SpecialistAdapter] Selection spawnerPromptId:', selection.spawnerPromptId);
+      log.debug('[SpecialistAdapter] ====================================');
       
       this.llmCache.set(cacheKey, selection);
       return selection;
@@ -859,72 +862,72 @@ export class SpecialistAdapter implements AgentAdapter {
     intent: ExtractedIntent,
     selection: SpecialistSelection
   ): Promise<string> {
-    console.log('[SpecialistAdapter] ========== CREATING SYSTEM PROMPT ==========');
-    console.log('[SpecialistAdapter] Requested spawnerPromptId:', selection.spawnerPromptId);
-    console.log('[SpecialistAdapter] Requested taskPromptId:', selection.taskPromptId);
+    log.debug('[SpecialistAdapter] ========== CREATING SYSTEM PROMPT ==========');
+    log.debug('[SpecialistAdapter] Requested spawnerPromptId:', selection.spawnerPromptId);
+    log.debug('[SpecialistAdapter] Requested taskPromptId:', selection.taskPromptId);
     
     // Debug: Log full template.prompts structure before lookup
-    console.log('[SpecialistAdapter] Full template.prompts keys:', Object.keys(this.template.prompts || {}).join(', '));
+    log.debug('[SpecialistAdapter] Full template.prompts keys:', Object.keys(this.template.prompts || {}).join(', '));
     
     // 1. Get spawner prompt content
-    console.log('[SpecialistAdapter] Looking up spawner prompt...');
+    log.debug('[SpecialistAdapter] Looking up spawner prompt...');
     const spawnerPromptContent = this.getPromptById(selection.spawnerPromptId);
     if (!spawnerPromptContent) {
-      console.error('[SpecialistAdapter] ❌ Spawner prompt lookup FAILED');
+      log.error('[SpecialistAdapter] ❌ Spawner prompt lookup FAILED');
       throw new Error(`Spawner prompt not found: ${selection.spawnerPromptId}`);
     }
-    console.log('[SpecialistAdapter] ✓ Spawner prompt found, length:', spawnerPromptContent.length);
+    log.debug('[SpecialistAdapter] ✓ Spawner prompt found, length:', spawnerPromptContent.length);
 
     // 2. Get task prompt content
-    console.log('[SpecialistAdapter] Looking up task prompt...');
+    log.debug('[SpecialistAdapter] Looking up task prompt...');
     let taskPromptContent = this.getPromptById(selection.taskPromptId);
     if (!taskPromptContent) {
-      console.log('[SpecialistAdapter] ⚠️ Task prompt not found on first attempt');
+      log.debug('[SpecialistAdapter] ⚠️ Task prompt not found on first attempt');
       // Try to fallback to default if model-specific not found
       const parts = selection.taskPromptId.split('.');
-      console.log('[SpecialistAdapter] Task prompt ID parts:', parts);
+      log.debug('[SpecialistAdapter] Task prompt ID parts:', parts);
       if (parts.length >= 4 && parts[1] === 'model_specific') {
         // Try default version: "migration.model_specific.claude-sonnet-4.5.systemPrompt" -> "migration.default.systemPrompt"
         const fallbackId = `${parts[0]}.default.${parts[3]}`;
-        console.log(`[SpecialistAdapter] Trying fallback: ${fallbackId}`);
+        log.debug(`[SpecialistAdapter] Trying fallback: ${fallbackId}`);
         taskPromptContent = this.getPromptById(fallbackId);
         if (taskPromptContent) {
-          console.log('[SpecialistAdapter] ✓ Fallback prompt found');
+          log.debug('[SpecialistAdapter] ✓ Fallback prompt found');
         } else {
-          console.log('[SpecialistAdapter] ❌ Fallback prompt also not found');
+          log.debug('[SpecialistAdapter] ❌ Fallback prompt also not found');
         }
       }
       
       if (!taskPromptContent) {
         // Final debug: Log the exact structure we're looking for
-        console.log('[SpecialistAdapter] ========== FINAL DEBUG: TEMPLATE STRUCTURE ==========');
+        log.debug('[SpecialistAdapter] ========== FINAL DEBUG: TEMPLATE STRUCTURE ==========');
         const taskType = parts[0];
         const modelKey = parts.length >= 3 ? parts[2] : 'N/A';
         const promptKey = parts.length >= 4 ? parts[3] : 'N/A';
-        console.log('[SpecialistAdapter] Looking for:', { taskType, modelKey, promptKey });
+        log.debug('[SpecialistAdapter] Looking for:', { taskType, modelKey, promptKey });
         
         const taskPrompts = (this.template.prompts as any)?.[taskType];
-        console.log('[SpecialistAdapter] Task prompts exists:', !!taskPrompts);
+        log.debug('[SpecialistAdapter] Task prompts exists:', !!taskPrompts);
         if (taskPrompts) {
-          console.log('[SpecialistAdapter] Task prompts keys:', Object.keys(taskPrompts).join(', '));
-          console.log('[SpecialistAdapter] Has model_specific:', !!taskPrompts.model_specific);
+          log.debug('[SpecialistAdapter] Task prompts keys:', Object.keys(taskPrompts).join(', '));
+          log.debug('[SpecialistAdapter] Has model_specific:', !!taskPrompts.model_specific);
           if (taskPrompts.model_specific) {
-            console.log('[SpecialistAdapter] Model-specific keys:', Object.keys(taskPrompts.model_specific).join(', '));
+            log.debug('[SpecialistAdapter] Model-specific keys:', Object.keys(taskPrompts.model_specific).join(', '));
             if (taskPrompts.model_specific[modelKey]) {
-              console.log('[SpecialistAdapter] Model key exists, its keys:', Object.keys(taskPrompts.model_specific[modelKey]).join(', '));
+              log.debug('[SpecialistAdapter] Model key exists, its keys:', Object.keys(taskPrompts.model_specific[modelKey]).join(', '));
             } else {
-              console.log('[SpecialistAdapter] Model key does not exist');
+              log.debug('[SpecialistAdapter] Model key does not exist');
             }
           }
         }
-        console.log('[SpecialistAdapter] ====================================================');
+        log.debug('[SpecialistAdapter] ====================================================');
         
         throw new Error(`Task prompt not found: ${selection.taskPromptId} (also tried fallback)`);
       }
     } else {
-      console.log('[SpecialistAdapter] ✓ Task prompt found, length:', taskPromptContent.length);
+      log.debug('[SpecialistAdapter] ✓ Task prompt found, length:', taskPromptContent.length);
     }
-    console.log('[SpecialistAdapter] ===========================================');
+    log.debug('[SpecialistAdapter] ===========================================');
 
     // 3. Build context for substitution
     const context = {
@@ -952,10 +955,10 @@ export class SpecialistAdapter implements AgentAdapter {
     );
     const spawnerDuration = Date.now() - spawnerStart;
 
-    console.log('[SpecialistAdapter] Step 3c - Spawner prompt substituted:');
-    console.log('  Original length:', spawnerPromptContent.length);
-    console.log('  Substituted length:', substitutedSpawner.length);
-    console.log('  Duration:', spawnerDuration, 'ms');
+    log.debug('[SpecialistAdapter] Step 3c - Spawner prompt substituted:');
+    log.debug('  Original length:', spawnerPromptContent.length);
+    log.debug('  Substituted length:', substitutedSpawner.length);
+    log.debug('  Duration:', spawnerDuration, 'ms');
 
     // 5. LLM-based substitution on task prompt
     const taskStart = Date.now();
@@ -969,10 +972,10 @@ export class SpecialistAdapter implements AgentAdapter {
     );
     const taskDuration = Date.now() - taskStart;
 
-    console.log('[SpecialistAdapter] Step 3c - Task prompt substituted:');
-    console.log('  Original length:', taskPromptContent.length);
-    console.log('  Substituted length:', substitutedTask.length);
-    console.log('  Duration:', taskDuration, 'ms');
+    log.debug('[SpecialistAdapter] Step 3c - Task prompt substituted:');
+    log.debug('  Original length:', taskPromptContent.length);
+    log.debug('  Substituted length:', substitutedTask.length);
+    log.debug('  Duration:', taskDuration, 'ms');
 
     // Store substitution telemetry
     if (this.llmTelemetry.substitution) {
@@ -989,9 +992,9 @@ export class SpecialistAdapter implements AgentAdapter {
     // 6. Format documentation section with CRITICAL marker
     const docSection = this.formatDocumentationSection(selection.documentation);
 
-    console.log('[SpecialistAdapter] Step 3c - Documentation section formatted:');
-    console.log('  Documentation section length:', docSection.length);
-    console.log('  Has CRITICAL marker:', docSection.includes('⚠️ CRITICAL'));
+    log.debug('[SpecialistAdapter] Step 3c - Documentation section formatted:');
+    log.debug('  Documentation section length:', docSection.length);
+    log.debug('  Has CRITICAL marker:', docSection.includes('⚠️ CRITICAL'));
 
     // 7. String concatenation ONLY - no interpretation
     const systemPrompt = [
@@ -1070,7 +1073,7 @@ export class SpecialistAdapter implements AgentAdapter {
     if (this.llmConfig.provider === 'openrouter') {
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) {
-        console.warn('[SpecialistAdapter] LLM selection enabled but OPENROUTER_API_KEY not found, disabling LLM selection');
+        log.warn('[SpecialistAdapter] LLM selection enabled but OPENROUTER_API_KEY not found, disabling LLM selection');
         (this.llmConfig as any).enabled = false;
         return;
       }
@@ -1082,7 +1085,7 @@ export class SpecialistAdapter implements AgentAdapter {
     } else if (this.llmConfig.provider === 'anthropic') {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
-        console.warn('[SpecialistAdapter] LLM selection enabled but ANTHROPIC_API_KEY not found, disabling LLM selection');
+        log.warn('[SpecialistAdapter] LLM selection enabled but ANTHROPIC_API_KEY not found, disabling LLM selection');
         (this.llmConfig as any).enabled = false;
         return;
       }
@@ -1109,7 +1112,7 @@ export class SpecialistAdapter implements AgentAdapter {
     const cacheKey = createCacheKey(userPrompt);
 
     // Phase 1: Select best prompt template
-    console.log('[SpecialistAdapter] Phase 1: Selecting prompt template');
+    log.debug('[SpecialistAdapter] Phase 1: Selecting prompt template');
 
     const selectionStart = Date.now();
     let selectionResult: PromptSelectionResult;
@@ -1119,16 +1122,16 @@ export class SpecialistAdapter implements AgentAdapter {
     if (cachedSelection) {
       selectionResult = cachedSelection;
       selectionCacheHit = true;
-      console.log('  Using cached selection');
+      log.debug('  Using cached selection');
     } else {
       selectionResult = await this.selectPromptWithLLM(userPrompt, model);
       this.llmCache.setSelection(cacheKey, selectionResult);
-      console.log('  LLM selected prompt');
+      log.debug('  LLM selected prompt');
     }
 
-    console.log('  Selected prompt ID:', selectionResult.selectedPromptId);
-    console.log('  Confidence:', selectionResult.confidence);
-    console.log('  Reasoning:', selectionResult.reasoning);
+    log.debug('  Selected prompt ID:', selectionResult.selectedPromptId);
+    log.debug('  Confidence:', selectionResult.confidence);
+    log.debug('  Reasoning:', selectionResult.reasoning);
 
     const selectionDuration = Date.now() - selectionStart;
 
@@ -1177,9 +1180,9 @@ export class SpecialistAdapter implements AgentAdapter {
     const taskType = this.extractTaskTypeFromPromptId(selectionResult.selectedPromptId);
     const defaultedVars = applyDefaults(extractedVars, selectionResult.selectedPromptId);
 
-    console.log('[SpecialistAdapter] Phase 4: Building context');
-    console.log('  Task type:', taskType);
-    console.log('  Extracted variables:', Object.keys(defaultedVars));
+    log.debug('[SpecialistAdapter] Phase 4: Building context');
+    log.debug('  Task type:', taskType);
+    log.debug('  Extracted variables:', Object.keys(defaultedVars));
 
     // Build base context from request
     const baseContext = request ? this.buildTemplateContext(request) : {
@@ -1188,7 +1191,7 @@ export class SpecialistAdapter implements AgentAdapter {
       toolCount: 0
     };
 
-    console.log('  Base context:', Object.keys(baseContext));
+    log.debug('  Base context:', Object.keys(baseContext));
 
     // Build context using agency-prompt-creator (includes documentation filtering)
     const templateContext = buildPromptCreatorContext(
@@ -1203,26 +1206,26 @@ export class SpecialistAdapter implements AgentAdapter {
       }
     );
 
-    console.log('  Template context keys:', Object.keys(templateContext));
-    console.log('  Documentation in context:', templateContext.documentation?.length || 0);
+    log.debug('  Template context keys:', Object.keys(templateContext));
+    log.debug('  Documentation in context:', templateContext.documentation?.length || 0);
     if (templateContext.documentation && templateContext.documentation.length > 0) {
-      console.log('  Documentation entries:', templateContext.documentation.map((d: any) => d.title));
+      log.debug('  Documentation entries:', templateContext.documentation.map((d: any) => d.title));
     }
 
     // Phase 5: Append documentation section if available
     const promptWithDocs = this.appendDocumentationSection(templateContent, templateContext);
 
-    console.log('[SpecialistAdapter] Phase 5: Appended documentation section');
-    console.log('  Template length before:', templateContent.length);
-    console.log('  Template length after:', promptWithDocs.length);
-    console.log('  Documentation section added:', promptWithDocs.length > templateContent.length);
+    log.debug('[SpecialistAdapter] Phase 5: Appended documentation section');
+    log.debug('  Template length before:', templateContent.length);
+    log.debug('  Template length after:', promptWithDocs.length);
+    log.debug('  Documentation section added:', promptWithDocs.length > templateContent.length);
 
     // Phase 6: Substitute and return
     const finalPrompt = substituteTemplate(promptWithDocs, templateContext);
 
-    console.log('[SpecialistAdapter] Phase 6: Final prompt generated');
-    console.log('  Final prompt length:', finalPrompt.length);
-    console.log('  Contains "Relevant Documentation":', finalPrompt.includes('Relevant Documentation'));
+    log.debug('[SpecialistAdapter] Phase 6: Final prompt generated');
+    log.debug('  Final prompt length:', finalPrompt.length);
+    log.debug('  Contains "Relevant Documentation":', finalPrompt.includes('Relevant Documentation'));
 
     return finalPrompt;
   }
@@ -1237,8 +1240,8 @@ export class SpecialistAdapter implements AgentAdapter {
 
     const prompt = buildPromptSelectionPrompt(userPrompt, this.template.prompts, model);
 
-    console.log('[SpecialistAdapter] Prompt selection LLM prompt (first 500 chars):');
-    console.log(prompt.substring(0, 500) + '...');
+    log.debug('[SpecialistAdapter] Prompt selection LLM prompt (first 500 chars):');
+    log.debug(prompt.substring(0, 500) + '...');
 
     try {
       const response = await Promise.race([
@@ -1299,7 +1302,7 @@ export class SpecialistAdapter implements AgentAdapter {
 
       const toolCalls = response.choices[0]?.message?.tool_calls;
       if (!toolCalls || toolCalls.length === 0) {
-        console.warn('[SpecialistAdapter] No tool calls in extraction response, returning empty variables');
+        log.warn('[SpecialistAdapter] No tool calls in extraction response, returning empty variables');
         return {};
       }
 
@@ -1307,7 +1310,7 @@ export class SpecialistAdapter implements AgentAdapter {
       return validateExtractedVariables(extracted);
     } catch (error) {
       if (error instanceof Error) {
-        console.warn(`[SpecialistAdapter] LLM variable extraction failed: ${error.message}`);
+        log.warn(`[SpecialistAdapter] LLM variable extraction failed: ${error.message}`);
       }
       return {}; // Return empty on error - will use defaults
     }
@@ -1348,7 +1351,7 @@ export class SpecialistAdapter implements AgentAdapter {
       return taskType as TaskType;
     }
 
-    console.warn(`[SpecialistAdapter] Unknown task type "${taskType}" in prompt ID "${promptId}", using "default"`);
+    log.warn(`[SpecialistAdapter] Unknown task type "${taskType}" in prompt ID "${promptId}", using "default"`);
     return 'default';
   }
 
@@ -1402,9 +1405,9 @@ The following documentation resources are most relevant to your task:
    * - "general.model_specific.claude-sonnet-4.5.spawnerPrompt"
    */
   private getPromptById(promptId: string): string | null {
-    console.log(`[SpecialistAdapter] getPromptById called with: "${promptId}"`);
+    log.debug(`[SpecialistAdapter] getPromptById called with: "${promptId}"`);
     const parts = promptId.split('.');
-    console.log(`[SpecialistAdapter] Split into ${parts.length} parts:`, parts);
+    log.debug(`[SpecialistAdapter] Split into ${parts.length} parts:`, parts);
 
     // Handle general default prompts: "default.spawnerPrompt"
     if (parts[0] === 'default' && parts.length === 2) {
@@ -1444,18 +1447,18 @@ The following documentation resources are most relevant to your task:
       
       const taskPrompts = (this.template.prompts as any)[taskType];
       
-      console.log(`[SpecialistAdapter] Looking for prompt: ${promptId}`);
-      console.log(`[SpecialistAdapter] Parsed: taskType="${taskType}", modelKey="${modelKey}", promptKey="${promptKey}"`);
-      console.log(`[SpecialistAdapter] Task prompts exists: ${!!taskPrompts}`);
+      log.debug(`[SpecialistAdapter] Looking for prompt: ${promptId}`);
+      log.debug(`[SpecialistAdapter] Parsed: taskType="${taskType}", modelKey="${modelKey}", promptKey="${promptKey}"`);
+      log.debug(`[SpecialistAdapter] Task prompts exists: ${!!taskPrompts}`);
       
       if (!taskPrompts) {
         const availableTasks = Object.keys(this.template.prompts || {}).filter(k => k !== 'default' && k !== 'model_specific' && k !== 'prompt_strategy');
-        console.log(`[SpecialistAdapter] Task type "${taskType}" not found in template. Available tasks: ${availableTasks.join(', ')}`);
-        console.log(`[SpecialistAdapter] All prompt keys: ${Object.keys(this.template.prompts || {}).join(', ')}`);
+        log.debug(`[SpecialistAdapter] Task type "${taskType}" not found in template. Available tasks: ${availableTasks.join(', ')}`);
+        log.debug(`[SpecialistAdapter] All prompt keys: ${Object.keys(this.template.prompts || {}).join(', ')}`);
         return null;
       }
       
-      console.log(`[SpecialistAdapter] Task prompts structure:`, {
+      log.debug(`[SpecialistAdapter] Task prompts structure:`, {
         hasDefault: !!taskPrompts.default,
         hasModelSpecific: !!taskPrompts.model_specific,
         defaultKeys: taskPrompts.default ? Object.keys(taskPrompts.default) : [],
@@ -1464,31 +1467,31 @@ The following documentation resources are most relevant to your task:
       
       // Try model-specific first
       const modelSpecificPrompt = taskPrompts?.model_specific?.[modelKey]?.[promptKey];
-      console.log(`[SpecialistAdapter] Model-specific prompt lookup: taskPrompts.model_specific["${modelKey}"]["${promptKey}"] = ${modelSpecificPrompt ? 'FOUND' : 'NOT FOUND'}`);
+      log.debug(`[SpecialistAdapter] Model-specific prompt lookup: taskPrompts.model_specific["${modelKey}"]["${promptKey}"] = ${modelSpecificPrompt ? 'FOUND' : 'NOT FOUND'}`);
       
       if (modelSpecificPrompt) {
-        console.log(`[SpecialistAdapter] ✓ Found model-specific prompt: ${promptId}`);
+        log.debug(`[SpecialistAdapter] ✓ Found model-specific prompt: ${promptId}`);
         return modelSpecificPrompt;
       }
       
       // Debug: Log what models are available
       if (taskPrompts.model_specific) {
         const availableModels = Object.keys(taskPrompts.model_specific);
-        console.log(`[SpecialistAdapter] Model "${modelKey}" not found in model_specific. Available models: ${availableModels.join(', ')}`);
-        console.log(`[SpecialistAdapter] Full model_specific structure:`, JSON.stringify(taskPrompts.model_specific, null, 2).substring(0, 500));
+        log.debug(`[SpecialistAdapter] Model "${modelKey}" not found in model_specific. Available models: ${availableModels.join(', ')}`);
+        log.debug(`[SpecialistAdapter] Full model_specific structure:`, JSON.stringify(taskPrompts.model_specific, null, 2).substring(0, 500));
       } else {
-        console.log(`[SpecialistAdapter] No model_specific section found for task "${taskType}"`);
-        console.log(`[SpecialistAdapter] Task prompts keys: ${Object.keys(taskPrompts).join(', ')}`);
+        log.debug(`[SpecialistAdapter] No model_specific section found for task "${taskType}"`);
+        log.debug(`[SpecialistAdapter] Task prompts keys: ${Object.keys(taskPrompts).join(', ')}`);
       }
       
       // Fallback to default if model-specific not found
       const defaultPrompt = taskPrompts?.default?.[promptKey];
       if (defaultPrompt) {
-        console.log(`[SpecialistAdapter] Model-specific prompt not found for ${promptId}, falling back to default`);
+        log.debug(`[SpecialistAdapter] Model-specific prompt not found for ${promptId}, falling back to default`);
         return defaultPrompt;
       }
       
-      console.log(`[SpecialistAdapter] Default prompt also not found. Available keys in default: ${taskPrompts.default ? Object.keys(taskPrompts.default).join(', ') : 'none'}`);
+      log.debug(`[SpecialistAdapter] Default prompt also not found. Available keys in default: ${taskPrompts.default ? Object.keys(taskPrompts.default).join(', ') : 'none'}`);
       return null;
     }
 

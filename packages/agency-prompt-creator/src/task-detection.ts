@@ -30,6 +30,9 @@
  */
 
 import type { TaskType, SpecialistTemplate } from './types.js';
+import { logger } from '@ze/logger';
+
+const log = logger.taskDetection;
 
 /**
  * Default task patterns (fallback when LLM is unavailable and template doesn't define patterns)
@@ -298,7 +301,7 @@ function patternToRegex(pattern: string): RegExp {
     try {
       return new RegExp(regexBody, flags);
     } catch (error) {
-      console.warn(`Invalid regex pattern: ${pattern}, treating as simple string`);
+      log.warn(`Invalid regex pattern: ${pattern}, treating as simple string`);
     }
   }
 
@@ -377,8 +380,8 @@ export async function analyzeTemplateWithLLM(
       priority: result.priority
     };
   } catch (error) {
-    console.warn('[Task Detection] LLM analysis failed:', error instanceof Error ? error.message : String(error));
-    console.warn('[Task Detection] Falling back to template-defined patterns or default');
+    log.warn('[Task Detection] LLM analysis failed:', error instanceof Error ? error.message : String(error));
+    log.warn('[Task Detection] Falling back to template-defined patterns or default');
     throw error; // Let caller handle fallback
   }
 }

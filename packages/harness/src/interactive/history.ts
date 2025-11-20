@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { BenchmarkLogger } from '@ze/worker-client';
 import { startDevServer } from '../dev-server.ts';
 import { displayRunInfo, formatStats } from '../lib/display.ts';
+import { logger } from '@ze/logger';
 
 // ============================================================================
 // INTERACTIVE RUN HISTORY
@@ -13,12 +14,12 @@ export async function runInteractiveHistory() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(chalk.gray(`\nView in browser: ${serverUrl}`));
+		logger.history.debug(`\nView in browser: ${serverUrl}`);
 	} catch (err) {
 		// Continue without web server
 	}
 
-	const logger = BenchmarkLogger.getInstance();
+	const benchmarkLogger = BenchmarkLogger.getInstance();
 
 	try {
 		const limit = await select({
@@ -32,7 +33,7 @@ export async function runInteractiveHistory() {
 		}) as number;
 
 		// Execute history command
-		const runHistory = await logger.getRunHistory({ limit });
+		const runHistory = await benchmarkLogger.getRunHistory({ limit });
 
 		if (runHistory.length === 0) {
 			log.warning('No benchmark runs found');
@@ -49,9 +50,9 @@ export async function runInteractiveHistory() {
 
 	} catch (error) {
 		log.error(chalk.red('Failed to fetch history:'));
-		console.error(chalk.dim(error instanceof Error ? error.message : String(error)));
+		logger.history.debug(error instanceof Error ? error.message : String(error));
 	} finally {
-		logger.close();
+		benchmarkLogger.close();
 	}
 }
 
@@ -64,15 +65,15 @@ export async function runInteractiveBatchHistory() {
 	try {
 		const serverUrl = await startDevServer();
 		// Note: Database is now created directly in public/ directory
-		console.log(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
-		console.log(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
-		console.log(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
+		logger.history.raw(`\n${chalk.cyan('🌐')} ${chalk.bold('Web Dashboard:')}`);
+		logger.history.raw(`   ${chalk.blue.underline(serverUrl)} ${chalk.gray('- Click to open interactive dashboard')}`);
+		logger.history.raw(`   ${chalk.gray('Features: Charts, analytics, batch comparison, and detailed run analysis')}`);
 	} catch (err) {
 		// Continue without web server
-		console.log(chalk.yellow('⚠ Web server not available, showing CLI statistics only'));
+		logger.history.warn('⚠ Web server not available, showing CLI statistics only');
 	}
 
-	const logger = BenchmarkLogger.getInstance();
+	const benchmarkLogger = BenchmarkLogger.getInstance();
 
 	try {
 		const limit = await select({
@@ -86,7 +87,7 @@ export async function runInteractiveBatchHistory() {
 		}) as number;
 
 		// Execute batch history command
-		const batchHistory = await logger.getBatchHistory(limit);
+		const batchHistory = await benchmarkLogger.getBatchHistory(limit);
 
 		if (batchHistory.length === 0) {
 			log.warning('No batch runs found');
@@ -101,13 +102,13 @@ export async function runInteractiveBatchHistory() {
 				? chalk.green('✓')
 				: chalk.yellow('○');
 
-			console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
-			console.log(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns}`, 'green')}`);
-			console.log(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
-			console.log(`   ${chalk.gray(new Date(batch.createdAt).toLocaleString())}`);
+			logger.history.raw(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan('Batch')} ${chalk.dim(batch.batchId.substring(0, 8))}...`);
+			logger.history.raw(`   ${formatStats('Runs', `${batch.successfulRuns}/${batch.totalRuns}`, 'green')}`);
+			logger.history.raw(`   ${formatStats('Avg Score', batch.avgWeightedScore?.toFixed(4) || 'N/A', 'yellow')}`);
+			logger.history.raw(`   ${chalk.gray(new Date(batch.createdAt).toLocaleString())}`);
 			if (batch.completedAt) {
 				const duration = (batch.completedAt - batch.createdAt) / 1000;
-				console.log(`   ${formatStats('Duration', `${duration.toFixed(2)}s`, 'blue')}`);
+				logger.history.raw(`   ${formatStats('Duration', `${duration.toFixed(2)}s`, 'blue')}`);
 			}
 		});
 
@@ -115,8 +116,8 @@ export async function runInteractiveBatchHistory() {
 
 	} catch (error) {
 		log.error(chalk.red('Failed to fetch batch history:'));
-		console.error(chalk.dim(error instanceof Error ? error.message : String(error)));
+		logger.history.debug(error instanceof Error ? error.message : String(error));
 	} finally {
-		logger.close();
+		benchmarkLogger.close();
 	}
 }

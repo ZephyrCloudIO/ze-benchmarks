@@ -6,6 +6,9 @@ import type {
   RunTelemetry as WorkerTelemetry
 } from '@ze/worker-client';
 import type { BenchmarkRun, BenchmarkResults } from './types.js';
+import { logger } from '@ze/logger';
+
+const log = logger.benchmarkLoader;
 
 /**
  * Load all benchmark runs from a batch using Worker API
@@ -28,9 +31,9 @@ export async function loadBenchmarkBatch(
     // Check worker connectivity
     const isHealthy = await client.healthCheck();
     if (!isHealthy) {
-      console.warn('⚠️  Worker API is not accessible');
-      console.warn(`   URL: ${workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL || 'http://localhost:8787'}`);
-      console.warn('   Make sure the worker is running: cd apps/worker && pnpm dev');
+      log.warn('⚠️  Worker API is not accessible');
+      log.warn(`   URL: ${workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL || 'http://localhost:8787'}`);
+      log.warn('   Make sure the worker is running: cd apps/worker && pnpm dev');
       return null;
     }
 
@@ -38,8 +41,8 @@ export async function loadBenchmarkBatch(
     const batch: BatchStatistics = await client.getBatchDetails(batchId);
 
     if (!batch.runs || batch.runs.length === 0) {
-      console.warn(`⚠️  No runs found for batch: ${batchId}`);
-      console.warn('   Continuing without benchmark results...');
+      log.warn(`⚠️  No runs found for batch: ${batchId}`);
+      log.warn('   Continuing without benchmark results...');
       return null;
     }
 
@@ -47,8 +50,8 @@ export async function loadBenchmarkBatch(
     const completedRuns = batch.runs.filter(run => run.status === 'completed');
 
     if (completedRuns.length === 0) {
-      console.warn(`⚠️  No completed runs found for batch: ${batchId}`);
-      console.warn('   Continuing without benchmark results...');
+      log.warn(`⚠️  No completed runs found for batch: ${batchId}`);
+      log.warn('   Continuing without benchmark results...');
       return null;
     }
 
@@ -58,7 +61,7 @@ export async function loadBenchmarkBatch(
         try {
           return await client.getRunDetails(run.runId);
         } catch (error) {
-          console.warn(`⚠️  Failed to fetch details for run ${run.runId}: ${error instanceof Error ? error.message : String(error)}`);
+          log.warn(`⚠️  Failed to fetch details for run ${run.runId}: ${error instanceof Error ? error.message : String(error)}`);
           return null;
         }
       })
@@ -69,12 +72,12 @@ export async function loadBenchmarkBatch(
       .filter((run): run is DetailedRunStatistics => run !== null)
       .map(mapWorkerRunToMintRun);
 
-    console.log(`✓ Loaded ${runs.length} benchmark run(s) from batch ${batchId}`);
+    log.debug(`✓ Loaded ${runs.length} benchmark run(s) from batch ${batchId}`);
     return runs;
 
   } catch (error) {
-    console.warn(`⚠️  Failed to load benchmark batch: ${error instanceof Error ? error.message : String(error)}`);
-    console.warn('   Continuing without benchmark results...');
+    log.warn(`⚠️  Failed to load benchmark batch: ${error instanceof Error ? error.message : String(error)}`);
+    log.warn('   Continuing without benchmark results...');
     return null;
   }
 }
@@ -96,7 +99,7 @@ export async function loadBenchmarkResults(workerUrl?: string): Promise<Benchmar
     // Check worker connectivity
     const isHealthy = await client.healthCheck();
     if (!isHealthy) {
-      console.warn('⚠️  Worker API is not accessible');
+      log.warn('⚠️  Worker API is not accessible');
       return null;
     }
 
@@ -107,8 +110,8 @@ export async function loadBenchmarkResults(workerUrl?: string): Promise<Benchmar
     );
 
     if (!successfulRun) {
-      console.warn('⚠️  No successful benchmark runs found');
-      console.warn('   Continuing without benchmark results...');
+      log.warn('⚠️  No successful benchmark runs found');
+      log.warn('   Continuing without benchmark results...');
       return null;
     }
 
@@ -130,16 +133,16 @@ export async function loadBenchmarkResults(workerUrl?: string): Promise<Benchmar
       evaluations: mintRun.evaluations
     };
 
-    console.log(`✓ Loaded benchmark results from Worker API`);
-    console.log(`  Run ID: ${result.run_id}`);
-    console.log(`  Suite: ${result.suite}`);
-    console.log(`  Scenario: ${result.scenario}`);
-    console.log(`  Overall Score: ${result.overall_score.toFixed(2)}`);
+    log.debug(`✓ Loaded benchmark results from Worker API`);
+    log.debug(`  Run ID: ${result.run_id}`);
+    log.debug(`  Suite: ${result.suite}`);
+    log.debug(`  Scenario: ${result.scenario}`);
+    log.debug(`  Overall Score: ${result.overall_score.toFixed(2)}`);
 
     return result;
   } catch (error) {
-    console.warn(`⚠️  Failed to load benchmark results: ${error instanceof Error ? error.message : String(error)}`);
-    console.warn('   Continuing without benchmark results...');
+    log.warn(`⚠️  Failed to load benchmark results: ${error instanceof Error ? error.message : String(error)}`);
+    log.warn('   Continuing without benchmark results...');
     return null;
   }
 }

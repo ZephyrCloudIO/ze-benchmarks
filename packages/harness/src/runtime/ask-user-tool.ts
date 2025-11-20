@@ -1,4 +1,7 @@
 import type { Oracle } from './oracle.ts';
+import { logger } from '@ze/logger';
+
+const log = logger.askUserTool;
 
 export type ToolDefinition = {
 	name: string;
@@ -41,13 +44,13 @@ export function createAskUserToolDefinition(): ToolDefinition {
  */
 export function createAskUserHandler(oracle: Oracle): ToolHandler {
 	return async (input: { question: string; context?: string }): Promise<string> => {
-		console.log(`[Oracle] Agent asked: "${input.question}"`);
+		log.debug(`[Oracle] Agent asked: "${input.question}"`);
 		if (input.context) {
-			console.log(`[Oracle] Context: ${input.context}`);
+			log.debug(`[Oracle] Context: ${input.context}`);
 		}
 		
 		const answer = oracle.ask(input.question);
-		console.log(`[Oracle] Answered: "${answer}"`);
+		log.debug(`[Oracle] Answered: "${answer}"`);
 		
 		return answer;
 	};

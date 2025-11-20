@@ -4,6 +4,9 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
 import { z } from 'zod';
 import { createFigmaResponseSummary } from './figma-tools.js';
+import { logger } from '@ze/logger';
+
+const log = logger.mcpTools;
 
 /**
  * MCP Server Configuration
@@ -50,8 +53,8 @@ class MCPClientWrapper {
 
 			const args = this.config.args || [];
 
-			console.log(chalk.blue(`[MCP] Starting MCP server: ${this.config.name}`));
-			console.log(chalk.gray(`[MCP] Command: ${this.config.command} ${args.join(' ')}`));
+			log.debug(chalk.blue(`[MCP] Starting MCP server: ${this.config.name}`));
+			log.debug(chalk.gray(`[MCP] Command: ${this.config.command} ${args.join(' ')}`));
 
 			// Create stdio transport (it handles process spawning internally)
 			this.transport = new StdioClientTransport({
@@ -78,9 +81,9 @@ class MCPClientWrapper {
 			await this.client.connect(this.transport);
 			this.initialized = true;
 
-			console.log(chalk.green(`[MCP] ✓ Connected to ${this.config.name}`));
+			log.debug(chalk.green(`[MCP] ✓ Connected to ${this.config.name}`));
 		} catch (error) {
-			console.error(chalk.red(`[MCP] ✗ Failed to connect to ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
+			log.error(chalk.red(`[MCP] ✗ Failed to connect to ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
 			await this.disconnect();
 			throw error;
 		}
@@ -105,17 +108,17 @@ class MCPClientWrapper {
 
 			// Extract tools from response
 			const tools = response.tools || [];
-			console.log(chalk.green(`[MCP] Found ${tools.length} tools from ${this.config.name}`));
+			log.debug(chalk.green(`[MCP] Found ${tools.length} tools from ${this.config.name}`));
 
 			// Log tool names for debugging
 			tools.forEach((tool: any) => {
-				console.log(chalk.blue(`[MCP]   - ${tool.name} (from ${this.config.name})`));
+				log.debug(chalk.blue(`[MCP]   - ${tool.name} (from ${this.config.name})`));
 			});
 
 			return tools;
 		} catch (error) {
-			console.error(chalk.red(`[MCP] Failed to list tools from ${this.config.name}`));
-			console.error(chalk.red(`[MCP] Error: ${error instanceof Error ? error.message : String(error)}`));
+			log.error(chalk.red(`[MCP] Failed to list tools from ${this.config.name}`));
+			log.error(chalk.red(`[MCP] Error: ${error instanceof Error ? error.message : String(error)}`));
 			return [];
 		}
 	}
@@ -136,7 +139,7 @@ class MCPClientWrapper {
 			try {
 				await this.client.close();
 			} catch (error) {
-				console.error(chalk.yellow(`[MCP] Error closing client for ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
+				log.error(chalk.yellow(`[MCP] Error closing client for ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
 			}
 			this.client = null;
 		}
@@ -145,7 +148,7 @@ class MCPClientWrapper {
 			try {
 				await this.transport.close();
 			} catch (error) {
-				console.error(chalk.yellow(`[MCP] Error closing transport for ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
+				log.error(chalk.yellow(`[MCP] Error closing transport for ${this.config.name}: ${error instanceof Error ? error.message : String(error)}`));
 			}
 			this.transport = null;
 		}
@@ -216,20 +219,20 @@ function createMCPToolHandler(
 				try {
 					const jsonData = JSON.parse(contentString);
 					if (jsonData.document) {
-						console.log(chalk.blue(`[MCP] Creating summary for figma_get_file response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
+						log.debug(chalk.blue(`[MCP] Creating summary for figma_get_file response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
 						const summary = createFigmaResponseSummary(jsonData);
-						console.log(chalk.green(`[MCP] ✓ Created summary (${summary.length} chars, ${(summary.length / 1024).toFixed(2)} KB)`));
+						log.debug(chalk.green(`[MCP] ✓ Created summary (${summary.length} chars, ${(summary.length / 1024).toFixed(2)} KB)`));
 						return summary;
 					}
 				} catch (e) {
-					console.log(chalk.yellow(`[MCP] ⚠️  Could not parse figma_get_file response as JSON, returning as-is`));
+					log.debug(chalk.yellow(`[MCP] ⚠️  Could not parse figma_get_file response as JSON, returning as-is`));
 				}
 			}
 			
 			// For other large responses, check size and summarize/truncate if needed
 			if (contentString.length > MAX_RESPONSE_SIZE) {
-				console.log(chalk.yellow(`[MCP] ⚠️  Tool ${toolName} returned very large response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
-				console.log(chalk.yellow(`[MCP] ⚠️  Truncating to prevent API errors...`));
+				log.debug(chalk.yellow(`[MCP] ⚠️  Tool ${toolName} returned very large response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
+				log.debug(chalk.yellow(`[MCP] ⚠️  Truncating to prevent API errors...`));
 				
 				// Try to parse as JSON and create a summary if possible
 				try {
@@ -261,7 +264,7 @@ function createMCPToolHandler(
 							_note: `Response summarized: original size was ${contentString.length} characters. Showing summary structure.`
 						};
 						const summaryString = JSON.stringify(summary, null, 2);
-						console.log(chalk.green(`[MCP] ✓ Created summary (${summaryString.length} chars, ${(summaryString.length / 1024).toFixed(2)} KB)`));
+						log.debug(chalk.green(`[MCP] ✓ Created summary (${summaryString.length} chars, ${(summaryString.length / 1024).toFixed(2)} KB)`));
 						return summaryString;
 					}
 					
@@ -278,7 +281,7 @@ function createMCPToolHandler(
 			return contentString;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error(chalk.red(`[MCP] Tool ${toolName} error: ${errorMessage}`));
+			log.error(chalk.red(`[MCP] Tool ${toolName} error: ${errorMessage}`));
 			return `Error calling MCP tool ${toolName}: ${errorMessage}`;
 		}
 	};
@@ -382,14 +385,14 @@ export async function initializeMCPClients(
 			clients.set(config.name, wrapper);
 
 			if (!quiet) {
-				console.log(chalk.green(`[MCP] ✓ Initialized ${config.name}`));
+				log.debug(chalk.green(`[MCP] ✓ Initialized ${config.name}`));
 			}
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			if (config.required) {
 				throw new Error(`Required MCP server "${config.name}" failed to initialize: ${errorMessage}`);
 			} else {
-				console.warn(chalk.yellow(`[MCP] ⚠️  Optional MCP server "${config.name}" failed to initialize: ${errorMessage}`));
+				log.warn(chalk.yellow(`[MCP] ⚠️  Optional MCP server "${config.name}" failed to initialize: ${errorMessage}`));
 			}
 		}
 	}
@@ -418,13 +421,13 @@ export async function loadMCPTools(
 			const mcpTools = await clientWrapper.getTools();
 
 			if (!quiet) {
-				console.log(chalk.blue(`[MCP] Found ${mcpTools.length} tools from ${serverName}`));
+				log.debug(chalk.blue(`[MCP] Found ${mcpTools.length} tools from ${serverName}`));
 			}
 
 			for (const mcpTool of mcpTools) {
 				if (allowedToolsSet && !allowedToolsSet.has(mcpTool.name)) {
 					if (!quiet) {
-						console.log(
+						log.debug(
 							chalk.gray(
 								`[MCP]   - Skipping ${mcpTool.name} (not in allowed list for ${serverName})`,
 							),
@@ -444,11 +447,11 @@ export async function loadMCPTools(
 				handlers.set(mcpTool.name, handler);
 
 				if (!quiet) {
-					console.log(chalk.gray(`[MCP]   - ${mcpTool.name} (from ${serverName})`));
+					log.debug(chalk.gray(`[MCP]   - ${mcpTool.name} (from ${serverName})`));
 				}
 			}
 		} catch (error) {
-			console.error(chalk.red(`[MCP] Failed to load tools from ${serverName}: ${error instanceof Error ? error.message : String(error)}`));
+			log.error(chalk.red(`[MCP] Failed to load tools from ${serverName}: ${error instanceof Error ? error.message : String(error)}`));
 		}
 	}
 
@@ -462,9 +465,9 @@ export async function cleanupMCPClients(clients: Map<string, MCPClientWrapper>):
 	for (const [name, client] of clients.entries()) {
 		try {
 			await client.disconnect();
-			console.log(chalk.gray(`[MCP] Disconnected from ${name}`));
+			log.debug(chalk.gray(`[MCP] Disconnected from ${name}`));
 		} catch (error) {
-			console.error(chalk.yellow(`[MCP] Error disconnecting from ${name}: ${error instanceof Error ? error.message : String(error)}`));
+			log.error(chalk.yellow(`[MCP] Error disconnecting from ${name}: ${error instanceof Error ? error.message : String(error)}`));
 		}
 	}
 }

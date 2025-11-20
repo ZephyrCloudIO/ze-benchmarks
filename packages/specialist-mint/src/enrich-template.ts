@@ -13,6 +13,9 @@
 import chalk from 'chalk';
 import type { SpecialistTemplate, DocumentationEnrichment } from './types.js';
 import { loadJSON5, writeJSON5 } from './utils.js';
+import { logger } from '@ze/logger';
+
+const log = logger.create('enrich-template');
 import { createLLMClient, type LLMProvider } from './llm-client.js';
 import { fetchDocumentation } from './doc-fetcher.js';
 import { resolve, dirname, basename, join } from 'path';
@@ -80,15 +83,15 @@ export async function enrichTemplate(
     concurrency = 3
   } = options;
 
-  console.log(chalk.blue('🔍 Starting template enrichment...'));
-  console.log(chalk.gray(`   Provider: ${provider}`));
-  console.log(chalk.gray(`   Model: ${model}`));
+  log.debug(chalk.blue('🔍 Starting template enrichment...'));
+  log.debug(chalk.gray(`   Provider: ${provider}`));
+  log.debug(chalk.gray(`   Model: ${model}`));
 
   // Load template
   const resolvedTemplatePath = resolve(process.cwd(), templatePath);
   const template: SpecialistTemplate = loadJSON5(resolvedTemplatePath);
 
-  console.log(chalk.gray(`   Template: ${template.name} v${template.version}`));
+  log.debug(chalk.gray(`   Template: ${template.name} v${template.version}`));
 
   // Extract specialist name from template path or use template name
   // e.g., templates/nextjs-specialist-template.json5 or .jsonc -> nextjs-specialist
@@ -99,7 +102,7 @@ export async function enrichTemplate(
 
   // Always generate new enriched template with incremented number
   const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, template.version, specialistName);
-  console.log(chalk.gray(`   Output: ${enrichedPath}`));
+  log.debug(chalk.gray(`   Output: ${enrichedPath}`));
 
   // Initialize LLM client
   const llmClient = createLLMClient(provider);
@@ -107,11 +110,11 @@ export async function enrichTemplate(
     throw new Error(`Failed to initialize LLM client for provider: ${provider}`);
   }
 
-  console.log(chalk.green('   ✓ LLM client initialized'));
+  log.debug(chalk.green('   ✓ LLM client initialized'));
 
   // Enrich documentation
   const documentation = template.documentation || [];
-  console.log(chalk.blue(`\n📚 Enriching ${documentation.length} documentation resources...`));
+  log.debug(chalk.blue(`\n📚 Enriching ${documentation.length} documentation resources...`));
 
   const errors: Array<{ index: number; error: string }> = [];
   let enriched = 0;
@@ -125,13 +128,13 @@ export async function enrichTemplate(
 
       // Skip if already enriched and not forcing
       if (!force && doc.enrichment) {
-        console.log(chalk.gray(`   [${index + 1}/${documentation.length}] Skipping (already enriched): ${doc.description}`));
+        log.debug(chalk.gray(`   [${index + 1}/${documentation.length}] Skipping (already enriched): ${doc.description}`));
         skipped++;
         return doc;
       }
 
       try {
-        console.log(chalk.gray(`   [${index + 1}/${documentation.length}] Enriching: ${doc.description}`));
+        log.debug(chalk.gray(`   [${index + 1}/${documentation.length}] Enriching: ${doc.description}`));
 
         const enrichment = await enrichDocument(
           doc,
@@ -142,7 +145,7 @@ export async function enrichTemplate(
         );
 
         enriched++;
-        console.log(chalk.green(`   [${index + 1}/${documentation.length}] ✓ Enriched: ${doc.description}`));
+        log.debug(chalk.green(`   [${index + 1}/${documentation.length}] ✓ Enriched: ${doc.description}`));
 
         return {
           ...doc,
@@ -151,7 +154,7 @@ export async function enrichTemplate(
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         errors.push({ index, error: errorMessage });
-        console.log(chalk.red(`   [${index + 1}/${documentation.length}] ✗ Failed: ${errorMessage}`));
+        log.debug(chalk.red(`   [${index + 1}/${documentation.length}] ✗ Failed: ${errorMessage}`));
 
         // Return original doc without enrichment
         return doc;
@@ -174,20 +177,20 @@ export async function enrichTemplate(
   };
 
   // Write enriched template
-  console.log(chalk.blue('\n💾 Writing enriched template...'));
+  log.debug(chalk.blue('\n💾 Writing enriched template...'));
   writeJSON5(enrichedPath, enrichedTemplate);
-  console.log(chalk.green(`   ✓ Enriched template saved to: ${enrichedPath}`));
+  log.debug(chalk.green(`   ✓ Enriched template saved to: ${enrichedPath}`));
 
   // Summary
-  console.log(chalk.blue('\n📊 Enrichment Summary:'));
-  console.log(chalk.gray(`   Documents enriched: ${enriched}`));
-  console.log(chalk.gray(`   Documents skipped: ${skipped}`));
-  console.log(chalk.gray(`   Errors: ${errors.length}`));
+  log.debug(chalk.blue('\n📊 Enrichment Summary:'));
+  log.debug(chalk.gray(`   Documents enriched: ${enriched}`));
+  log.debug(chalk.gray(`   Documents skipped: ${skipped}`));
+  log.debug(chalk.gray(`   Errors: ${errors.length}`));
 
   if (errors.length > 0) {
-    console.log(chalk.yellow('\n⚠️  Errors occurred:'));
+    log.debug(chalk.yellow('\n⚠️  Errors occurred:'));
     errors.forEach(({ index, error }) => {
-      console.log(chalk.yellow(`   [${index + 1}] ${error}`));
+      log.debug(chalk.yellow(`   [${index + 1}] ${error}`));
     });
   }
 

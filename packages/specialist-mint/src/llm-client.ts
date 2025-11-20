@@ -5,6 +5,9 @@
  */
 
 import { OpenAI } from 'openai';
+import { logger } from '@ze/logger';
+
+const log = logger.create('llm-client');
 
 export type LLMProvider = 'openrouter' | 'anthropic';
 
@@ -18,7 +21,7 @@ export function createLLMClient(provider: LLMProvider): OpenAI | null {
   if (provider === 'openrouter') {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      console.warn('[LLM Client] OPENROUTER_API_KEY not found');
+      log.warn('[LLM Client] OPENROUTER_API_KEY not found');
       return null;
     }
 
@@ -31,7 +34,7 @@ export function createLLMClient(provider: LLMProvider): OpenAI | null {
   if (provider === 'anthropic') {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      console.warn('[LLM Client] ANTHROPIC_API_KEY not found');
+      log.warn('[LLM Client] ANTHROPIC_API_KEY not found');
       return null;
     }
 

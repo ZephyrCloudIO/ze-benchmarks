@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import chalk from 'chalk';
 import type { AgentRequest } from '../../../agent-adapters/src/index.ts';
 import { getScenarioDir } from './scenario.ts';
+import { logger } from '@ze/logger';
 
 // ============================================================================
 // WARMUP EXECUTION
@@ -33,9 +34,9 @@ export async function executeWarmup(
 	const workingDir = join(scenarioDir, warmupCfg.working_dir || './repo-fixture');
 
 	if (!quiet) {
-		console.log(chalk.blue('🔥 Executing warmup phase...'));
-		console.log(chalk.blue(`[Warmup] Working directory: ${workingDir}`));
-		console.log(chalk.blue(`[Warmup] Expected control folder: ${join(workingDir, 'control')}`));
+		logger.warmup.info(chalk.blue('🔥 Executing warmup phase...'));
+		logger.warmup.info(`Working directory: ${workingDir}`);
+		logger.warmup.info(`Expected control folder: ${join(workingDir, 'control')}`);
 	}
 
 	// Create working directory if it doesn't exist, or clean it if it does
@@ -44,8 +45,8 @@ export async function executeWarmup(
 		try {
 			const files = readdirSync(workingDir);
 			if (!quiet) {
-				console.log(chalk.blue(`[Warmup] Cleaning existing working directory...`));
-				console.log(chalk.blue(`[Warmup] Removing: [${files.join(', ')}]`));
+				logger.warmup.info(`Cleaning existing working directory...`);
+				logger.warmup.info(`Removing: [${files.join(', ')}]`);
 			}
 			for (const file of files) {
 				const filePath = join(workingDir, file);
@@ -62,7 +63,7 @@ export async function executeWarmup(
 	} else {
 		mkdirSync(workingDir, { recursive: true });
 		if (!quiet) {
-			console.log(chalk.green(`[Warmup] Created working directory: ${workingDir}`));
+			logger.warmup.success(`Created working directory: ${workingDir}`);
 		}
 	}
 
@@ -79,8 +80,8 @@ export async function executeWarmup(
 		}
 
 		if (!quiet) {
-			console.log(chalk.blue(`[Warmup] Provider: ${provider}`));
-			console.log(chalk.blue(`[Warmup] Model: ${model || 'default'}`));
+			logger.warmup.info(`Provider: ${provider}`);
+			logger.warmup.info(`Model: ${model || 'default'}`);
 		}
 
 		try {
@@ -115,39 +116,39 @@ export async function executeWarmup(
 
 			// Execute the agent
 			if (!quiet) {
-				console.log(chalk.blue(`[Warmup] Starting agent execution...`));
-				console.log(chalk.blue(`[Warmup] Agent: ${agentAdapter.constructor.name}`));
-				console.log(chalk.blue(`[Warmup] Workspace: ${request.workspaceDir}`));
+				logger.warmup.info(`Starting agent execution...`);
+				logger.warmup.info(`Agent: ${agentAdapter.constructor.name}`);
+				logger.warmup.info(`Workspace: ${request.workspaceDir}`);
 			}
 
 			const response = await agentAdapter.send(request);
 
 			if (!quiet) {
-				console.log(chalk.green(`[Warmup] ✓ Agent execution completed`));
-				console.log(chalk.blue(`[Warmup] Tool calls made: ${response.toolCalls || 0}`));
-				console.log(chalk.blue(`[Warmup] Tokens used: ${response.tokensIn} in / ${response.tokensOut} out`));
+				logger.warmup.success(`✓ Agent execution completed`);
+				logger.warmup.info(`Tool calls made: ${response.toolCalls || 0}`);
+				logger.warmup.info(`Tokens used: ${response.tokensIn} in / ${response.tokensOut} out`);
 
 				if (response.content) {
 					const preview = response.content.substring(0, 150).replace(/\n/g, ' ');
-					console.log(chalk.gray(`[Warmup] Final response: ${preview}${response.content.length > 150 ? '...' : ''}`));
+					logger.warmup.debug(`Final response: ${preview}${response.content.length > 150 ? '...' : ''}`);
 				}
 
 				// Warn if no tools were called
 				if (!response.toolCalls || response.toolCalls === 0) {
-					console.warn(chalk.yellow(`[Warmup] ⚠️  Warning: Agent did not use any tools`));
-					console.warn(chalk.yellow(`[Warmup] Agent may not have understood the task requires tool use`));
+					logger.warmup.warn(`⚠️  Warning: Agent did not use any tools`);
+					logger.warmup.warn(`Agent may not have understood the task requires tool use`);
 				}
 			}
 
 			// Validate control folder was created
 			const controlPath = join(workingDir, 'control');
 			if (!quiet) {
-				console.log(chalk.blue(`[Warmup] Validating control folder at: ${controlPath}`));
+				logger.warmup.info(`Validating control folder at: ${controlPath}`);
 			}
 
 			if (!existsSync(controlPath)) {
-				console.error(chalk.red(`[Warmup] ❌ Control folder not found`));
-				console.error(chalk.red(`[Warmup] Expected at: ${controlPath}`));
+				logger.warmup.error(`❌ Control folder not found`);
+				logger.warmup.error(`Expected at: ${controlPath}`);
 				return {
 					success: false,
 					error: `Control folder not created at ${controlPath}`,
@@ -157,12 +158,12 @@ export async function executeWarmup(
 
 			const controlContents = readdirSync(controlPath);
 			if (!quiet) {
-				console.log(chalk.green(`[Warmup] ✓ Control folder created successfully`));
-				console.log(chalk.blue(`[Warmup] Contents: [${controlContents.join(', ')}]`));
+				logger.warmup.success(`✓ Control folder created successfully`);
+				logger.warmup.info(`Contents: [${controlContents.join(', ')}]`);
 			}
 
 			if (controlContents.length === 0) {
-				console.warn(chalk.yellow(`[Warmup] ⚠ Warning: Control folder is empty`));
+				logger.warmup.warn(`⚠ Warning: Control folder is empty`);
 				return {
 					success: false,
 					error: `Control folder created but is empty`,
@@ -178,10 +179,10 @@ export async function executeWarmup(
 			};
 
 		} catch (err: any) {
-			console.error(chalk.red(`[Warmup] ❌ Exception during agent execution`));
-			console.error(chalk.red(`[Warmup] ${err.message}`));
+			logger.warmup.error(`❌ Exception during agent execution`);
+			logger.warmup.error(`${err.message}`);
 			if (err.stack) {
-				console.error(chalk.gray(err.stack));
+				logger.warmup.debug(err.stack);
 			}
 			return {
 				success: false,
@@ -193,13 +194,13 @@ export async function executeWarmup(
 		// Scripted warmup
 		const commands = warmupCfg.commands || [];
 
-		if (!quiet) console.log(chalk.blue(`   Running ${commands.length} warmup commands...`));
+		if (!quiet) logger.warmup.info(`   Running ${commands.length} warmup commands...`);
 
 		for (const cmdCfg of commands) {
 			const cmd = cmdCfg.cmd;
 			const description = cmdCfg.description || cmd;
 
-			if (!quiet) console.log(chalk.gray(`   → ${description}`));
+			if (!quiet) logger.warmup.debug(`   → ${description}`);
 
 			try {
 				const { execSync } = await import('child_process');
@@ -213,7 +214,7 @@ export async function executeWarmup(
 			}
 		}
 
-		if (!quiet) console.log(chalk.green('   ✓ Warmup commands completed'));
+		if (!quiet) logger.warmup.success('   ✓ Warmup commands completed');
 		return { success: true };
 	} else {
 		return { success: false, error: `Unknown warmup type: ${warmupCfg.type}` };
