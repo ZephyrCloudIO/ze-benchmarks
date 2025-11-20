@@ -351,6 +351,68 @@ export async function executeBenchmark(
 					}
 				}
 
+				// Add MCP tools if specialist template defines them
+				let mcpClients: Map<string, any> | null = null;
+				if (specialist && workspaceRoot) {
+					try {
+						const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+						const templatePath = resolveSpecialistTemplatePath(specialist, workspaceRoot);
+						
+						// Load template to extract MCP configs
+						const { loadTemplate } = await import('../../../agency-prompt-creator/src/loader.js');
+						const template = await loadTemplate(templatePath, {
+							baseDir: workspaceRoot
+						});
+
+						// Extract MCP configs from template
+						const mcpDefs = template.dependencies?.mcps || [];
+						
+						if (mcpDefs.length > 0) {
+							if (!quiet) {
+								console.log(chalk.blue(`[Benchmark] Found ${mcpDefs.length} MCP server(s) in specialist template`));
+							}
+
+							const {
+								resolveMCPConfig,
+								initializeMCPClients,
+								loadMCPTools,
+								cleanupMCPClients,
+							} = await import('../runtime/mcp-tools.ts');
+
+							// Resolve MCP configs
+							const mcpConfigs = mcpDefs.map(resolveMCPConfig);
+
+							// Initialize MCP clients
+							mcpClients = await initializeMCPClients(mcpConfigs, quiet);
+
+							// Load tools from MCP servers
+							const { tools: mcpTools, handlers: mcpHandlers } = await loadMCPTools(mcpClients, quiet);
+
+							// Add MCP tools to the tools array
+							tools.push(...mcpTools);
+							mcpHandlers.forEach((handler, name) => {
+								toolHandlers.set(name, handler);
+							});
+
+							if (!quiet) {
+								console.log(chalk.green(`[Benchmark] Added ${mcpTools.length} MCP tool(s) from ${mcpDefs.length} server(s)`));
+							}
+
+							// Store cleanup function for later
+							// We'll clean up MCP clients after agent execution completes
+							(globalThis as any).__mcpCleanup = async () => {
+								if (mcpClients) {
+									await cleanupMCPClients(mcpClients);
+									mcpClients = null;
+								}
+							};
+						}
+					} catch (error) {
+						console.error(chalk.yellow(`[Benchmark] Failed to load MCP tools: ${error instanceof Error ? error.message : String(error)}`));
+						// Don't fail the benchmark if MCP loading fails (unless required)
+					}
+				}
+
 				// Convert tools to adapter-specific format
 				// If agent is undefined, we'll determine format after adapter is created
 				// For now, default to OpenRouter format when agent is undefined
@@ -373,10 +435,29 @@ export async function executeBenchmark(
 				
 				// Log tools being sent to agent
 				if (!quiet) {
+					// Categorize tools for better visibility
+					const workspaceToolNames = workspaceDir ? getAllWorkspaceTools().map(t => t.name) : [];
+					const figmaToolNames = isArtifactScenario && scenarioCfg.artifact?.type === 'figma' ? ['fetchFigmaFile'] : [];
+					const mcpToolNames = tools
+						.map(t => t.name)
+						.filter(name => !workspaceToolNames.includes(name) && !figmaToolNames.includes(name) && name !== 'askUser');
+					
 					console.log(chalk.cyan(`[Benchmark] ========== TOOLS CONFIGURATION ==========`));
 					console.log(chalk.cyan(`[Benchmark] Total tools: ${tools.length}`));
 					console.log(chalk.cyan(`[Benchmark] Tool handlers: ${toolHandlers.size}`));
-					console.log(chalk.cyan(`[Benchmark] Tools: ${tools.map(t => t.name).join(', ')}`));
+					if (workspaceToolNames.length > 0) {
+						console.log(chalk.cyan(`[Benchmark] Workspace tools (${workspaceToolNames.length}): ${workspaceToolNames.join(', ')}`));
+					}
+					if (figmaToolNames.length > 0) {
+						console.log(chalk.cyan(`[Benchmark] Figma tools (${figmaToolNames.length}): ${figmaToolNames.join(', ')}`));
+					}
+					if (mcpToolNames.length > 0) {
+						console.log(chalk.green(`[Benchmark] MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(', ')}`));
+					}
+					if (oracle) {
+						console.log(chalk.cyan(`[Benchmark] Oracle tool: askUser`));
+					}
+					console.log(chalk.cyan(`[Benchmark] All tools: ${tools.map(t => t.name).join(', ')}`));
 					console.log(chalk.cyan(`[Benchmark] =========================================`));
 				}
 			}
@@ -695,6 +776,16 @@ export async function executeBenchmark(
 		if (timeoutId) {
 			clearTimeout(timeoutId);
 			timeoutId = null;
+		}
+
+		// Cleanup MCP clients if they were initialized
+		if ((globalThis as any).__mcpCleanup) {
+			try {
+				await (globalThis as any).__mcpCleanup();
+				delete (globalThis as any).__mcpCleanup;
+			} catch (error) {
+				console.error(chalk.yellow(`[Benchmark] Error cleaning up MCP clients: ${error instanceof Error ? error.message : String(error)}`));
+			}
 		}
 	}
 }
