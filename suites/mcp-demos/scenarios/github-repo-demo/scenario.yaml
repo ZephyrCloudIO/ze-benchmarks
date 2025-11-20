@@ -1,0 +1,43 @@
+id: github-repo-demo
+suite: mcp-demos
+title: "MCP GitHub Repository Operations Demo"
+description: |
+  A simple demonstration scenario that shows MCP (Model Context Protocol) integration
+  in action. This scenario uses the GitHub MCP server to perform repository operations.
+
+  The agent should:
+  - Use the search_repositories MCP tool to find repositories related to "MCP" or "model context protocol"
+  - Use the get_file_contents MCP tool to retrieve a README or documentation file from one of the found repos
+  - Optionally use search_code or list_issues to demonstrate additional GitHub MCP capabilities
+  - Clearly state which MCP tools are being used
+  - Verify that all operations completed successfully
+
+  Success criteria:
+  - Agent successfully uses GitHub MCP tools
+  - Repositories are found and listed
+  - File contents are successfully retrieved from a repository
+  - Agent verifies operations completed
+  - Agent provides clear explanations of what it's doing
+
+# This is an artifact-based demo scenario (no code workspace needed)
+workspace:
+  required: false
+
+validation:
+  required: false
+
+# Use LLM judge to evaluate if MCP integration worked correctly
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-3.5-sonnet"
+  temperature: 0.1
+  max_tokens: 4000
+  categories:
+    - "MCP Tool Usage (40%): Does the agent correctly use GitHub MCP tools (search_repositories, get_file_contents, etc.)? Does it explicitly state it's using MCP tools? Score 1-5: 1=didn't use MCP tools or used wrong tools, 3=used MCP tools but unclear, 5=clearly used correct MCP tools with explicit explanations"
+    - "Operation Success (30%): Do the GitHub operations complete successfully? Are repositories found? Is file content retrieved? Score 1-5: 1=operations failed, 3=partial success, 5=all operations succeeded"
+    - "Verification (20%): Does the agent verify operations worked (e.g., confirming repos were found, file was retrieved)? Score 1-5: 1=no verification, 3=minimal verification, 5=thorough verification with clear confirmation"
+    - "Communication Clarity (10%): Does the agent clearly explain what it's doing at each step? Score 1-5: 1=unclear/silent, 3=basic explanations, 5=clear, detailed explanations that help understand MCP flow"
+
+rubric_overrides:
+  weights:
+    llm_judge: 1.0
