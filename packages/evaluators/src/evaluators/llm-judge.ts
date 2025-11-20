@@ -368,19 +368,16 @@ Evaluate the agent across these ${scenario.llm_judge?.categories?.length || 0} c
 
 ${this.buildCategoriesSection(scenario.llm_judge?.categories || [])}
 
-**Scoring Guidelines - BE RUTHLESS:**
-- **5: PERFECT** - Absolutely flawless implementation. Zero issues. Exemplary code quality. Industry best practices followed exactly. Would be used as a reference example. **VERY RARE.**
-- **4: Excellent** - Minor cosmetic issues only (formatting, variable naming). Core implementation is sound and follows best practices. No functional problems.
-- **3: Good/Acceptable** - Functional and mostly correct, but has notable issues: suboptimal patterns, missing edge cases, or minor bugs. Works but not production-ready without improvements.
-- **2: Below Average** - Significant problems: incorrect patterns, security issues, broken functionality, or fundamental misunderstandings. Requires substantial rework.
-- **1: Poor/Failing** - Completely incorrect, non-functional, or dangerous. Violates fundamental principles. Would cause serious problems in production.
+**Scoring Guidelines - BE RUTHLESS AND CONSISTENT**
 
-**CRITICAL EVALUATION CRITERIA:**
-- Do NOT give a 5 unless the implementation is genuinely perfect with zero room for improvement
-- Be harsh on antipatterns, security issues, performance problems, and outdated practices
-- Deduct points for missing error handling, poor type safety, or inadequate testing considerations
-- A "working" solution that has flaws should get 3 or below, not 4-5
-- Reserve 4-5 scores for code you would confidently deploy to production without changes
+**Score Meanings (1-5 scale):**
+- **5: Excellent** - Fully meets ALL requirements. **Actual implementation completed** with high quality. Production-ready. RARE - only for genuinely excellent work with clear evidence of implementation.
+- **4: Good** - Meets MOST requirements (80-90%). **Substantial implementation done** with minor issues. Functional and maintainable.
+- **3: Acceptable** - Meets CORE requirements (60-80%). **Adequate implementation** with notable issues. Works but needs improvements.
+- **2: Needs Improvement** - Notable problems OR **minimal/incomplete implementation**. Requires substantial fixes or more work.
+- **1: Poor** - Fundamentally fails OR **no/minimal work done**. Non-functional, broken, or no evidence of implementation.
+
+If no changes were made for a category requirement, score 1-2 - do not reward inaction or minimal work.
 
 **Output JSON format:**
 {
