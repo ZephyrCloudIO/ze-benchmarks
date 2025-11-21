@@ -13,21 +13,31 @@ description: |
   - Include specific technologies, configurations, or outcomes expected
   - Define what "passing" looks like for this benchmark
 
-# Workspace Configuration (Required)
+# Workspace Configuration (Required for code-based scenarios)
+# For artifact-based scenarios (e.g., Figma), set required: false
 workspace:
+  required: true  # Set to false for artifact-based scenarios
   node: "20.x"
   manager: auto
   managers_allowed: [pnpm]
   workspaces: none  # Use "pnpm", "npm", "yarn", or "none"
+
+# Artifact Configuration (Optional - for artifact-based scenarios)
+# Use this instead of workspace for scenarios that evaluate external artifacts
+# artifact:
+#   type: figma  # Options: figma, api, image
+#   figma_file_id: "abc123xyz456"  # Extract from Figma URL: figma.com/file/{file_id}/...
+#   figma_file_key: "optional-version-key"  # Optional: specific file version
 
 # Constraints (Optional)
 # Restrict which package managers the agent can use
 constraints:
   managers_allowed: [pnpm]
 
-# Validation Commands (Required)
-# Commands used to validate successful completion
+# Validation Commands (Required for code-based scenarios)
+# For artifact-based scenarios, set required: false
 validation:
+  required: true  # Set to false for artifact-based scenarios
   commands:
     install: "pnpm install"
     build: "pnpm build"

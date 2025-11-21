@@ -19,7 +19,8 @@
     "globby": "^14.0.2",
     "openai": "^4.0.0",
     "ze-evaluator": "workspace:*",
-    "@ze/worker-client": "workspace:*"
+    "@ze/worker-client": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.17.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

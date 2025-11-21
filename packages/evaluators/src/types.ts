@@ -6,6 +6,18 @@ export interface ScenarioConfig {
 	reference_path?: string;
 	title?: string;
 	description?: string;
+	artifact?: {
+		type: 'figma' | 'api' | 'image';
+		figma_file_id?: string;
+		figma_file_key?: string;
+	};
+	workspace?: {
+		required?: boolean;
+		node?: string;
+		manager?: string;
+		managers_allowed?: string[];
+		workspaces?: string;
+	};
 	constraints?: {
 		blocklist?: { name: string; versions?: string[] }[];
 		namespace_migrations?: { from: string; to: string }[];
@@ -16,7 +28,10 @@ export interface ScenarioConfig {
 		required?: { name: string; to?: string }[];
 		optional?: { name: string; to?: string }[];
 	};
-	validation?: { commands?: { install?: string; test?: string; lint?: string; typecheck?: string } };
+	validation?: {
+		required?: boolean;
+		commands?: { install?: string; test?: string; lint?: string; typecheck?: string };
+	};
 	rubric_overrides?: { weights?: Record<string, number> };
 	llm_judge?: {
 		enabled?: boolean;
@@ -53,13 +68,17 @@ export interface ExecutedCommand {
 
 export interface EvaluationContext {
 	scenario: ScenarioConfig;
-	workspaceDir: string;
+	workspaceDir?: string; // Optional for artifact-based scenarios
 	suitesDir: string; // Absolute path to suites directory
 	referencePath?: string; // Absolute path to reference implementation (if scenario has reference_path)
 	agentResponse?: string;
 	diffSummary?: FileDiff[];
 	depsDelta?: DepChange[];
 	commandLog?: ExecutedCommand[];
+	artifact?: {
+		type: string;
+		data?: any; // Fetched artifact data
+	};
 }
 
 export interface EvaluatorResult {

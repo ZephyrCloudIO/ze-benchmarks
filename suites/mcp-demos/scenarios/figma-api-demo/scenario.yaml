@@ -1,0 +1,67 @@
+id: figma-api-demo
+suite: mcp-demos
+title: "MCP Figma API Operations Demo"
+description: |
+  A demonstration scenario that shows MCP (Model Context Protocol) integration
+  with authenticated services. This scenario uses the Figma MCP server to perform
+  authenticated API operations, demonstrating how environment variables from .env
+  files are used for authentication.
+
+  The agent should:
+  - Verify authentication by using the figma_get_me MCP tool
+  - Use the figma_get_file MCP tool to retrieve a Figma file (requires file_id)
+  - Optionally use other Figma MCP tools to demonstrate additional capabilities
+  - Clearly state which MCP tools are being used
+  - Verify that all operations completed successfully
+  - If auth fails, provide clear guidance on setting up FIGMA_API_KEY
+
+  This demonstrates:
+  - MCP integration with authenticated services
+  - Environment variable configuration from .env files
+  - Automatic environment variable passing to MCP servers
+
+# This is an artifact-based demo scenario (no code workspace needed)
+workspace:
+  required: false
+
+validation:
+  required: false
+
+success_criteria:
+  - "Authentication verified with figma_get_me"
+  - "Figma file data retrieved successfully"
+  - "Clear explanations provided for each step"
+  - "Operations verified to confirm they worked"
+
+llm_judge:
+  enabled: true
+  model: "anthropic/claude-3.5-sonnet"
+  temperature: 0.1
+  max_tokens: 4000
+  categories:
+    - "MCP Tool Usage (40%): Does the agent correctly use Figma MCP tools (figma_get_me, figma_get_file, etc.)? Does it explicitly state it's using MCP tools? Score 1-5: 1=didn't use MCP tools or used wrong tools, 3=used MCP tools but unclear, 5=clearly used correct MCP tools with explicit explanations"
+    - "Authentication (20%): Does the agent verify authentication with figma_get_me and handle auth errors gracefully? Score 1-5: 1=no auth verification, 3=verified auth but poor error handling, 5=thorough auth verification with clear error guidance"
+    - "Operation Success (20%): Do the Figma operations complete successfully? Is a Figma file retrieved? Score 1-5: 1=operations failed, 3=partial success, 5=all operations succeeded"
+    - "Verification (10%): Does the agent verify operations worked (e.g., confirming auth succeeded, file was retrieved)? Score 1-5: 1=no verification, 3=minimal verification, 5=thorough verification with clear confirmation"
+    - "Communication Clarity (10%): Does the agent clearly explain what it's doing and how authentication works? Score 1-5: 1=unclear/silent, 3=basic explanations, 5=clear, detailed explanations that help understand MCP auth flow"
+
+rubric_overrides:
+  weights:
+    llm_judge: 1.0
+
+hints:
+  - "Start by verifying auth with figma_get_me"
+  - "Use a public Figma community file if you don't have a specific file_id"
+  - "Figma file URLs look like: https://www.figma.com/file/FILE_ID/filename"
+  - "Extract FILE_ID from the URL to use with figma_get_file"
+  - "If FIGMA_API_KEY is not set, explain how to get one from https://www.figma.com/settings"
+
+tags:
+  - mcp
+  - figma
+  - authentication
+  - design-systems
+  - demo
+
+difficulty: basic
+estimated_time: 5m

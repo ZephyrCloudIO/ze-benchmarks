@@ -118,7 +118,21 @@ export async function executeBenchmark(
 		}, timeoutMs);
 
 		if (progress) updateProgress(progress, 1, 'Loading prompt');
-	const promptContent = loadPrompt(suite, scenario, tier);
+	let promptContent = loadPrompt(suite, scenario, tier);
+	
+	// Inject artifact information into prompt if this is an artifact scenario
+	if (promptContent && scenarioCfg.artifact?.type === 'figma' && scenarioCfg.artifact.figma_file_id) {
+		const fileId = scenarioCfg.artifact.figma_file_id;
+		const nodeId = scenarioCfg.artifact.figma_file_key; // Could be node ID if provided
+		
+		// Add artifact context to the prompt
+		const artifactContext = `\n\n## Artifact Information\n\n**Figma File ID**: ${fileId}${nodeId ? `\n**Node ID**: ${nodeId}` : ''}\n\nUse the \`figma_get_file\` MCP tool with file_id: "${fileId}"${nodeId ? ` and node_ids: "${nodeId}"` : ''} to fetch the design file.\n`;
+		promptContent = promptContent + artifactContext;
+		
+		if (!quiet) {
+			console.log(chalk.blue(`[Benchmark] Injected Figma file ID into prompt: ${fileId}`));
+		}
+	}
 
 		// Early failure check: prompt missing for non-echo agents
 		if (!promptContent && agent !== 'echo' && agent !== undefined) {
@@ -156,11 +170,20 @@ export async function executeBenchmark(
 		}
 	}
 
-	// Stage 2: Workspace
+	// Stage 2: Workspace (optional for artifact-based scenarios)
 		if (progress) updateProgress(progress, 2, 'Preparing workspace');
-	const workspacePrep = prepareWorkspaceFromFixture(suite, scenario, getScenarioDir);
+	
+	// Check if this is an artifact-based scenario
+	const isArtifactScenario = !!scenarioCfg.artifact?.type;
+	const workspaceRequired = scenarioCfg.workspace?.required !== false; // Default to true for backward compatibility
+	
+	let workspaceDir: string | undefined;
+	let fixtureDir: string | undefined;
+	
+	if (!isArtifactScenario && workspaceRequired) {
+		const workspacePrep = prepareWorkspaceFromFixture(suite, scenario, getScenarioDir);
 
-		// Early failure check: workspace preparation failed
+		// Early failure check: workspace preparation failed (only fail if workspace is required)
 		if (!workspacePrep) {
 			logger.failRun('Workspace preparation failed', 'workspace');
 			if (!quiet) console.log(chalk.red('✗ Workspace preparation failed'));
@@ -168,12 +191,22 @@ export async function executeBenchmark(
 			return;
 		}
 
-		const workspaceDir = workspacePrep.workspaceDir;
-		const fixtureDir = workspacePrep.fixtureDir;
+		workspaceDir = workspacePrep.workspaceDir;
+		fixtureDir = workspacePrep.fixtureDir;
 
 		console.log(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
 		console.log(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
 		console.log(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+	} else if (isArtifactScenario) {
+		if (!quiet) {
+			console.log(chalk.blue('[Benchmark] Artifact-based scenario detected - skipping workspace preparation'));
+			console.log(chalk.gray(`  Artifact type: ${scenarioCfg.artifact.type}`));
+		}
+	} else {
+		if (!quiet) {
+			console.log(chalk.yellow('[Benchmark] Workspace not required for this scenario - skipping workspace preparation'));
+		}
+	}
 
 	// Initialize result structure
 	const result = {
@@ -282,21 +315,92 @@ export async function executeBenchmark(
 			// Add tools if agent supports them (Anthropic and OpenRouter)
 			// Also support when agent is undefined but specialist will auto-detect (will be determined in createAgentAdapter)
 			const supportsTools = agent === 'anthropic' || agent === 'openrouter' || (!agent && specialist);
-			if (supportsTools && workspaceDir) {
-				// Create workspace tool handlers
-				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
+			if (supportsTools) {
+				const tools: any[] = [];
+				const toolHandlers = new Map<string, any>();
 
-				// Start with workspace tools
-				const tools = getAllWorkspaceTools();
-				const toolHandlers = workspaceHandlers;
+				// Add workspace tools if workspace is available
+				if (workspaceDir) {
+					// Create workspace tool handlers
+					const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
 
-				// Add askUser tool if oracle is available
-				if (oracle) {
-					tools.push(createAskUserToolDefinition());
-					toolHandlers.set('askUser', createAskUserHandler(oracle));
-					// Tools: readFile, writeFile, runCommand, listFiles, askUser
-				} else {
-					// Tools: readFile, writeFile, runCommand, listFiles
+					// Start with workspace tools
+					const workspaceTools = getAllWorkspaceTools();
+					tools.push(...workspaceTools);
+					workspaceHandlers.forEach((handler, name) => {
+						toolHandlers.set(name, handler);
+					});
+
+					// Add askUser tool if oracle is available
+					if (oracle) {
+						tools.push(createAskUserToolDefinition());
+						toolHandlers.set('askUser', createAskUserHandler(oracle));
+					}
+				}
+
+				// Note: For Figma artifacts, we rely on MCP tools (figma_get_file) from the specialist template
+				// The old custom fetchFigmaFile tool has been removed in favor of MCP tools
+
+				// Add MCP tools if specialist template defines them
+				let mcpClients: Map<string, any> | null = null;
+				if (specialist && workspaceRoot) {
+					try {
+						const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+						const templatePath = resolveSpecialistTemplatePath(specialist, workspaceRoot);
+						
+						// Load template to extract MCP configs
+						const { loadTemplate } = await import('../../../agency-prompt-creator/src/loader.js');
+						const template = await loadTemplate(templatePath, {
+							baseDir: workspaceRoot
+						});
+
+						// Extract MCP configs from template
+						const mcpDefs = template.dependencies?.mcps || [];
+						
+						if (mcpDefs.length > 0) {
+							if (!quiet) {
+								console.log(chalk.blue(`[Benchmark] Found ${mcpDefs.length} MCP server(s) in specialist template`));
+							}
+
+							const {
+								resolveMCPConfig,
+								initializeMCPClients,
+								loadMCPTools,
+								cleanupMCPClients,
+							} = await import('../runtime/mcp-tools.ts');
+
+							// Resolve MCP configs
+							const mcpConfigs = mcpDefs.map(resolveMCPConfig);
+
+							// Initialize MCP clients
+							mcpClients = await initializeMCPClients(mcpConfigs, quiet);
+
+							// Load tools from MCP servers
+							const { tools: mcpTools, handlers: mcpHandlers } = await loadMCPTools(mcpClients, quiet);
+
+							// Add MCP tools to the tools array
+							tools.push(...mcpTools);
+							mcpHandlers.forEach((handler, name) => {
+								toolHandlers.set(name, handler);
+							});
+
+							if (!quiet) {
+								console.log(chalk.green(`[Benchmark] Added ${mcpTools.length} MCP tool(s) from ${mcpDefs.length} server(s)`));
+							}
+
+							// Store cleanup function for later
+							// We'll clean up MCP clients after agent execution completes
+							(globalThis as any).__mcpCleanup = async () => {
+								if (mcpClients) {
+									await cleanupMCPClients(mcpClients);
+									mcpClients = null;
+								}
+							};
+						}
+					} catch (error) {
+						console.error(chalk.yellow(`[Benchmark] Failed to load MCP tools: ${error instanceof Error ? error.message : String(error)}`));
+						// Don't fail the benchmark if MCP loading fails (unless required)
+					}
 				}
 
 				// Convert tools to adapter-specific format
@@ -318,6 +422,30 @@ export async function executeBenchmark(
 				}
 
 				request.toolHandlers = toolHandlers;
+				
+				// Log tools being sent to agent
+				if (!quiet) {
+					// Categorize tools for better visibility
+					const workspaceToolNames = workspaceDir ? getAllWorkspaceTools().map(t => t.name) : [];
+					const mcpToolNames = tools
+						.map(t => t.name)
+						.filter(name => !workspaceToolNames.includes(name) && name !== 'askUser');
+					
+					console.log(chalk.cyan(`[Benchmark] ========== TOOLS CONFIGURATION ==========`));
+					console.log(chalk.cyan(`[Benchmark] Total tools: ${tools.length}`));
+					console.log(chalk.cyan(`[Benchmark] Tool handlers: ${toolHandlers.size}`));
+					if (workspaceToolNames.length > 0) {
+						console.log(chalk.cyan(`[Benchmark] Workspace tools (${workspaceToolNames.length}): ${workspaceToolNames.join(', ')}`));
+					}
+					if (mcpToolNames.length > 0) {
+						console.log(chalk.green(`[Benchmark] MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(', ')}`));
+					}
+					if (oracle) {
+						console.log(chalk.cyan(`[Benchmark] Oracle tool: askUser`));
+					}
+					console.log(chalk.cyan(`[Benchmark] All tools: ${tools.map(t => t.name).join(', ')}`));
+					console.log(chalk.cyan(`[Benchmark] =========================================`));
+				}
 			}
 
 			// Execute agent request
@@ -400,11 +528,22 @@ export async function executeBenchmark(
 		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
 	}
 
-	// Stage 4: Validation
+	// Stage 4: Validation (skip for artifact scenarios or if validation not required)
 	console.log(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
-	if (progress) updateProgress(progress, 4, 'Running validation commands');
-	const commandLog = workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
+	const validationRequired = scenarioCfg.validation?.required !== false; // Default to true for backward compatibility
+	const shouldRunValidation = !isArtifactScenario && workspaceDir && validationRequired;
+	
+	if (progress) updateProgress(progress, 4, shouldRunValidation ? 'Running validation commands' : 'Skipping validation');
+	const commandLog = shouldRunValidation && workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
 	const diffArtifacts = workspaceDir && fixtureDir ? buildDiffArtifacts(fixtureDir, workspaceDir) : { diffSummary: [], depsDelta: [] };
+	
+	if (!shouldRunValidation && !quiet) {
+		if (isArtifactScenario) {
+			console.log(chalk.blue('[Benchmark] Skipping validation commands (artifact-based scenario)'));
+		} else if (!validationRequired) {
+			console.log(chalk.blue('[Benchmark] Skipping validation commands (validation.required: false)'));
+		}
+	}
 
 	const passedCommands = commandLog.filter(cmd => cmd.exitCode === 0).length;
 	if (!quiet) console.log(chalk.gray(`  ✓ ${passedCommands}/${commandLog.length} commands passed`));
@@ -417,50 +556,61 @@ export async function executeBenchmark(
 	if (progress) updateProgress(progress, 5, llmJudgeOnly ? 'Computing LLM judge scores' : 'Computing scores');
 
 	try {
-		if (workspaceDir) {
-			// Load benchmark config to get suitesDir
-			const { loadBenchmarkConfig } = await import('../lib/config.ts');
-			const config = loadBenchmarkConfig();
+		// Load benchmark config to get suitesDir (needed for both workspace and artifact scenarios)
+		const { loadBenchmarkConfig } = await import('../lib/config.ts');
+		const config = loadBenchmarkConfig();
 
-			// Calculate reference path if scenario has reference_path
-			let referencePath: string | undefined;
-			if (scenarioCfg.reference_path) {
-				const scenarioDir = getScenarioDir(suite, scenario);
-				referencePath = join(scenarioDir, scenarioCfg.reference_path);
-			}
-
-			// Actually run evaluators
-			const ctx = {
-				scenario: scenarioCfg,
-				workspaceDir,
-				suitesDir: config.suitesDir,
-				referencePath,
-				agentResponse: result.agent_response,
-				commandLog,
-				diffSummary: diffArtifacts.diffSummary,
-				depsDelta: diffArtifacts.depsDelta,
-			};
-			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx, llmJudgeOnly);
-			result.scores = { ...result.scores, ...scoreCard };
-			result.totals = computeWeightedTotals(result.scores, scenarioCfg);
-			(result as any).evaluator_results = evaluatorResults;
-			(result as any).diff_summary = diffArtifacts.diffSummary;
-			(result as any).deps_delta = diffArtifacts.depsDelta;
-
-			// Store evaluation results locally (for parallel execution safety)
-			for (const evalResult of evaluatorResults) {
-				evaluationsData.push({
-					evaluatorName: evalResult.name,
-					score: evalResult.score,
-					maxScore: 1.0,
-					details: evalResult.details,
-				});
-			}
-
-			// Show evaluator summary
-			const avgScore = Object.values(scoreCard).reduce((sum, score) => sum + (score as number), 0) / Object.keys(scoreCard).length;
-			if (!quiet) console.log(chalk.gray(`  ✓ Average score: ${(avgScore * 100).toFixed(1)}%`));
+		// Calculate reference path if scenario has reference_path
+		let referencePath: string | undefined;
+		if (scenarioCfg.reference_path) {
+			const scenarioDir = getScenarioDir(suite, scenario);
+			referencePath = join(scenarioDir, scenarioCfg.reference_path);
 		}
+
+		// Build evaluation context
+		const ctx = {
+			scenario: scenarioCfg,
+			workspaceDir, // May be undefined for artifact scenarios
+			suitesDir: config.suitesDir,
+			referencePath,
+			agentResponse: result.agent_response,
+			commandLog,
+			diffSummary: diffArtifacts.diffSummary,
+			depsDelta: diffArtifacts.depsDelta,
+			...(isArtifactScenario && {
+				artifact: {
+					type: scenarioCfg.artifact!.type,
+					// Artifact data could be fetched here if needed, or left for evaluators to fetch
+				}
+			}),
+		};
+
+		// For artifact scenarios, force LLM judge only (code-based evaluators don't apply)
+		const shouldUseLLMJudgeOnly = isArtifactScenario || llmJudgeOnly;
+		if (isArtifactScenario && !llmJudgeOnly && !quiet) {
+			console.log(chalk.blue('[Benchmark] Artifact scenario detected - using LLM judge only'));
+		}
+
+		const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx, shouldUseLLMJudgeOnly);
+		result.scores = { ...result.scores, ...scoreCard };
+		result.totals = computeWeightedTotals(result.scores, scenarioCfg);
+		(result as any).evaluator_results = evaluatorResults;
+		(result as any).diff_summary = diffArtifacts.diffSummary;
+		(result as any).deps_delta = diffArtifacts.depsDelta;
+
+		// Store evaluation results locally (for parallel execution safety)
+		for (const evalResult of evaluatorResults) {
+			evaluationsData.push({
+				evaluatorName: evalResult.name,
+				score: evalResult.score,
+				maxScore: 1.0,
+				details: evalResult.details,
+			});
+		}
+
+		// Show evaluator summary
+		const avgScore = Object.values(scoreCard).reduce((sum, score) => sum + (score as number), 0) / Object.keys(scoreCard).length;
+		if (!quiet) console.log(chalk.gray(`  ✓ Average score: ${(avgScore * 100).toFixed(1)}%`));
 	} catch (e) {
 		// Evaluator run failed
 	}
@@ -612,6 +762,16 @@ export async function executeBenchmark(
 		if (timeoutId) {
 			clearTimeout(timeoutId);
 			timeoutId = null;
+		}
+
+		// Cleanup MCP clients if they were initialized
+		if ((globalThis as any).__mcpCleanup) {
+			try {
+				await (globalThis as any).__mcpCleanup();
+				delete (globalThis as any).__mcpCleanup;
+			} catch (error) {
+				console.error(chalk.yellow(`[Benchmark] Error cleaning up MCP clients: ${error instanceof Error ? error.message : String(error)}`));
+			}
 		}
 	}
 }

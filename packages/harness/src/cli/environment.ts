@@ -12,6 +12,9 @@ export async function validateEnvironment() {
 		missingVars.push('OPENROUTER_API_KEY or ANTHROPIC_API_KEY');
 	}
 
+	// Note: FIGMA_API_KEY is optional - only needed for artifact-based scenarios with Figma files
+	// We don't fail if it's missing, but we'll warn if a Figma scenario is run without it
+
 	if (missingVars.length > 0) {
 		console.log(chalk.red('❌ Missing required environment variables:'));
 		console.log(chalk.yellow(`   ${missingVars.join(', ')}`));
@@ -24,6 +27,7 @@ export async function validateEnvironment() {
 		console.log(chalk.gray('3. Edit .env and add your API keys:'));
 		console.log(chalk.gray('   OPENROUTER_API_KEY=your_key_here'));
 		console.log(chalk.gray('   ANTHROPIC_API_KEY=your_key_here'));
+		console.log(chalk.gray('   FIGMA_API_KEY=your_key_here  # Optional: for Figma artifact scenarios'));
 		console.log(chalk.gray('4. Or set environment variables directly:'));
 		console.log(chalk.gray('   Windows: set OPENROUTER_API_KEY=your_key_here'));
 		console.log(chalk.gray('   Linux/Mac: export OPENROUTER_API_KEY=your_key_here'));

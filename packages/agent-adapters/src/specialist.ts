@@ -395,10 +395,10 @@ export class SpecialistAdapter implements AgentAdapter {
 
   /**
    * Check if a path is an enriched template
-   * NEW FORMAT: {specialist-name}.enriched.{number}.json5
+   * NEW FORMAT: {specialist-name}.enriched.{number}.json5 or .jsonc
    */
   private static isEnrichedTemplatePath(path: string): boolean {
-    return path.includes('/enriched/') && path.includes('.enriched.') && path.endsWith('.json5');
+    return path.includes('/enriched/') && path.includes('.enriched.') && (path.endsWith('.json5') || path.endsWith('.jsonc'));
   }
 
   /**
@@ -439,8 +439,10 @@ export class SpecialistAdapter implements AgentAdapter {
 
     try {
       // Extract specialist name from template path
-      // e.g., templates/nextjs-specialist-template.json5 -> nextjs-specialist
-      const templateBasename = basename(templatePath, '.json5');
+      // e.g., templates/nextjs-specialist-template.json5 or .jsonc -> nextjs-specialist
+      const templateBasename = templatePath.endsWith('.jsonc')
+        ? basename(templatePath, '.jsonc')
+        : basename(templatePath, '.json5');
       const specialistName = templateBasename.replace(/-template$/, '');
       
       // Escape special regex characters in specialist name

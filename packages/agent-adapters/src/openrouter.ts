@@ -189,6 +189,7 @@ export class OpenRouterAdapter implements AgentAdapter {
     let totalToolCalls = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let lastRequestSnapshot = '';
 
     // Multi-turn conversation loop
     for (let turn = 0; turn < maxIterations; turn++) {
@@ -204,8 +205,42 @@ export class OpenRouterAdapter implements AgentAdapter {
         });
       }
 
+      // Log tools being sent to the API
+      if (apiRequest.tools && apiRequest.tools.length > 0) {
+        console.log(chalk.cyan(`[OpenRouterAdapter] ========== TOOLS SENT TO API ==========`));
+        console.log(chalk.cyan(`[OpenRouterAdapter] Number of tools: ${apiRequest.tools.length}`));
+        
+        // Calculate approximate request size
+        const requestSize = JSON.stringify(apiRequest).length;
+        console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  Approximate request size: ${(requestSize / 1024).toFixed(2)} KB`));
+        if (requestSize > 100000) {
+          console.log(chalk.red(`[OpenRouterAdapter] ⚠️  Request size is large (>100KB), this might cause issues`));
+        }
+        
+        apiRequest.tools.forEach((tool: any, idx: number) => {
+          const toolName = tool.function?.name || tool.name || 'unknown';
+          console.log(chalk.cyan(`[OpenRouterAdapter]   ${idx + 1}. ${toolName}`));
+          if (tool.function?.description) {
+            console.log(chalk.gray(`[OpenRouterAdapter]      Description: ${tool.function.description.substring(0, 80)}...`));
+          }
+        });
+        console.log(chalk.cyan(`[OpenRouterAdapter] ======================================`));
+      } else {
+        console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  No tools provided in API request`));
+      }
+
       try {
+        lastRequestSnapshot = JSON.stringify(apiRequest, null, 2);
+        console.log(chalk.gray(`[OpenRouterAdapter] Request payload size: ${(lastRequestSnapshot.length / 1024).toFixed(2)} KB`));
+        const payloadPreviewLimit = 4000;
+        const payloadPreview =
+          lastRequestSnapshot.length > payloadPreviewLimit
+            ? `${lastRequestSnapshot.substring(0, payloadPreviewLimit)}... [truncated]`
+            : lastRequestSnapshot;
+        console.log(chalk.gray(`[OpenRouterAdapter] Request payload preview:\n${payloadPreview}`));
+
         const response = await this.client.chat.completions.create(apiRequest);
+        const fullResponseString = JSON.stringify(response, null, 2);
 
         const message = response.choices[0]?.message;
         if (!message) {
@@ -213,17 +248,26 @@ export class OpenRouterAdapter implements AgentAdapter {
         }
 
         // Log the full response for debugging
+        console.log(chalk.cyan(`[OpenRouterAdapter] ========== API RESPONSE ==========`));
         console.log(chalk.gray(`[OpenRouterAdapter] Response finish_reason: ${response.choices[0]?.finish_reason}`));
         console.log(chalk.gray(`[OpenRouterAdapter] Message content: ${message.content ? `${message.content.length} chars` : 'null/empty'}`));
         if (message.content) {
-          console.log(chalk.gray(`[OpenRouterAdapter] Full content:\n${message.content}`));
+          console.log(chalk.gray(`[OpenRouterAdapter] Content preview: ${message.content.substring(0, 200)}${message.content.length > 200 ? '...' : ''}`));
         } else {
           console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  Agent returned empty content with finish_reason=${response.choices[0]?.finish_reason}`));
         }
         console.log(chalk.gray(`[OpenRouterAdapter] Tool calls present: ${!!message.tool_calls}`));
         if (message.tool_calls) {
-          console.log(chalk.gray(`[OpenRouterAdapter] Number of tool calls: ${message.tool_calls.length}`));
+          console.log(chalk.green(`[OpenRouterAdapter] ✓ Agent requested ${message.tool_calls.length} tool call(s):`));
+          message.tool_calls.forEach((tc: any, idx: number) => {
+            console.log(chalk.green(`[OpenRouterAdapter]   ${idx + 1}. ${tc.function?.name || 'unknown'}`));
+            console.log(chalk.gray(`[OpenRouterAdapter]      Arguments: ${tc.function?.arguments || 'none'}`));
+          });
+        } else {
+          console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  No tool calls in response`));
         }
+        console.log(chalk.cyan(`[OpenRouterAdapter] ====================================`));
+        console.log(chalk.gray(`[OpenRouterAdapter] Full response payload:\n${fullResponseString}`));
 
         totalInputTokens += response.usage?.prompt_tokens || 0;
         totalOutputTokens += response.usage?.completion_tokens || 0;
@@ -286,18 +330,61 @@ export class OpenRouterAdapter implements AgentAdapter {
         const toolResults = await this.executeTools(toolCalls, request.toolHandlers);
         console.log(chalk.green(`[OpenRouterAdapter] ✓ All tools executed`));
 
+        // Log tool results for debugging
+        console.log(chalk.cyan(`[OpenRouterAdapter] Tool results:`));
+        toolResults.forEach((result, idx) => {
+          const contentLength = result.content?.length || 0;
+          const contentPreview = result.content?.substring(0, 200) || 'null';
+          console.log(chalk.gray(`  ${idx + 1}. tool_call_id: ${result.tool_call_id}, content length: ${contentLength}`));
+          console.log(chalk.gray(`     Preview: ${contentPreview}${contentLength > 200 ? '...' : ''}`));
+          // Check if content is valid JSON
+          if (result.content) {
+            try {
+              JSON.parse(result.content);
+              console.log(chalk.gray(`     ✓ Content is valid JSON`));
+            } catch (e) {
+              console.log(chalk.gray(`     ⚠️  Content is not valid JSON (might be intentional)`));
+            }
+          }
+        });
+
         // Update request for next turn
+        // Log tool_calls structure for debugging
+        if (toolCalls.length > 0) {
+          console.log(chalk.gray(`[OpenRouterAdapter] Tool calls structure check:`));
+          console.log(chalk.gray(`  Number of tool calls: ${toolCalls.length}`));
+          const firstToolCall = toolCalls[0];
+          console.log(chalk.gray(`  First tool call keys: ${Object.keys(firstToolCall || {}).join(', ')}`));
+          if (firstToolCall?.function) {
+            console.log(chalk.gray(`  Function keys: ${Object.keys(firstToolCall.function || {}).join(', ')}`));
+          }
+        }
+        
         const assistantMessage = { 
-          role: 'assistant', 
+          role: 'assistant' as const, 
           content: message.content || null, 
           tool_calls: toolCalls 
         };
         
         const toolMessages = toolResults.map((result) => ({
-          role: 'tool',
+          role: 'tool' as const,
           tool_call_id: result.tool_call_id,
           content: result.content
         }));
+        
+        // Log the messages being added
+        console.log(chalk.gray(`[OpenRouterAdapter] Adding to conversation:`));
+        console.log(chalk.gray(`  Assistant message: content=${assistantMessage.content?.length || 0} chars, tool_calls=${assistantMessage.tool_calls?.length || 0}`));
+        console.log(chalk.gray(`  Tool messages: ${toolMessages.length}`));
+        
+        // Log tool message sizes
+        toolMessages.forEach((msg, idx) => {
+          const contentSize = msg.content?.length || 0;
+          console.log(chalk.gray(`    Tool message ${idx + 1}: ${contentSize} chars (${(contentSize / 1024).toFixed(2)} KB)`));
+          if (contentSize > 100000) {
+            console.log(chalk.yellow(`      ⚠️  Large tool result detected!`));
+          }
+        });
         
         apiRequest.messages = [
           ...apiRequest.messages,
@@ -305,13 +392,84 @@ export class OpenRouterAdapter implements AgentAdapter {
           ...toolMessages
         ];
         
-        // Ensure tools are included in every request (use transformed tools)
-        if (transformedTools && transformedTools.length > 0) {
-          apiRequest.tools = transformedTools;
-          apiRequest.tool_choice = "auto";
+        // Log total request size after adding messages
+        const requestSizeAfter = JSON.stringify(apiRequest).length;
+        console.log(chalk.gray(`[OpenRouterAdapter] Request size after adding messages: ${(requestSizeAfter / 1024).toFixed(2)} KB`));
+        if (requestSizeAfter > 100000) {
+          console.log(chalk.yellow(`[OpenRouterAdapter] ⚠️  Request is large (${(requestSizeAfter / 1024).toFixed(2)} KB), this might cause issues`));
         }
         
-      } catch (error) {
+        // Include tool definitions only on the first turn to reduce payload size
+        if (transformedTools && transformedTools.length > 0) {
+          if (turn === 0) {
+            apiRequest.tools = transformedTools;
+            apiRequest.tool_choice = "auto";
+          } else if (turn === 1) {
+            delete apiRequest.tools;
+            delete apiRequest.tool_choice;
+            console.log(chalk.gray(`[OpenRouterAdapter] Tools removed from subsequent requests to avoid repeated payload`));
+          }
+        }
+        
+      } catch (error: any) {
+        // Log detailed error information
+        console.error(chalk.red(`[OpenRouterAdapter] ❌ API Error occurred:`));
+        console.error(chalk.red(`  Error type: ${error?.constructor?.name || 'Unknown'}`));
+        console.error(chalk.red(`  Error message: ${error?.message || String(error)}`));
+        
+        // Log API error details if available (OpenAI SDK structure)
+        if (error?.status) {
+          console.error(chalk.red(`  API Status: ${error.status}`));
+        }
+        if (error?.error) {
+          console.error(chalk.red(`  API Error Object: ${JSON.stringify(error.error, null, 2).substring(0, 1000)}`));
+        }
+        if (error?.response) {
+          console.error(chalk.red(`  API Status: ${error.response.status}`));
+          console.error(chalk.red(`  API Status Text: ${error.response.statusText}`));
+          try {
+            const errorBody = await error.response.text();
+            console.error(chalk.red(`  API Error Body: ${errorBody.substring(0, 1000)}`));
+          } catch (e) {
+            console.error(chalk.red(`  Could not read error body`));
+          }
+        }
+        if (lastRequestSnapshot) {
+          const snapshotLimit = 8000;
+          const requestPreview =
+            lastRequestSnapshot.length > snapshotLimit
+              ? `${lastRequestSnapshot.substring(0, snapshotLimit)}... [truncated]`
+              : lastRequestSnapshot;
+          console.error(chalk.yellow(`[OpenRouterAdapter] Request payload snapshot:\n${requestPreview}`));
+        }
+        if ((error as any)?.responseBody) {
+          console.error(chalk.red(`[OpenRouterAdapter] Response body:\n${(error as any).responseBody}`));
+        }
+        // Log all error properties for debugging
+        if (error && typeof error === 'object') {
+          console.error(chalk.yellow(`  Error properties: ${Object.keys(error).join(', ')}`));
+          if (error.status) console.error(chalk.yellow(`  error.status: ${error.status}`));
+          if (error.code) console.error(chalk.yellow(`  error.code: ${error.code}`));
+          if (error.type) console.error(chalk.yellow(`  error.type: ${error.type}`));
+        }
+        
+        // Log request details for debugging
+        if (apiRequest.messages) {
+          const lastMessages = apiRequest.messages.slice(-3);
+          console.error(chalk.yellow(`  Last ${lastMessages.length} messages in request:`));
+          lastMessages.forEach((msg: any, idx: number) => {
+            const role = msg.role;
+            const contentLength = msg.content ? msg.content.length : (msg.tool_calls ? `[${msg.tool_calls.length} tool calls]` : 0);
+            console.error(chalk.yellow(`    ${idx + 1}. ${role} - ${contentLength} chars`));
+            if (msg.content && msg.content.length > 500) {
+              console.error(chalk.yellow(`       Content too large: ${msg.content.length} chars (first 200: ${msg.content.substring(0, 200)}...)`));
+            }
+            if (msg.tool_calls) {
+              console.error(chalk.yellow(`       Tool calls: ${msg.tool_calls.length}`));
+            }
+          });
+        }
+        
         if (error instanceof Error) {
           // Handle specific OpenRouter errors
           if (error.message.includes('No allowed providers are available')) {
@@ -326,6 +484,13 @@ export class OpenRouterAdapter implements AgentAdapter {
           } else if (error.message.includes('rate limit')) {
             console.error('🚨 Rate limit exceeded!');
             console.error('💡 Wait a moment and try again');
+          } else if (error.message.includes('500')) {
+            console.error('🚨 OpenRouter API returned 500 error!');
+            console.error('💡 This might be due to:');
+            console.error('   - Request payload too large');
+            console.error('   - Tool result content too large');
+            console.error('   - Malformed request');
+            console.error('   - Temporary OpenRouter API issue');
           }
         }
         
@@ -378,22 +543,26 @@ export class OpenRouterAdapter implements AgentAdapter {
       // or still in Anthropic format (have .input_schema property)
       const firstTool = request.tools[0] as any;
       const alreadyTransformed = firstTool.type === 'function' && firstTool.function;
+      const simplifyTool = (tool: any) => ({
+        type: 'function',
+        function: {
+          name: (tool.function?.name ?? tool.name) || 'unnamed_tool',
+          description: tool.function?.description ?? tool.description ?? 'No description provided',
+          parameters: {
+            type: 'object',
+            properties: {}
+          }
+        }
+      });
 
       if (alreadyTransformed) {
-        // Tools already in OpenRouter format, use as-is
-        params.tools = request.tools;
-        console.log(chalk.gray(`[OpenRouterAdapter] Tools already in OpenRouter format`));
+        // Tools already in OpenRouter format, but strip schemas to reduce payload size
+        params.tools = request.tools.map((tool: any) => simplifyTool(tool));
+        console.log(chalk.gray(`[OpenRouterAdapter] Tools already in OpenRouter format (schemas stripped)`));
       } else {
         // Transform tools from Anthropic format (input_schema) to OpenAI format (function.parameters)
-        params.tools = request.tools.map((tool: any) => ({
-          type: 'function',
-          function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.input_schema || tool.parameters
-          }
-        }));
-        console.log(chalk.gray(`[OpenRouterAdapter] Transformed tools from Anthropic to OpenRouter format`));
+        params.tools = request.tools.map((tool: any) => simplifyTool(tool));
+        console.log(chalk.gray(`[OpenRouterAdapter] Transformed tools from Anthropic to OpenRouter format (schemas stripped)`));
       }
       params.tool_choice = "auto";
     }
@@ -415,7 +584,10 @@ export class OpenRouterAdapter implements AgentAdapter {
       if (handler) {
         console.log(chalk.blue(`[OpenRouterAdapter] Executing tool: ${toolName}`));
         try {
-          const input = JSON.parse(toolCall.function.arguments || '{}');
+          const rawArguments = toolCall.function.arguments || '{}';
+          console.log(chalk.cyan(`[OpenRouterAdapter] Tool arguments (raw): ${rawArguments}`));
+          const input = JSON.parse(rawArguments);
+          console.log(chalk.cyan(`[OpenRouterAdapter] Tool arguments (parsed): ${JSON.stringify(input, null, 2)}`));
           resultContent = await handler(input);
           console.log(chalk.green(`[OpenRouterAdapter] ✓ ${toolName} completed`));
         } catch (error) {

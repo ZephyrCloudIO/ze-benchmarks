@@ -132,7 +132,13 @@ function resolveTemplatePath(templatePath: string, baseDir: string): string {
 
   // Scoped package reference
   if (templatePath.startsWith('@')) {
-    return join(baseDir, 'personas', `${templatePath}.json5`);
+    // Try .jsonc first, then .json5
+    const jsoncPath = join(baseDir, 'personas', `${templatePath}.jsonc`);
+    const json5Path = join(baseDir, 'personas', `${templatePath}.json5`);
+    if (existsSync(jsoncPath)) {
+      return jsoncPath;
+    }
+    return json5Path;
   }
 
   // Relative path
@@ -171,8 +177,8 @@ async function loadTemplateFile(filePath: string): Promise<any> {
       JSON5 = json5Module.default || json5Module;
     }
     
-    if (hasComments || hasTrailingCommas || filePath.endsWith('.json5')) {
-      // Use JSON5 for .json5 files or files with comments
+    if (hasComments || hasTrailingCommas || filePath.endsWith('.json5') || filePath.endsWith('.jsonc')) {
+      // Use JSON5 for .json5/.jsonc files or files with comments
       try {
         return JSON5.parse(content);
       } catch (json5Error) {

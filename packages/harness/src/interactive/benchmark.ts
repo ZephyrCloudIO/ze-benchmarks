@@ -1022,9 +1022,9 @@ async function getAvailableSpecialists(): Promise<Array<{
     return specialists;
   }
 
-  // Read all JSON5 files in templates directory
+  // Read all JSON5/JSONC files in templates directory
   const files = readdirSync(templatesPath).filter(file =>
-    file.endsWith('.json5') && file.includes('specialist')
+    (file.endsWith('.json5') || file.endsWith('.jsonc')) && file.includes('specialist')
   );
 
   for (const file of files) {
@@ -1036,14 +1036,14 @@ async function getAvailableSpecialists(): Promise<Array<{
 
       // Extract specialist info from template
       // Use template.name if available, otherwise extract from filename
-      // Filename format: "nextjs-specialist-template.json5" -> "nextjs-specialist"
+      // Filename format: "nextjs-specialist-template.json5" or ".jsonc" -> "nextjs-specialist"
       let name = template.name;
       if (!name) {
-        // Remove "-template.json5" suffix if present
-        name = file.replace(/-specialist-template\.json5$/, '-specialist');
+        // Remove "-template.json5" or "-template.jsonc" suffix if present
+        name = file.replace(/-specialist-template\.(json5|jsonc)$/, '-specialist');
         // If still doesn't end with "-specialist", add it
         if (!name.endsWith('-specialist')) {
-          name = name.replace(/-template\.json5$/, '') + '-specialist';
+          name = name.replace(/-template\.(json5|jsonc)$/, '') + '-specialist';
         }
       }
       const displayName = template.displayName || name;
