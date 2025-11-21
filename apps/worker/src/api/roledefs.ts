@@ -198,7 +198,7 @@ export async function createRoleDef(request: IRequest, ...[env]: CF) {
 
     // Generate ID
     const id = `roledef_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const now = Date.now();
+    const now = new Date();
 
     // Prepare RoleDef data
     const roleDefData = {
@@ -264,7 +264,7 @@ export async function updateRoleDef(request: IRequest, ...[env]: CF) {
       return errorResponse('RoleDef not found', 404);
     }
 
-    const now = Date.now();
+    const now = new Date();
 
     // Prepare update data
     const updateData: any = {
