@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { fetchRoleDefById, deleteRoleDef } from '../api';
+import { fetchRoleDefById, deleteRoleDef, updateRoleDef } from '../api';
 import { RoleDef } from '../types';
+import EditableField from '../components/EditableField';
+import EditableList from '../components/EditableList';
+import EnrichTab from '../components/EnrichTab';
 import '../styles/RoleDefDetail.css';
 
 export default function RoleDefDetail() {
@@ -10,7 +13,9 @@ export default function RoleDefDetail() {
   const [roleDef, setRoleDef] = useState<RoleDef | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'persona' | 'capabilities' | 'criteria' | 'json'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'persona' | 'capabilities' | 'criteria' | 'enrich' | 'json'>('overview');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -39,6 +44,87 @@ export default function RoleDefDetail() {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete RoleDef');
     }
+  }
+
+  async function handleSave() {
+    if (!roleDef) return;
+
+    setIsSaving(true);
+    try {
+      await updateRoleDef(id!, roleDef);
+      await loadRoleDef();
+      setIsEditing(false);
+      alert('RoleDef saved successfully!');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save RoleDef');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleEnrich(enrichedData: any) {
+    if (!roleDef) return;
+
+    // Merge enriched data with existing roleDef
+    const updated = { ...roleDef };
+
+    // Update persona if provided
+    if (enrichedData.persona) {
+      const currentPersona = JSON.parse(updated.persona);
+      updated.persona = JSON.stringify({ ...currentPersona, ...enrichedData.persona });
+    }
+
+    // Update capabilities if provided
+    if (enrichedData.capabilities) {
+      const currentCapabilities = JSON.parse(updated.capabilities);
+      updated.capabilities = JSON.stringify({ ...currentCapabilities, ...enrichedData.capabilities });
+    }
+
+    // Update documentation if provided
+    if (enrichedData.documentation) {
+      const currentDocs = JSON.parse(updated.documentation);
+      updated.documentation = JSON.stringify([...currentDocs, ...enrichedData.documentation]);
+    }
+
+    // Update dependencies if provided
+    if (enrichedData.dependencies) {
+      const currentDeps = JSON.parse(updated.dependencies);
+      updated.dependencies = JSON.stringify({ ...currentDeps, ...enrichedData.dependencies });
+    }
+
+    setRoleDef(updated);
+    await updateRoleDef(id!, updated);
+    await loadRoleDef();
+  }
+
+  async function updateField(field: keyof RoleDef, value: any) {
+    if (!roleDef) return;
+    const updated = { ...roleDef, [field]: value };
+    setRoleDef(updated);
+
+    // Auto-save to server
+    try {
+      console.log('Saving field:', field, 'value:', value);
+      const result = await updateRoleDef(id!, updated);
+      console.log('Save result:', result);
+    } catch (err) {
+      console.error('Failed to save:', err);
+      alert('Failed to save changes: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }
+
+  async function updatePersonaField(field: string, value: any) {
+    if (!roleDef) return;
+    const persona = JSON.parse(roleDef.persona);
+    persona[field] = value;
+    await updateField('persona', JSON.stringify(persona));
+  }
+
+  async function updateCapabilitiesField(field: string, value: any) {
+    if (!roleDef) return;
+    const capabilities = JSON.parse(roleDef.capabilities);
+    capabilities[field] = value;
+    await updateField('capabilities', JSON.stringify(capabilities));
   }
 
   function downloadJSON() {
@@ -93,12 +179,31 @@ export default function RoleDefDetail() {
         </div>
         <p className="detail-subtitle">{persona.purpose}</p>
         <div className="detail-actions">
-          <button onClick={downloadJSON} className="btn btn-secondary">
-            Download JSON
-          </button>
-          <button onClick={handleDelete} className="btn btn-danger">
-            Delete
-          </button>
+          {isEditing ? (
+            <>
+              <button onClick={handleSave} disabled={isSaving} className="btn btn-primary">
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button onClick={() => {
+                setIsEditing(false);
+                loadRoleDef();
+              }} className="btn btn-secondary">
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setIsEditing(true)} className="btn btn-primary">
+                Edit
+              </button>
+              <button onClick={downloadJSON} className="btn btn-secondary">
+                Download JSON
+              </button>
+              <button onClick={handleDelete} className="btn btn-danger">
+                Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -128,6 +233,12 @@ export default function RoleDefDetail() {
           Evaluation Criteria
         </button>
         <button
+          className={`tab ${activeTab === 'enrich' ? 'active' : ''}`}
+          onClick={() => setActiveTab('enrich')}
+        >
+          Enrich
+        </button>
+        <button
           className={`tab ${activeTab === 'json' ? 'active' : ''}`}
           onClick={() => setActiveTab('json')}
         >
@@ -140,20 +251,39 @@ export default function RoleDefDetail() {
           <div className="detail-section">
             <div className="info-grid">
               <div className="info-item">
-                <label>Name</label>
-                <div>{roleDef.name}</div>
+                <EditableField
+                  label="Name"
+                  value={roleDef.name}
+                  onSave={(v) => updateField('name', v)}
+                />
               </div>
               <div className="info-item">
-                <label>Version</label>
-                <div>{roleDef.version}</div>
+                <EditableField
+                  label="Display Name"
+                  value={roleDef.displayName}
+                  onSave={(v) => updateField('displayName', v)}
+                />
               </div>
               <div className="info-item">
-                <label>License</label>
-                <div>{roleDef.license}</div>
+                <EditableField
+                  label="Version"
+                  value={roleDef.version}
+                  onSave={(v) => updateField('version', v)}
+                />
               </div>
               <div className="info-item">
-                <label>Availability</label>
-                <div>{roleDef.availability}</div>
+                <EditableField
+                  label="License"
+                  value={roleDef.license}
+                  onSave={(v) => updateField('license', v)}
+                />
+              </div>
+              <div className="info-item">
+                <EditableField
+                  label="Availability"
+                  value={roleDef.availability}
+                  onSave={(v) => updateField('availability', v)}
+                />
               </div>
               <div className="info-item">
                 <label>Created</label>
@@ -170,7 +300,24 @@ export default function RoleDefDetail() {
               <div className="list">
                 {maintainers.map((m: any, i: number) => (
                   <div key={i} className="list-item">
-                    <strong>{m.name}</strong> - {m.email}
+                    <EditableField
+                      label="Name"
+                      value={m.name}
+                      onSave={(v) => {
+                        const updated = [...maintainers];
+                        updated[i].name = v;
+                        updateField('maintainers', JSON.stringify(updated));
+                      }}
+                    />
+                    <EditableField
+                      label="Email"
+                      value={m.email}
+                      onSave={(v) => {
+                        const updated = [...maintainers];
+                        updated[i].email = v;
+                        updateField('maintainers', JSON.stringify(updated));
+                      }}
+                    />
                   </div>
                 ))}
               </div>
@@ -205,57 +352,49 @@ export default function RoleDefDetail() {
         {activeTab === 'persona' && (
           <div className="detail-section">
             <div className="subsection">
-              <h3>Purpose</h3>
-              <p>{persona.purpose}</p>
+              <EditableField
+                label="Purpose"
+                value={persona.purpose}
+                multiline
+                onSave={(v) => updatePersonaField('purpose', v)}
+              />
             </div>
 
-            {persona.values && persona.values.length > 0 && (
-              <div className="subsection">
-                <h3>Values</h3>
-                <ul className="list">
-                  {persona.values.map((v: string, i: number) => (
-                    <li key={i}>{v}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="subsection">
+              <EditableList
+                label="Values"
+                items={persona.values || []}
+                onUpdate={(items) => updatePersonaField('values', items)}
+              />
+            </div>
 
-            {persona.attributes && persona.attributes.length > 0 && (
-              <div className="subsection">
-                <h3>Attributes</h3>
-                <ul className="list">
-                  {persona.attributes.map((a: string, i: number) => (
-                    <li key={i}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="subsection">
+              <EditableList
+                label="Attributes"
+                items={persona.attributes || []}
+                onUpdate={(items) => updatePersonaField('attributes', items)}
+              />
+            </div>
 
-            {persona.tech_stack && persona.tech_stack.length > 0 && (
-              <div className="subsection">
-                <h3>Tech Stack</h3>
-                <div className="tags">
-                  {persona.tech_stack.map((t: string, i: number) => (
-                    <span key={i} className="tag">{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="subsection">
+              <EditableList
+                label="Tech Stack"
+                items={persona.tech_stack || []}
+                onUpdate={(items) => updatePersonaField('tech_stack', items)}
+              />
+            </div>
           </div>
         )}
 
         {activeTab === 'capabilities' && (
           <div className="detail-section">
-            {capabilities.tags && capabilities.tags.length > 0 && (
-              <div className="subsection">
-                <h3>Tags</h3>
-                <div className="tags">
-                  {capabilities.tags.map((t: string, i: number) => (
-                    <span key={i} className="tag">{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="subsection">
+              <EditableList
+                label="Tags"
+                items={capabilities.tags || []}
+                onUpdate={(items) => updateCapabilitiesField('tags', items)}
+              />
+            </div>
 
             {capabilities.descriptions && Object.keys(capabilities.descriptions).length > 0 && (
               <div className="subsection">
@@ -264,23 +403,28 @@ export default function RoleDefDetail() {
                   {Object.entries(capabilities.descriptions).map(([key, value]: [string, any], i: number) => (
                     <div key={i} className="list-item">
                       <strong>{key}</strong>
-                      <p>{value}</p>
+                      <EditableField
+                        value={value}
+                        multiline
+                        onSave={(v) => {
+                          const updated = { ...capabilities.descriptions };
+                          updated[key] = v;
+                          updateCapabilitiesField('descriptions', updated);
+                        }}
+                      />
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {capabilities.considerations && capabilities.considerations.length > 0 && (
-              <div className="subsection">
-                <h3>Considerations</h3>
-                <ul className="list">
-                  {capabilities.considerations.map((c: string, i: number) => (
-                    <li key={i}>{c}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="subsection">
+              <EditableList
+                label="Considerations"
+                items={capabilities.considerations || []}
+                onUpdate={(items) => updateCapabilitiesField('considerations', items)}
+              />
+            </div>
 
             <div className="subsection">
               <h3>Dependencies</h3>
@@ -291,21 +435,29 @@ export default function RoleDefDetail() {
                 </div>
                 {dependencies.subscription?.purpose && (
                   <div className="info-item">
-                    <label>Purpose</label>
-                    <div>{dependencies.subscription.purpose}</div>
+                    <EditableField
+                      label="Purpose"
+                      value={dependencies.subscription.purpose}
+                      onSave={(v) => {
+                        const deps = JSON.parse(roleDef.dependencies);
+                        deps.subscription.purpose = v;
+                        updateField('dependencies', JSON.stringify(deps));
+                      }}
+                    />
                   </div>
                 )}
               </div>
-              {dependencies.available_tools && dependencies.available_tools.length > 0 && (
-                <div>
-                  <label>Available Tools</label>
-                  <div className="tags">
-                    {dependencies.available_tools.map((t: string, i: number) => (
-                      <span key={i} className="tag">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="subsection">
+                <EditableList
+                  label="Available Tools"
+                  items={dependencies.available_tools || []}
+                  onUpdate={(items) => {
+                    const deps = JSON.parse(roleDef.dependencies);
+                    deps.available_tools = items;
+                    updateField('dependencies', JSON.stringify(deps));
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -332,6 +484,10 @@ export default function RoleDefDetail() {
               <p>No evaluation criteria defined</p>
             )}
           </div>
+        )}
+
+        {activeTab === 'enrich' && (
+          <EnrichTab onEnrich={handleEnrich} />
         )}
 
         {activeTab === 'json' && (

@@ -253,6 +253,9 @@ export async function updateRoleDef(request: IRequest, ...[env]: CF) {
     const body = await request.json();
     const db = drizzle(env.DB);
 
+    console.log('Updating RoleDef:', roleDefId);
+    console.log('Body keys:', Object.keys(body));
+
     // Check if RoleDef exists
     const existing = await db
       .select()
@@ -266,26 +269,36 @@ export async function updateRoleDef(request: IRequest, ...[env]: CF) {
 
     const now = new Date();
 
-    // Prepare update data
+    // Prepare update data - check for undefined, not just falsy values
     const updateData: any = {
       updatedAt: now,
     };
 
-    if (body.displayName) updateData.displayName = body.displayName;
-    if (body.version) updateData.version = body.version;
-    if (body.license) updateData.license = body.license;
-    if (body.availability) updateData.availability = body.availability;
-    if (body.maintainers) updateData.maintainers = JSON.stringify(body.maintainers);
-    if (body.persona) updateData.persona = JSON.stringify(body.persona);
-    if (body.capabilities) updateData.capabilities = JSON.stringify(body.capabilities);
-    if (body.dependencies) updateData.dependencies = JSON.stringify(body.dependencies);
-    if (body.documentation) updateData.documentation = JSON.stringify(body.documentation);
-    if (body.preferredModels) updateData.preferredModels = JSON.stringify(body.preferredModels);
-    if (body.prompts) updateData.prompts = JSON.stringify(body.prompts);
-    if (body.spawnableSubAgents) updateData.spawnableSubAgents = JSON.stringify(body.spawnableSubAgents);
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.displayName !== undefined) updateData.displayName = body.displayName;
+    if (body.version !== undefined) updateData.version = body.version;
+    if (body.license !== undefined) updateData.license = body.license;
+    if (body.availability !== undefined) updateData.availability = body.availability;
+    if (body.maintainers !== undefined) updateData.maintainers = typeof body.maintainers === 'string' ? body.maintainers : JSON.stringify(body.maintainers);
+    if (body.persona !== undefined) updateData.persona = typeof body.persona === 'string' ? body.persona : JSON.stringify(body.persona);
+    if (body.capabilities !== undefined) updateData.capabilities = typeof body.capabilities === 'string' ? body.capabilities : JSON.stringify(body.capabilities);
+    if (body.dependencies !== undefined) updateData.dependencies = typeof body.dependencies === 'string' ? body.dependencies : JSON.stringify(body.dependencies);
+    if (body.documentation !== undefined) updateData.documentation = typeof body.documentation === 'string' ? body.documentation : JSON.stringify(body.documentation);
+    if (body.preferredModels !== undefined) updateData.preferredModels = typeof body.preferredModels === 'string' ? body.preferredModels : JSON.stringify(body.preferredModels);
+    if (body.prompts !== undefined) updateData.prompts = typeof body.prompts === 'string' ? body.prompts : JSON.stringify(body.prompts);
+    if (body.spawnableSubAgents !== undefined) updateData.spawnableSubAgents = typeof body.spawnableSubAgents === 'string' ? body.spawnableSubAgents : JSON.stringify(body.spawnableSubAgents);
+
+    console.log('Update data keys:', Object.keys(updateData));
+    console.log('Sample update data:', {
+      name: updateData.name,
+      displayName: updateData.displayName,
+      persona: typeof updateData.persona === 'string' ? updateData.persona.substring(0, 100) : updateData.persona
+    });
 
     // Update RoleDef
     await db.update(roleDefs).set(updateData).where(eq(roleDefs.id, roleDefId));
+
+    console.log('Update successful');
 
     return jsonResponse({ id: roleDefId, ...updateData });
   } catch (error) {
@@ -318,6 +331,266 @@ export async function deleteRoleDef(request: IRequest, ...[env]: CF) {
   } catch (error) {
     console.error('Error deleting roledef:', error);
     return errorResponse('Failed to delete roledef', 500);
+  }
+}
+
+// Enrich RoleDef from document upload
+export async function enrichFromDocument(request: IRequest, ...[env]: CF) {
+  try {
+    if (!env.OPENROUTER_API_KEY) {
+      return errorResponse('OpenRouter API key not configured', 500);
+    }
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+
+    if (!file) {
+      return errorResponse('No file provided', 400);
+    }
+
+    // Read file content
+    const fileContent = await file.text();
+
+    const systemPrompt = `You are an AI assistant that analyzes documents (resumes, job descriptions, etc.) and extracts relevant information for creating AI agent role definitions.
+
+Analyze the document and extract:
+- Relevant skills and technologies (for tech_stack and tags)
+- Key attributes and qualities (for attributes)
+- Core values or principles (for values)
+- Capabilities and expertise areas (for capabilities)
+- Best practices and considerations
+
+Return a JSON object with this structure:
+{
+  "persona": {
+    "values": ["array of core values/principles found"],
+    "attributes": ["array of key attributes/skills"],
+    "tech_stack": ["array of technologies, tools, frameworks mentioned"]
+  },
+  "capabilities": {
+    "tags": ["array of capability tags"],
+    "descriptions": {"tag1": "description", ...},
+    "considerations": ["array of best practices and guidelines"]
+  },
+  "documentation": [
+    {"description": "description", "url": "relevant URL if mentioned"}
+  ]
+}
+
+Only include information that is clearly mentioned or strongly implied in the document.`;
+
+    const userPrompt = `Document content:\n\n${fileContent}\n\nExtract relevant information for an AI agent role definition.`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.5,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('OpenRouter API error:', await response.text());
+      return errorResponse('Failed to process document', response.status);
+    }
+
+    const data = await response.json() as any;
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return errorResponse('Invalid response from AI', 500);
+    }
+
+    let enrichedData;
+    try {
+      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      enrichedData = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', content);
+      return errorResponse('Failed to parse AI response', 500);
+    }
+
+    return jsonResponse(enrichedData);
+  } catch (error) {
+    console.error('Error enriching from document:', error);
+    return errorResponse('Failed to enrich from document', 500);
+  }
+}
+
+// Enrich RoleDef from URL
+export async function enrichFromUrl(request: IRequest, ...[env]: CF) {
+  try {
+    if (!env.OPENROUTER_API_KEY) {
+      return errorResponse('OpenRouter API key not configured', 500);
+    }
+
+    const body = await request.json();
+    const { url } = body;
+
+    if (!url) {
+      return errorResponse('No URL provided', 400);
+    }
+
+    // Fetch URL content
+    const urlResponse = await fetch(url);
+    if (!urlResponse.ok) {
+      return errorResponse('Failed to fetch URL', urlResponse.status);
+    }
+
+    const content = await urlResponse.text();
+
+    const systemPrompt = `You are an AI assistant that analyzes web pages and documentation to extract relevant information for creating AI agent role definitions.
+
+Analyze the content and extract:
+- Relevant technologies and frameworks (for tech_stack)
+- Key capabilities and features (for capabilities)
+- Best practices and guidelines (for considerations)
+- Documentation references
+
+Return a JSON object with this structure:
+{
+  "persona": {
+    "tech_stack": ["array of technologies mentioned"]
+  },
+  "capabilities": {
+    "tags": ["array of capability tags"],
+    "descriptions": {"tag1": "description", ...},
+    "considerations": ["array of best practices"]
+  },
+  "documentation": [
+    {"description": "description", "url": "${url}"}
+  ]
+}`;
+
+    const userPrompt = `Web page content:\n\n${content.substring(0, 10000)}\n\nExtract relevant information for an AI agent role definition.`;
+
+    const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.5,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      console.error('OpenRouter API error:', await aiResponse.text());
+      return errorResponse('Failed to process URL', aiResponse.status);
+    }
+
+    const data = await aiResponse.json() as any;
+    const aiContent = data.choices?.[0]?.message?.content;
+
+    if (!aiContent) {
+      return errorResponse('Invalid response from AI', 500);
+    }
+
+    let enrichedData;
+    try {
+      const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      enrichedData = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiContent);
+      return errorResponse('Failed to parse AI response', 500);
+    }
+
+    return jsonResponse(enrichedData);
+  } catch (error) {
+    console.error('Error enriching from URL:', error);
+    return errorResponse('Failed to enrich from URL', 500);
+  }
+}
+
+// Enrich RoleDef from MCP configuration
+export async function enrichFromMcp(request: IRequest, ...[env]: CF) {
+  try {
+    if (!env.OPENROUTER_API_KEY) {
+      return errorResponse('OpenRouter API key not configured', 500);
+    }
+
+    const body = await request.json();
+    const { config } = body;
+
+    if (!config) {
+      return errorResponse('No MCP configuration provided', 400);
+    }
+
+    const systemPrompt = `You are an AI assistant that analyzes MCP (Model Context Protocol) configurations and extracts relevant information for AI agent role definitions.
+
+Analyze the MCP configuration and extract:
+- Tools and capabilities (for capabilities)
+- Technologies and dependencies (for dependencies)
+- Available tools list
+
+Return a JSON object with this structure:
+{
+  "capabilities": {
+    "tags": ["array of capability tags based on tools"],
+    "descriptions": {"tag1": "description of what this tool/capability does", ...}
+  },
+  "dependencies": {
+    "available_tools": ["array of tool names from MCP config"]
+  }
+}`;
+
+    const userPrompt = `MCP Configuration:\n\n${JSON.stringify(config, null, 2)}\n\nExtract relevant information for an AI agent role definition.`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.5,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('OpenRouter API error:', await response.text());
+      return errorResponse('Failed to process MCP configuration', response.status);
+    }
+
+    const data = await response.json() as any;
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return errorResponse('Invalid response from AI', 500);
+    }
+
+    let enrichedData;
+    try {
+      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      enrichedData = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', content);
+      return errorResponse('Failed to parse AI response', 500);
+    }
+
+    return jsonResponse(enrichedData);
+  } catch (error) {
+    console.error('Error enriching from MCP:', error);
+    return errorResponse('Failed to enrich from MCP configuration', 500);
   }
 }
 

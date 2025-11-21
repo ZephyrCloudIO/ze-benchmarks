@@ -35,6 +35,11 @@ router.post('/api/roledefs', authenticate, roledefsApi.createRoleDef);
 router.put('/api/roledefs/:roleDefId', authenticate, roledefsApi.updateRoleDef);
 router.delete('/api/roledefs/:roleDefId', authenticate, roledefsApi.deleteRoleDef);
 
+// RoleDef enrichment endpoints
+router.post('/api/roledefs/enrich/document', authenticate, roledefsApi.enrichFromDocument);
+router.post('/api/roledefs/enrich/url', authenticate, roledefsApi.enrichFromUrl);
+router.post('/api/roledefs/enrich/mcp', authenticate, roledefsApi.enrichFromMcp);
+
 // Protected write endpoints (requires authentication)
 router.post('/api/results', authenticate, submitApi.submitResults);
 router.post('/api/results/batch', authenticate, submitApi.submitBatchResults);
