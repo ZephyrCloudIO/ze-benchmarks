@@ -116,3 +116,7 @@ specialists/
 
 # Wrangler local development state
 .wrangler/
+
+# macOS system files
+.DS_Store
+**/.DS_Store
