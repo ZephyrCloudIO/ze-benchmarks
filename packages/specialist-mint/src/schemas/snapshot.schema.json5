@@ -212,11 +212,68 @@
               },
               "description": {
                 "type": "string",
-                "description": "Purpose of this MCP integration"
+              "description": "Purpose of this MCP integration"
               },
               "required": {
                 "type": "boolean",
                 "description": "Whether this MCP is required or optional"
+              },
+              "allowed_tools": {
+                "type": "array",
+                "description": "Optional whitelist of MCP tool names exposed to the agent (e.g., ['figma_get_me', 'figma_get_file'])",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "client_id": {
+                "type": "string",
+                "description": "OAuth client ID for HTTP/streamable MCP gateways (overrides default derived from name)"
+              },
+              "scope": {
+                "type": "string",
+                "description": "OAuth scopes to request (defaults to offline_access)"
+              },
+              "redirect_port": {
+                "type": "number",
+                "description": "Port to listen on for OAuth callback (defaults to 8123)"
+              },
+              "redirect_path": {
+                "type": "string",
+                "description": "Path to listen on for OAuth callback (defaults to /mcp/callback)"
+              },
+              "transport": {
+                "type": "string",
+                "enum": ["stdio", "http", "sse", "streamable-http"],
+                "description": "Transport to use when connecting to the MCP server (defaults to stdio; streamable-http enables HTTP+SSE gateway support)"
+              },
+              "url": {
+                "type": "string",
+                "description": "URL for HTTP/SSE or streamable MCP servers"
+              },
+              "headers": {
+                "type": "object",
+                "description": "Optional headers to include on HTTP-based MCP connections",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "command": {
+                "type": "string",
+                "description": "Override the command used to spawn stdio-based MCP servers (defaults to npx)"
+              },
+              "args": {
+                "type": "array",
+                "description": "Override arguments passed to the command for stdio-based MCP servers",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables to pass when spawning stdio-based MCP servers",
+                "additionalProperties": {
+                  "type": "string"
+                }
               }
             }
           }

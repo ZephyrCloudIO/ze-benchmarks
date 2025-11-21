@@ -110,7 +110,17 @@
       "git",
       "web_fetch"
     ],
-    "mcps": []
+    "mcps": [
+      {
+        "name": "MCP Gateway",
+        "version": "*",
+        "description": "Remote MCP gateway over Streamable HTTP",
+        "transport": "streamable-http",
+        "url": " https://mcp.atlassian.com/v1/mcp",
+        "scope": "offline_access",
+        "required": false
+      }
+    ]
   },
   "documentation": [
     {
@@ -267,4 +277,3 @@
   },
   "spawnable_sub_agent_specialists": []
 }
-

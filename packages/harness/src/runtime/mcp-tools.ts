@@ -1,10 +1,16 @@
 import chalk from 'chalk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
 import { z } from 'zod';
 import { createFigmaResponseSummary } from './figma-tools.js';
 import { logger } from '@ze/logger';
+import http from 'http';
+import { spawn } from 'child_process';
+import path from 'path';
+import os from 'os';
+import fs from 'fs/promises';
 
 const log = logger.mcpTools;
 
@@ -17,7 +23,12 @@ export interface MCPServerConfig {
 	args?: string[]; // Command arguments (e.g., ["-y", "@modelcontextprotocol/server-filesystem"])
 	env?: Record<string, string>; // Environment variables
 	url?: string; // For HTTP transport
-	transport?: 'stdio' | 'http' | 'sse';
+	headers?: Record<string, string>; // Optional headers for HTTP transports
+	transport?: 'stdio' | 'http' | 'sse' | 'streamable-http';
+	clientId?: string; // OAuth client ID (for HTTP MCP gateways)
+	scope?: string; // OAuth scope override
+	redirectPort?: number; // OAuth redirect port override
+	redirectPath?: string; // OAuth redirect path override
 	required?: boolean;
 	allowedTools?: string[];
 }
@@ -27,7 +38,7 @@ export interface MCPServerConfig {
  */
 class MCPClientWrapper {
 	private client: Client | null = null;
-	private transport: StdioClientTransport | null = null;
+	private transport: StdioClientTransport | StreamableHTTPClientTransport | null = null;
 	private initialized = false;
 
 	constructor(private config: MCPServerConfig) {}
@@ -42,29 +53,55 @@ class MCPClientWrapper {
 		}
 
 		try {
-			if (this.config.transport === 'http' || this.config.url) {
-				throw new Error('HTTP/SSE transport not yet implemented');
+			const transportType = this.config.transport || (this.config.url ? 'streamable-http' : 'stdio');
+			let authProvider: any = null;
+
+			if (transportType === 'streamable-http' || transportType === 'http' || transportType === 'sse') {
+				if (!this.config.url) {
+					throw new Error(`MCP server "${this.config.name}" requires a URL for HTTP transport`);
+				}
+
+				log.debug(chalk.blue(`[MCP] Connecting to MCP server via HTTP: ${this.config.name}`));
+				log.debug(chalk.gray(`[MCP] URL: ${this.config.url}`));
+
+				// Prepare OAuth-capable auth provider for gateways that require browser login
+				const { BrowserOAuthProvider, ensureOAuthFlow } = await import('./oauth-provider.js');
+				authProvider = new BrowserOAuthProvider(this.config.name, this.config.url, {
+					clientId: this.config.clientId,
+					scope: this.config.scope,
+					redirectPort: this.config.redirectPort,
+					redirectPath: this.config.redirectPath,
+				});
+
+				// Run an explicit pre-flight OAuth flow so we can log the auth URL and wait for a code
+				await ensureOAuthFlow(authProvider, this.config.url);
+
+				// Streamable HTTP transport (HTTP POST + SSE receive)
+				this.transport = new StreamableHTTPClientTransport(this.config.url, {
+					requestInit: this.config.headers ? { headers: this.config.headers } : undefined,
+					authProvider,
+				});
+			} else {
+				// Default: use stdio transport (most common for MCP servers)
+				if (!this.config.command) {
+					throw new Error(`MCP server "${this.config.name}" requires a command for stdio transport`);
+				}
+
+				const args = this.config.args || [];
+
+				log.debug(chalk.blue(`[MCP] Starting MCP server: ${this.config.name}`));
+				log.debug(chalk.gray(`[MCP] Command: ${this.config.command} ${args.join(' ')}`));
+
+				// Create stdio transport (it handles process spawning internally)
+				this.transport = new StdioClientTransport({
+					command: this.config.command,
+					args: args,
+					env: {
+						...process.env,
+						...(this.config.env || {})
+					} as Record<string, string>,
+				});
 			}
-
-			// Use stdio transport (most common for MCP servers)
-			if (!this.config.command) {
-				throw new Error(`MCP server "${this.config.name}" requires a command for stdio transport`);
-			}
-
-			const args = this.config.args || [];
-
-			log.debug(chalk.blue(`[MCP] Starting MCP server: ${this.config.name}`));
-			log.debug(chalk.gray(`[MCP] Command: ${this.config.command} ${args.join(' ')}`));
-
-			// Create stdio transport (it handles process spawning internally)
-			this.transport = new StdioClientTransport({
-				command: this.config.command,
-				args: args,
-				env: {
-					...process.env,
-					...(this.config.env || {})
-				} as Record<string, string>,
-			});
 
 			// Create client
 			this.client = new Client(
@@ -301,6 +338,16 @@ export function resolveMCPConfig(mcpDef: {
 	description?: string;
 	required?: boolean;
 	allowed_tools?: string[];
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	transport?: 'stdio' | 'http' | 'sse' | 'streamable-http';
+	url?: string;
+	headers?: Record<string, string>;
+	client_id?: string;
+	scope?: string;
+	redirect_port?: number;
+	redirect_path?: string;
 }): MCPServerConfig {
 	const name = mcpDef.name.toLowerCase();
 
@@ -344,17 +391,25 @@ export function resolveMCPConfig(mcpDef: {
 	};
 
 	const serverConfig = mcpServerMap[name];
+	const transport = mcpDef.transport || (mcpDef.url ? 'streamable-http' : 'stdio');
 
 	if (!serverConfig) {
 		// If not found in map, try to use the name as a command directly
 		// This allows custom MCP servers to be specified by their package name
 		return {
 			name: mcpDef.name,
-			command: 'npx',
-			args: ['-y', mcpDef.name],
-			transport: 'stdio',
+			command: mcpDef.command || 'npx',
+			args: mcpDef.args || ['-y', mcpDef.name],
+			url: mcpDef.url,
+			headers: mcpDef.headers,
+			transport,
+			clientId: mcpDef.client_id || process.env.MCP_CLIENT_ID,
+			scope: mcpDef.scope,
+			redirectPort: mcpDef.redirect_port,
+			redirectPath: mcpDef.redirect_path,
+			env: mcpDef.env,
 			required: mcpDef.required ?? false,
-		allowedTools: mcpDef.allowed_tools,
+			allowedTools: mcpDef.allowed_tools,
 		};
 	}
 
@@ -362,8 +417,17 @@ export function resolveMCPConfig(mcpDef: {
 		name: mcpDef.name,
 		command: serverConfig.command,
 		args: serverConfig.args,
-		env: serverConfig.env,
-		transport: 'stdio',
+		env: {
+			...serverConfig.env,
+			...mcpDef.env,
+		},
+		url: mcpDef.url,
+		headers: mcpDef.headers,
+		transport,
+		clientId: mcpDef.client_id || process.env.MCP_CLIENT_ID,
+		scope: mcpDef.scope,
+		redirectPort: mcpDef.redirect_port,
+		redirectPath: mcpDef.redirect_path,
 		required: mcpDef.required ?? false,
 		allowedTools: mcpDef.allowed_tools,
 	};
@@ -471,4 +535,3 @@ export async function cleanupMCPClients(clients: Map<string, MCPClientWrapper>):
 		}
 	}
 }
-

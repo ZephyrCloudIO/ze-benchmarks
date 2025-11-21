@@ -170,6 +170,14 @@ Specifies external services, tools, and Model Context Protocol servers required 
   - `permissions` (optional): Array of `"read"`, `"write"`, `"execute"`
   - `description` (optional): Purpose of this MCP integration
   - `required` (optional): Whether this MCP is mandatory or optional
+  - `transport` (optional): `"stdio"` (default), `"http"`, `"sse"`, or `"streamable-http"` for HTTP+SSE gateways
+  - `url` (optional): HTTP/SSE endpoint for MCP gateways (required when `transport` is HTTP-based)
+  - `headers` (optional): Key/value headers to send with HTTP MCP connections
+  - `client_id` (optional): OAuth client ID for HTTP/streamable MCP gateways (default derives from name)
+  - `scope` (optional): OAuth scopes (default `offline_access`)
+  - `redirect_port` / `redirect_path` (optional): Override the localhost callback for OAuth (defaults to `8123` and `/mcp/callback`)
+  - `allowed_tools` (optional): Whitelist MCP tools exposed to the agent
+  - `command` / `args` / `env` (optional): Overrides for spawning stdio MCP servers
 - **Usage**: Enables integration with external services and tools
 
 ---

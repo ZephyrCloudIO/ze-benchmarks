@@ -20,7 +20,7 @@ import type {
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
   private static log = logger.workerClient;
-  private client: WorkerClient;
+  private client: WorkerClient | null;
   private currentRun: {
     runId: string;
     batchId?: string;
@@ -31,9 +31,16 @@ export class BenchmarkLogger {
     model?: string;
     startedAt: string;
   } | null = null;
+  private readonly disabled: boolean;
 
   private constructor() {
-    this.client = getWorkerClient();
+    this.disabled = process.env.ZE_BENCHMARKS_DISABLE_WORKER === '1' || process.env.ZE_BENCHMARKS_OFFLINE === '1' || false;
+    if (this.disabled) {
+      BenchmarkLogger.log.warn('Worker logging disabled (ZE_BENCHMARKS_DISABLE_WORKER or ZE_BENCHMARKS_OFFLINE set)');
+      this.client = null;
+    } else {
+      this.client = getWorkerClient();
+    }
   }
 
   static getInstance(): BenchmarkLogger {
@@ -218,14 +225,18 @@ export class BenchmarkLogger {
       };
     }
 
-    try {
-      await this.client.submitRun(payload);
-      const evalCount = payload.evaluations?.length || 0;
-      BenchmarkLogger.log.info(`Run completed: ${payload.runId} with ${evalCount} evaluations`);
-    } catch (error) {
-      BenchmarkLogger.log.warn(`Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
-      // Continue without worker - result tracking is optional
-      // Note: If batch creation failed, startBatch() would have thrown, so batchId should always be valid
+    if (this.disabled || !this.client) {
+      BenchmarkLogger.log.info(`Run completed (worker logging disabled): ${payload.runId}`);
+    } else {
+      try {
+        await this.client.submitRun(payload);
+        const evalCount = payload.evaluations?.length || 0;
+        BenchmarkLogger.log.info(`Run completed: ${payload.runId} with ${evalCount} evaluations`);
+      } catch (error) {
+        BenchmarkLogger.log.warn(`Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
+        // Continue without worker - result tracking is optional
+        // Note: If batch creation failed, startBatch() would have thrown, so batchId should always be valid
+      }
     }
 
     // Clear current run
@@ -245,6 +256,10 @@ export class BenchmarkLogger {
     avgWeightedScore?: number;
     metadata?: Record<string, any>;
   }): Promise<void> {
+    if (this.disabled || !this.client) {
+      return;
+    }
+
     const payload: SubmitBatchPayload = {
       batchId: data.batchId,
       createdAt: data.createdAt,
@@ -269,6 +284,9 @@ export class BenchmarkLogger {
     agent?: string;
     limit?: number;
   }): Promise<BenchmarkRun[]> {
+    if (this.disabled || !this.client) {
+      return [];
+    }
     return this.client.listRuns(filters);
   }
 
@@ -276,6 +294,24 @@ export class BenchmarkLogger {
    * Get detailed run information
    */
   async getRunDetails(runId: string): Promise<DetailedRunStatistics> {
+    if (this.disabled || !this.client) {
+      return {
+        runId,
+        suite: '',
+        scenario: '',
+        tier: '',
+        agent: '',
+        status: 'completed',
+        startedAt: '',
+        completedAt: '',
+        totalScore: 0,
+        weightedScore: 0,
+        isSuccessful: false,
+        successMetric: 0,
+        evaluations: [],
+        telemetry: undefined as any,
+      };
+    }
     return this.client.getRunDetails(runId);
   }
 
@@ -283,6 +319,9 @@ export class BenchmarkLogger {
    * Get all batches
    */
   async getBatches(limit?: number): Promise<BatchRun[]> {
+    if (this.disabled || !this.client) {
+      return [];
+    }
     return this.client.listBatches({ limit });
   }
 
@@ -290,6 +329,19 @@ export class BenchmarkLogger {
    * Get detailed batch information
    */
   async getBatchDetails(batchId: string): Promise<BatchStatistics> {
+    if (this.disabled || !this.client) {
+      return {
+        batchId,
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        totalRuns: 0,
+        successfulRuns: 0,
+        avgScore: 0,
+        avgWeightedScore: 0,
+        metadata: {},
+        runs: [],
+      };
+    }
     return this.client.getBatchDetails(batchId);
   }
 
@@ -297,6 +349,14 @@ export class BenchmarkLogger {
    * Get global statistics
    */
   async getStats(): Promise<RunStatistics> {
+    if (this.disabled || !this.client) {
+      return {
+        totalRuns: 0,
+        successfulRuns: 0,
+        avgScore: 0,
+        avgWeightedScore: 0,
+      };
+    }
     return this.client.getGlobalStats();
   }
 
@@ -374,12 +434,21 @@ export class BenchmarkLogger {
     // Create the batch in the database immediately
     // If this fails, throw an error to prevent returning a batchId that doesn't exist
     // This ensures foreign key constraint is never violated because batches will always exist before runs reference them
-    await this.upsertBatch({
-      batchId,
-      createdAt: Date.now(),
-      totalRuns: 0,
-      successfulRuns: 0,
-    });
+    try {
+      await this.upsertBatch({
+        batchId,
+        createdAt: Date.now(),
+        totalRuns: 0,
+        successfulRuns: 0,
+      });
+    } catch (error) {
+      if (this.disabled) {
+        BenchmarkLogger.log.info(`Batch started (worker logging disabled): ${batchId}`);
+        return batchId;
+      }
+      BenchmarkLogger.log.warn(`Failed to start batch (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
+      // Allow continuing without worker logging
+    }
 
     BenchmarkLogger.log.info(`Batch started: ${batchId}`);
     return batchId;
