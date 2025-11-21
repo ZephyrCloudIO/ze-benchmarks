@@ -6,11 +6,6 @@ import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
 import { z } from 'zod';
 import { createFigmaResponseSummary } from './figma-tools.js';
 import { logger } from '@ze/logger';
-import http from 'http';
-import { spawn } from 'child_process';
-import path from 'path';
-import os from 'os';
-import fs from 'fs/promises';
 
 const log = logger.mcpTools;
 
@@ -214,6 +209,65 @@ function convertMCPToolToDefinition(mcpTool: any): ToolDefinition {
 }
 
 /**
+ * Summarize large tool outputs to keep LLM requests small.
+ */
+function summarizeLargeContent(toolName: string, contentString: string, limit: number): string {
+	log.debug(
+		chalk.yellow(
+			`[MCP] Summarizing large response from ${toolName} (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`,
+		),
+	);
+
+	// Try JSON summarization first
+	try {
+		const parsed = JSON.parse(contentString);
+		const summary: any = {
+			_summary: true,
+			_tool: toolName,
+			_originalSize: contentString.length,
+		};
+
+		if (Array.isArray(parsed)) {
+			summary.type = 'array';
+			summary.count = parsed.length;
+			summary.sample = parsed.slice(0, 3);
+		} else if (parsed && typeof parsed === 'object') {
+			summary.type = 'object';
+			const keys = Object.keys(parsed);
+			summary.keys = keys.slice(0, 20);
+			summary.sample = keys.slice(0, 5).reduce((acc: any, key: string) => {
+				const value = parsed[key];
+				if (Array.isArray(value)) {
+					acc[key] = { _type: 'array', count: value.length, sample: value.slice(0, 2) };
+				} else if (value && typeof value === 'object') {
+					acc[key] = { _type: 'object', keys: Object.keys(value).slice(0, 10) };
+				} else {
+					acc[key] = value;
+				}
+				return acc;
+			}, {});
+		} else {
+			summary.type = typeof parsed;
+			summary.value = parsed;
+		}
+
+		summary._note = `Response summarized for ${toolName}; original size ${contentString.length} chars.`;
+		const serialized = JSON.stringify(summary, null, 2);
+		if (serialized.length <= limit) {
+			return serialized;
+		}
+		return serialized.substring(0, limit) + `\n\n... [Summary truncated to ${limit} chars]`;
+	} catch {
+		// Fallback: plain truncation with note
+		const truncated = contentString.substring(0, limit);
+		return (
+			truncated +
+			`\n\n... [Response truncated for ${toolName}: original size ${contentString.length} characters. Showing first ${limit} characters.]`
+		);
+	}
+}
+
+/**
  * Create tool handler for an MCP tool
  */
 function createMCPToolHandler(
@@ -250,6 +304,7 @@ function createMCPToolHandler(
 			// Always create summaries for Figma file responses to reduce token usage and prevent API errors
 			// OpenRouter and most APIs have limits on message size
 			const MAX_RESPONSE_SIZE = 500000; // ~500KB to leave room for conversation context
+			const SAFE_SUMMARY_LIMIT = 1000; // Keep OpenRouter payloads very small (~1 KB)
 			
 			// For figma_get_file, always create a summary (even if response is small)
 			if (toolName === 'figma_get_file') {
@@ -264,6 +319,11 @@ function createMCPToolHandler(
 				} catch (e) {
 					log.debug(chalk.yellow(`[MCP] ⚠️  Could not parse figma_get_file response as JSON, returning as-is`));
 				}
+			}
+
+			// For other responses, summarize if they'll bloat the LLM request
+			if (contentString.length > SAFE_SUMMARY_LIMIT) {
+				return summarizeLargeContent(toolName, contentString, SAFE_SUMMARY_LIMIT);
 			}
 			
 			// For other large responses, check size and summarize/truncate if needed

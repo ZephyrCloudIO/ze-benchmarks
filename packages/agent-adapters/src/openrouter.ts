@@ -4,6 +4,14 @@ import chalk from 'chalk';
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
+
+function safeJsonParse(text: string): any | null {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 import { logger } from '@ze/logger';
 
 const log = logger.openrouter;
@@ -31,6 +39,50 @@ config({ path: envPath });
 interface ToolResult {
   tool_call_id: string;
   content: string;
+}
+
+function summarizeToolContent(content: string, limit: number): string {
+  if (!content) return '';
+  if (content.length <= limit) return content;
+
+  const parsed = safeJsonParse(content);
+  if (parsed !== null) {
+    const summary: any = {
+      _summary: true,
+      _originalSize: content.length,
+    };
+
+    if (Array.isArray(parsed)) {
+      summary.type = 'array';
+      summary.count = parsed.length;
+      summary.sample = parsed.slice(0, 2);
+    } else if (parsed && typeof parsed === 'object') {
+      const keys = Object.keys(parsed);
+      summary.type = 'object';
+      summary.keys = keys.slice(0, 10);
+      summary.sample = keys.slice(0, 3).reduce((acc: any, key: string) => {
+        const value = (parsed as any)[key];
+        if (Array.isArray(value)) {
+          acc[key] = { _type: 'array', count: value.length, sample: value.slice(0, 1) };
+        } else if (value && typeof value === 'object') {
+          acc[key] = { _type: 'object', keys: Object.keys(value).slice(0, 5) };
+        } else {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+    } else {
+      summary.type = typeof parsed;
+      summary.value = parsed;
+    }
+    summary._note = `Tool output summarized to ${limit} chars`;
+    const serialized = JSON.stringify(summary, null, 2);
+    if (serialized.length <= limit) return serialized;
+    return serialized.substring(0, limit) + `\n\n... [Summary truncated to ${limit} chars]`;
+  }
+
+  // Fallback: plain truncation with note
+  return content.substring(0, limit) + `\n\n... [Content truncated to ${limit} chars; original ${content.length}]`;
 }
 
 interface ModelPricing {
@@ -372,7 +424,7 @@ export class OpenRouterAdapter implements AgentAdapter {
         const toolMessages = toolResults.map((result) => ({
           role: 'tool' as const,
           tool_call_id: result.tool_call_id,
-          content: result.content
+          content: summarizeToolContent(result.content, 800) // hard cap tool message size
         }));
 
         // Log the messages being added
