@@ -1,4 +1,5 @@
 import { WorkerClient, getWorkerClient } from './client';
+import { logger } from '@ze/logger'
 import type {
   SubmitRunPayload,
   SubmitBatchPayload,
@@ -18,6 +19,7 @@ import type {
  */
 export class BenchmarkLogger {
   private static instance: BenchmarkLogger | null = null;
+  private static log = logger.workerClient;
   private client: WorkerClient;
   private currentRun: {
     runId: string;
@@ -104,7 +106,7 @@ export class BenchmarkLogger {
 
     // Store run context for backwards-compatible methods
     this.currentRun = runData;
-    console.log(`[BenchmarkLogger] Run started: ${runId}`);
+    BenchmarkLogger.log.info(`Run started: ${runId}`);
 
     return runId;
   }
@@ -115,7 +117,7 @@ export class BenchmarkLogger {
   async failRun(error: string, category?: string): Promise<void> {
     // Old signature for backwards compatibility
     // Just log it - we don't have enough context to submit to API
-    console.log(`[BenchmarkLogger] Run failed: ${error} (category: ${category || 'unknown'})`);
+    BenchmarkLogger.log.info(`Run failed: ${error} (category: ${category || 'unknown'})`);
     // In the old system this would mark the current run as failed
     // With the new API-based system, we need full run context which isn't available here
     // Callers should use completeRun with status: 'failed' instead
@@ -219,9 +221,9 @@ export class BenchmarkLogger {
     try {
       await this.client.submitRun(payload);
       const evalCount = payload.evaluations?.length || 0;
-      console.log(`[BenchmarkLogger] Run completed: ${payload.runId} with ${evalCount} evaluations`);
+      BenchmarkLogger.log.info(`Run completed: ${payload.runId} with ${evalCount} evaluations`);
     } catch (error) {
-      console.warn(`[BenchmarkLogger] Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
+      BenchmarkLogger.log.warn(`Failed to submit run (worker may not be running): ${error instanceof Error ? error.message : String(error)}`);
       // Continue without worker - result tracking is optional
       // Note: If batch creation failed, startBatch() would have thrown, so batchId should always be valid
     }
@@ -255,7 +257,7 @@ export class BenchmarkLogger {
     };
 
     await this.client.submitBatch(payload);
-    console.log(`[BenchmarkLogger] Batch upserted: ${data.batchId}`);
+    BenchmarkLogger.log.info(`Batch upserted: ${data.batchId}`);
   }
 
   /**
@@ -359,7 +361,7 @@ export class BenchmarkLogger {
   async getBatchComparison(): Promise<any[]> {
     // This was used for CLI comparison feature
     // Return empty array for now as this needs redesign for API-based system
-    console.log('[BenchmarkLogger] getBatchComparison: Not yet implemented for worker-based system');
+    BenchmarkLogger.log.info('getBatchComparison: Not yet implemented for worker-based system');
     return [];
   }
 
@@ -379,7 +381,7 @@ export class BenchmarkLogger {
       successfulRuns: 0,
     });
 
-    console.log(`[BenchmarkLogger] Batch started: ${batchId}`);
+    BenchmarkLogger.log.info(`Batch started: ${batchId}`);
     return batchId;
   }
 
@@ -403,7 +405,7 @@ export class BenchmarkLogger {
       avgWeightedScore: stats.avgWeightedScore,
       metadata: stats.metadata,
     });
-    console.log(`[BenchmarkLogger] Batch completed: ${batchId}`);
+    BenchmarkLogger.log.info(`Batch completed: ${batchId}`);
   }
 
   /**
@@ -484,7 +486,7 @@ export class BenchmarkLogger {
    */
   markRunIncomplete(reason?: string, stage?: string): void {
     if (!this.currentRun) {
-      console.log('[BenchmarkLogger] Warning: No active run to mark incomplete');
+      BenchmarkLogger.log.warn('No active run to mark incomplete');
       return;
     }
 
@@ -499,7 +501,7 @@ export class BenchmarkLogger {
       ...metadata
     };
 
-    console.log(`[BenchmarkLogger] Run marked incomplete: ${this.currentRun.runId}`);
+    BenchmarkLogger.log.info(`Run marked incomplete: ${this.currentRun.runId}`);
   }
 
   /**
@@ -507,21 +509,21 @@ export class BenchmarkLogger {
    */
   updateAgent(agentName: string, runId?: string): void {
     if (!this.currentRun) {
-      console.log('[BenchmarkLogger] Warning: No active run to update agent');
+      BenchmarkLogger.log.warn('No active run to update agent');
       return;
     }
 
     // Update the agent name in currentRun
     (this.currentRun as any).agent = agentName;
 
-    console.log(`[BenchmarkLogger] Agent updated to: ${agentName}`);
+    BenchmarkLogger.log.info(`Agent updated to: ${agentName}`);
   }
 
   /**
    * Clear database (no-op for worker-based system)
    */
   async clearDatabase(): Promise<void> {
-    console.log('[BenchmarkLogger] clearDatabase: Not supported for worker-based system');
+    BenchmarkLogger.log.info('clearDatabase: Not supported for worker-based system');
   }
 
   /**
@@ -539,7 +541,7 @@ export class BenchmarkLogger {
   ): void {
     // New signature: logTelemetry(runId: string, telemetry: RunTelemetry)
     if (typeof runIdOrToolCalls === 'string' && typeof telemetryOrTokensIn === 'object') {
-      console.log(`[BenchmarkLogger] Telemetry logged for run: ${runIdOrToolCalls}`);
+      BenchmarkLogger.log.info(`Telemetry logged for run: ${runIdOrToolCalls}`);
       // Telemetry is sent as part of completeRun in the new API-based system
       return;
     }
@@ -547,7 +549,7 @@ export class BenchmarkLogger {
     // Old signature: logTelemetry(toolCalls?, tokensIn?, tokensOut?, costUsd?, durationMs?, workspaceDir?, promptSent?)
     // Store telemetry to be sent with completeRun
     if (!this.currentRun) {
-      console.log('[BenchmarkLogger] Warning: No active run for telemetry logging');
+      BenchmarkLogger.log.warn('No active run for telemetry logging');
       return;
     }
 
@@ -562,7 +564,7 @@ export class BenchmarkLogger {
       promptSent,
     };
 
-    console.log(`[BenchmarkLogger] Telemetry cached for run: ${this.currentRun.runId}`);
+    BenchmarkLogger.log.info(`Telemetry cached for run: ${this.currentRun.runId}`);
   }
 
   /**
@@ -577,7 +579,7 @@ export class BenchmarkLogger {
   ): void {
     // New signature: logEvaluation(runId: string, evaluation: EvaluationResult)
     if (typeof evaluationOrScore === 'object') {
-      console.log(`[BenchmarkLogger] Evaluation logged for run: ${runIdOrEvaluatorName}`);
+      BenchmarkLogger.log.info(`Evaluation logged for run: ${runIdOrEvaluatorName}`);
       // Evaluations are sent as part of completeRun in the new API-based system
       return;
     }
@@ -585,7 +587,7 @@ export class BenchmarkLogger {
     // Old signature: logEvaluation(evaluatorName: string, score: number, maxScore: number, details?: string)
     // Store evaluation to be sent with completeRun
     if (!this.currentRun) {
-      console.log('[BenchmarkLogger] Warning: No active run for evaluation logging');
+      BenchmarkLogger.log.warn('No active run for evaluation logging');
       return;
     }
 
@@ -602,14 +604,14 @@ export class BenchmarkLogger {
       details,
     });
 
-    console.log(`[BenchmarkLogger] Evaluation cached for run: ${this.currentRun.runId} (${runIdOrEvaluatorName})`);
+    BenchmarkLogger.log.info(`Evaluation cached for run: ${this.currentRun.runId} (${runIdOrEvaluatorName})`);
   }
 
   /**
    * Close connection (no-op for HTTP client)
    */
   close(): void {
-    console.log('[BenchmarkLogger] Connection closed');
+    BenchmarkLogger.log.info('Connection closed');
   }
 }
 

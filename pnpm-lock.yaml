@@ -365,6 +365,9 @@ importers:
 
   packages/worker-client:
     dependencies:
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1

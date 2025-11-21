@@ -248,7 +248,11 @@ export const logger = {
 
   // Harness Lib
   /** OpenRouter API logging */
-  openrouterApi: createLogger('openrouter-api')
+  openrouterApi: createLogger('openrouter-api'),
+
+  // Worker Client
+  /** Worker client logging */
+  workerClient: createLogger('worker-client')
 };
 
 /**
