@@ -6,6 +6,9 @@
 import { z } from 'zod';
 import json5 from 'json5';
 import { readFile } from 'fs/promises';
+import { logger } from '@ze/logger';
+
+const log = logger.schemaAnalyzer;
 
 /**
  * Zod schema for Documentation Entry enrichment
@@ -192,11 +195,11 @@ export async function readAndValidateTemplate(
     return SpecialistTemplateSchema.parse(parsedData);
     } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error(`Validation error in ${filePath}:`);
-      console.error(JSON.stringify(error.errors, null, 2));
+      log.error(`Validation error in ${filePath}:`);
+      log.error(JSON.stringify(error.errors, null, 2));
       throw new Error(`Template validation failed: ${error.message}`);
     }
-    console.error(`Error reading or parsing JSON5 file at ${filePath}:`, error);
+    log.error(`Error reading or parsing JSON5 file at ${filePath}:`, error);
     throw error;
   }
 }

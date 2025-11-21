@@ -11,12 +11,13 @@ import { runInteractiveClear } from './clear.ts';
 import { showHelp } from '../cli/args.ts';
 import { createTitle } from '../lib/display.ts';
 import { validateEnvironment } from '../cli/environment.ts';
+import { logger } from '@ze/logger';
 
 async function showInteractiveMenu() {
 	// Check environment variables for interactive mode
 	await validateEnvironment();
 
-	console.log(chalk.cyan(createTitle()));
+	logger.interactive.raw(chalk.cyan(createTitle()));
 	intro(chalk.bgBlue(' Interactive Mode '));
 
 	while (true) {
@@ -74,7 +75,7 @@ async function showInteractiveMenu() {
 		}
 
 		// Add a small pause before showing the menu again
-		console.log('\n');
+		logger.interactive.raw('\n');
 	}
 }
 

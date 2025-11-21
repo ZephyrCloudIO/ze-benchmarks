@@ -9,6 +9,10 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, isAbsolute } from 'node:path';
 import type { SpecialistTemplate, LoadTemplateOptions } from './types.js';
+import { logger } from '@ze/logger';
+
+const log = logger.templateLoader;
+
 import {
   mergeTemplates,
   validateTemplate,
@@ -100,10 +104,10 @@ async function loadTemplateRecursive(
   } catch (error) {
     // Parent template not found or failed to load - use template without inheritance
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(
+    log.warn(
       `[Template Loader] Parent template '${template.from}' not found or failed to load: ${errorMessage}`
     );
-    console.warn(
+    log.warn(
       `[Template Loader] Continuing without inheritance for: ${resolvedPath}`
     );
 

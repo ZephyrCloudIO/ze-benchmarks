@@ -1,5 +1,8 @@
 import chalk from 'chalk';
 import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
+import { logger } from '@ze/logger';
+
+const log = logger.figmaTools;
 
 /**
  * Design token extraction results
@@ -520,28 +523,28 @@ export function createFigmaFetchTool(): ToolDefinition {
 export function createFigmaFetchHandler(): ToolHandler {
 	return async (input: { file_id: string; node_ids?: string; file_key?: string }): Promise<string> => {
 		// Log the request parameters the agent is making
-		console.log(chalk.cyan(`[fetchFigmaFile] ========== AGENT REQUEST ==========`));
-		console.log(chalk.cyan(`[fetchFigmaFile] Agent called fetchFigmaFile with:`));
-		console.log(chalk.cyan(`[fetchFigmaFile]   file_id: ${input.file_id}`));
+		log.debug(chalk.cyan(`[fetchFigmaFile] ========== AGENT REQUEST ==========`));
+		log.debug(chalk.cyan(`[fetchFigmaFile] Agent called fetchFigmaFile with:`));
+		log.debug(chalk.cyan(`[fetchFigmaFile]   file_id: ${input.file_id}`));
 		if (input.node_ids) {
-			console.log(chalk.cyan(`[fetchFigmaFile]   node_ids: ${input.node_ids}`));
+			log.debug(chalk.cyan(`[fetchFigmaFile]   node_ids: ${input.node_ids}`));
 		}
 		if (input.file_key) {
-			console.log(chalk.cyan(`[fetchFigmaFile]   file_key: ${input.file_key}`));
+			log.debug(chalk.cyan(`[fetchFigmaFile]   file_key: ${input.file_key}`));
 		}
-		console.log(chalk.cyan(`[fetchFigmaFile] Full input: ${JSON.stringify(input, null, 2)}`));
-		console.log(chalk.cyan(`[fetchFigmaFile] ====================================`));
+		log.debug(chalk.cyan(`[fetchFigmaFile] Full input: ${JSON.stringify(input, null, 2)}`));
+		log.debug(chalk.cyan(`[fetchFigmaFile] ====================================`));
 		
 		const apiKey = process.env.FIGMA_API_KEY;
 		
 		// Debug: Log API key status (without exposing the key)
-		console.log(chalk.gray(`[fetchFigmaFile] API key check: ${apiKey ? `✓ Found (${apiKey.substring(0, 10)}...)` : '✗ Not found'}`));
-		console.log(chalk.gray(`[fetchFigmaFile] Environment check: NODE_ENV=${process.env.NODE_ENV || 'undefined'}`));
+		log.debug(chalk.gray(`[fetchFigmaFile] API key check: ${apiKey ? `✓ Found (${apiKey.substring(0, 10)}...)` : '✗ Not found'}`));
+		log.debug(chalk.gray(`[fetchFigmaFile] Environment check: NODE_ENV=${process.env.NODE_ENV || 'undefined'}`));
 		
 		if (!apiKey) {
 			const error = 'FIGMA_API_KEY environment variable not set. Please set it in your .env file or environment.';
-			console.error(chalk.red(`[fetchFigmaFile] ${error}`));
-			console.error(chalk.yellow(`[fetchFigmaFile] Tip: Add FIGMA_API_KEY=your_key_here to your .env file in the project root`));
+			log.error(chalk.red(`[fetchFigmaFile] ${error}`));
+			log.error(chalk.yellow(`[fetchFigmaFile] Tip: Add FIGMA_API_KEY=your_key_here to your .env file in the project root`));
 			return `Error: ${error}`;
 		}
 
@@ -562,70 +565,70 @@ export function createFigmaFetchHandler(): ToolHandler {
 		}
 
 		const fetchType = input.node_ids ? `nodes (${input.node_ids})` : 'entire file';
-		console.log(chalk.blue(`[fetchFigmaFile] Fetching Figma ${fetchType}: ${input.file_id}${input.file_key ? ` (version: ${input.file_key})` : ''}`));
-		console.log(chalk.gray(`[fetchFigmaFile] Request URL: ${url}`));
-		console.log(chalk.gray(`[fetchFigmaFile] Request headers: X-Figma-Token: ${apiKey.substring(0, 10)}...`));
+		log.debug(chalk.blue(`[fetchFigmaFile] Fetching Figma ${fetchType}: ${input.file_id}${input.file_key ? ` (version: ${input.file_key})` : ''}`));
+		log.debug(chalk.gray(`[fetchFigmaFile] Request URL: ${url}`));
+		log.debug(chalk.gray(`[fetchFigmaFile] Request headers: X-Figma-Token: ${apiKey.substring(0, 10)}...`));
 
 		try {
-			console.log(chalk.gray(`[fetchFigmaFile] Sending fetch request...`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Sending fetch request...`));
 			const response = await fetch(url, {
 				headers: {
 					'X-Figma-Token': apiKey
 				}
 			});
 
-			console.log(chalk.gray(`[fetchFigmaFile] Response status: ${response.status} ${response.statusText}`));
-			console.log(chalk.gray(`[fetchFigmaFile] Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Response status: ${response.status} ${response.statusText}`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`));
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error(chalk.red(`[fetchFigmaFile] ✗ API Error Response:`));
-				console.error(chalk.red(`[fetchFigmaFile]   Status: ${response.status} ${response.statusText}`));
-				console.error(chalk.red(`[fetchFigmaFile]   Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`));
+				log.error(chalk.red(`[fetchFigmaFile] ✗ API Error Response:`));
+				log.error(chalk.red(`[fetchFigmaFile]   Status: ${response.status} ${response.statusText}`));
+				log.error(chalk.red(`[fetchFigmaFile]   Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`));
 				const error = `Figma API error (${response.status} ${response.statusText}): ${errorText}`;
 				return `Error: ${error}`;
 			}
 
 			const responseText = await response.text();
-			console.log(chalk.gray(`[fetchFigmaFile] Response body length: ${responseText.length} characters`));
-			console.log(chalk.gray(`[fetchFigmaFile] Response body preview (first 500 chars):\n${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Response body length: ${responseText.length} characters`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Response body preview (first 500 chars):\n${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`));
 
 			let data: any;
 			try {
 				data = JSON.parse(responseText);
 			} catch (parseError) {
-				console.error(chalk.red(`[fetchFigmaFile] ✗ Failed to parse JSON response`));
-				console.error(chalk.red(`[fetchFigmaFile]   Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`));
-				console.error(chalk.red(`[fetchFigmaFile]   Response text: ${responseText.substring(0, 1000)}`));
+				log.error(chalk.red(`[fetchFigmaFile] ✗ Failed to parse JSON response`));
+				log.error(chalk.red(`[fetchFigmaFile]   Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`));
+				log.error(chalk.red(`[fetchFigmaFile]   Response text: ${responseText.substring(0, 1000)}`));
 				return `Error: Failed to parse Figma API response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`;
 			}
 
 			const dataSize = JSON.stringify(data).length;
-			console.log(chalk.green(`[fetchFigmaFile] ✓ Successfully fetched Figma ${fetchType} (${dataSize} bytes)`));
-			console.log(chalk.gray(`[fetchFigmaFile] Response structure: ${Object.keys(data).join(', ')}`));
+			log.debug(chalk.green(`[fetchFigmaFile] ✓ Successfully fetched Figma ${fetchType} (${dataSize} bytes)`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Response structure: ${Object.keys(data).join(', ')}`));
 			
 			// Handle large responses by summarizing or truncating
 			const MAX_RESPONSE_SIZE = 500000; // ~500KB to leave room for conversation context
 			const formattedJson = JSON.stringify(data, null, 2);
 			
 			if (formattedJson.length > MAX_RESPONSE_SIZE) {
-				console.log(chalk.yellow(`[fetchFigmaFile] ⚠️  Response is very large (${formattedJson.length} chars), creating summary...`));
+				log.debug(chalk.yellow(`[fetchFigmaFile] ⚠️  Response is very large (${formattedJson.length} chars), creating summary...`));
 				
 				// Create a summarized version
 				const summary = createFigmaResponseSummary(data);
-				console.log(chalk.gray(`[fetchFigmaFile] Summary length: ${summary.length} characters`));
-				console.log(chalk.yellow(`[fetchFigmaFile] Returning summarized response instead of full JSON`));
+				log.debug(chalk.gray(`[fetchFigmaFile] Summary length: ${summary.length} characters`));
+				log.debug(chalk.yellow(`[fetchFigmaFile] Returning summarized response instead of full JSON`));
 				return summary;
 			}
 			
-			console.log(chalk.gray(`[fetchFigmaFile] Returning ${formattedJson.length} characters of formatted JSON to agent`));
+			log.debug(chalk.gray(`[fetchFigmaFile] Returning ${formattedJson.length} characters of formatted JSON to agent`));
 			return formattedJson;
 		} catch (error) {
 			const errorMessage = `Error fetching Figma file: ${error instanceof Error ? error.message : String(error)}`;
-			console.error(chalk.red(`[fetchFigmaFile] ✗ Fetch error:`));
-			console.error(chalk.red(`[fetchFigmaFile]   ${errorMessage}`));
+			log.error(chalk.red(`[fetchFigmaFile] ✗ Fetch error:`));
+			log.error(chalk.red(`[fetchFigmaFile]   ${errorMessage}`));
 			if (error instanceof Error && error.stack) {
-				console.error(chalk.gray(`[fetchFigmaFile]   Stack: ${error.stack}`));
+				log.error(chalk.gray(`[fetchFigmaFile]   Stack: ${error.stack}`));
 			}
 			return `Error: ${errorMessage}`;
 		}

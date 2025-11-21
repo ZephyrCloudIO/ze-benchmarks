@@ -11,6 +11,9 @@
 
 import type { SpecialistTemplate, TaskType, TemplateContext } from './types.js';
 import { extractKeywords, containsKeyword, countKeywordMatches, type ExtractedKeywords } from './keyword-extraction.js';
+import { logger } from '@ze/logger';
+
+const log = logger.docFilter;
 
 /**
  * Documentation entry with enrichment data
@@ -89,15 +92,15 @@ export function filterDocumentation(
 
   // Log scoring decisions for debugging
   if (process.env.DEBUG_DOC_FILTERING === 'true') {
-    console.log('\n=== Documentation Filtering Debug ===');
-    console.log('User Prompt:', userPrompt);
-    console.log('Extracted Keywords:', keywords);
-    console.log('\nScored Documents:');
+    log.debug('\n=== Documentation Filtering Debug ===');
+    log.debug('User Prompt:', userPrompt);
+    log.debug('Extracted Keywords:', keywords);
+    log.debug('\nScored Documents:');
     scoredDocs.forEach(({ doc, score }) => {
-      console.log(`  [${score.toFixed(1)}] ${doc.description}`);
-      console.log(`       URL: ${doc.url || doc.path}`);
+      log.debug(`  [${score.toFixed(1)}] ${doc.description}`);
+      log.debug(`       URL: ${doc.url || doc.path}`);
     });
-    console.log('=====================================\n');
+    log.debug('=====================================\n');
   }
 
   // Take top N docs
@@ -222,9 +225,9 @@ function calculateRelevanceScore(
 
   // Debug logging
   if (process.env.DEBUG_DOC_FILTERING === 'true') {
-    console.log(`\nScoring: ${doc.description}`);
-    console.log('  Breakdown:', debugScores);
-    console.log(`  Total: ${score}`);
+    log.debug(`\nScoring: ${doc.description}`);
+    log.debug('  Breakdown:', debugScores);
+    log.debug(`  Total: ${score}`);
   }
 
   return score;

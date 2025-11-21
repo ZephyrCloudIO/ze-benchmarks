@@ -3,6 +3,9 @@ import { Command } from 'commander';
 import { mintSnapshot } from './mint.js';
 import { enrichTemplate } from './enrich-template.js';
 import chalk from 'chalk';
+import { logger } from '@ze/logger';
+
+const log = logger.specialistMintCli;
 
 const program = new Command();
 
@@ -20,20 +23,20 @@ program
   .option('--worker-url <url>', 'Worker API URL (defaults to ZE_BENCHMARKS_WORKER_URL env var or http://localhost:8787)')
   .action(async (templatePath: string, options: { output: string; batchId: string; workerUrl?: string }) => {
     try {
-      console.log(chalk.blue('\n🔨 Starting snapshot minting process...\n'));
+      log.debug(chalk.blue('\n🔨 Starting snapshot minting process...\n'));
 
       const result = await mintSnapshot(templatePath, options.output, {
         batchId: options.batchId,
         workerUrl: options.workerUrl
       });
 
-      console.log(chalk.green('\n✅ Snapshot minted successfully!'));
-      console.log(chalk.gray(`   Snapshot ID: ${result.snapshotId}`));
-      console.log(chalk.gray(`   Output path: ${result.outputPath}`));
-      console.log(chalk.gray(`   Template version: ${result.templateVersion}\n`));
+      log.debug(chalk.green('\n✅ Snapshot minted successfully!'));
+      log.debug(chalk.gray(`   Snapshot ID: ${result.snapshotId}`));
+      log.debug(chalk.gray(`   Output path: ${result.outputPath}`));
+      log.debug(chalk.gray(`   Template version: ${result.templateVersion}\n`));
     } catch (error) {
-      console.error(chalk.red('\n❌ Error minting snapshot:'));
-      console.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
+      log.error(chalk.red('\n❌ Error minting snapshot:'));
+      log.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
       process.exit(1);
     }
   });
@@ -55,7 +58,7 @@ program
     concurrency: string;
   }) => {
     try {
-      console.log(chalk.blue('\n🔍 Starting template enrichment process...\n'));
+      log.debug(chalk.blue('\n🔍 Starting template enrichment process...\n'));
 
       const result = await enrichTemplate(templatePath, {
         provider: options.provider,
@@ -65,20 +68,20 @@ program
         concurrency: parseInt(options.concurrency, 10)
       });
 
-      console.log(chalk.green('\n✅ Template enrichment completed!'));
-      console.log(chalk.gray(`   Enriched template: ${result.enrichedTemplatePath}`));
-      console.log(chalk.gray(`   Documents enriched: ${result.documentsEnriched}`));
-      console.log(chalk.gray(`   Documents skipped: ${result.documentsSkipped}`));
+      log.debug(chalk.green('\n✅ Template enrichment completed!'));
+      log.debug(chalk.gray(`   Enriched template: ${result.enrichedTemplatePath}`));
+      log.debug(chalk.gray(`   Documents enriched: ${result.documentsEnriched}`));
+      log.debug(chalk.gray(`   Documents skipped: ${result.documentsSkipped}`));
 
       if (result.errors.length > 0) {
-        console.log(chalk.yellow(`   Errors: ${result.errors.length}\n`));
+        log.debug(chalk.yellow(`   Errors: ${result.errors.length}\n`));
         process.exit(1);
       } else {
-        console.log();
+        log.debug();
       }
     } catch (error) {
-      console.error(chalk.red('\n❌ Error enriching template:'));
-      console.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
+      log.error(chalk.red('\n❌ Error enriching template:'));
+      log.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
       process.exit(1);
     }
   });

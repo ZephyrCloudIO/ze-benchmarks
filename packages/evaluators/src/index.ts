@@ -1,5 +1,8 @@
 import type { EvaluationContext, Evaluator, EvaluatorResult, ScoreCard } from './types.ts';
 import chalk from 'chalk';
+import { logger } from '@ze/logger';
+
+const log = logger.evaluators;
 
 import { DependencyTargetsEvaluator } from './evaluators/dependency-targets.ts';
 import { InstallEvaluator } from './evaluators/install.ts';
@@ -19,12 +22,12 @@ export async function runEvaluators(
 
 	// If llmJudgeOnly is true, only run LLM judge
 	if (llmJudgeOnly) {
-		console.log(chalk.blue('[Evaluators] LLM judge only mode: Skipping other evaluators'));
+		log.debug(chalk.blue('[Evaluators] LLM judge only mode: Skipping other evaluators'));
 		if (shouldEnableLLMJudge(ctx.scenario)) {
 			evaluators.push(new LLMJudgeEvaluator());
 		} else {
-			console.log(chalk.yellow('[Evaluators] ⚠️  LLM judge only requested but LLM judge is not enabled in scenario'));
-			console.log(chalk.gray('[Evaluators]   Enable it by setting llm_judge.enabled: true in scenario.yaml'));
+			log.debug(chalk.yellow('[Evaluators] ⚠️  LLM judge only requested but LLM judge is not enabled in scenario'));
+			log.debug(chalk.gray('[Evaluators]   Enable it by setting llm_judge.enabled: true in scenario.yaml'));
 		}
 	} else {
 		// Run all evaluators
@@ -79,7 +82,7 @@ function shouldEnableLLMJudge(scenario: any): boolean {
 	const isEnabled = scenario.llm_judge?.enabled;
 	
 	// Debug: Log environment variable check
-	console.log(`[env] LLM Judge check - OPENROUTER_API_KEY=${hasApiKey ? '***set***' : '(not set)'}, scenario.enabled=${isEnabled}`);
+	log.debug(`[env] LLM Judge check - OPENROUTER_API_KEY=${hasApiKey ? '***set***' : '(not set)'}, scenario.enabled=${isEnabled}`);
 	
 	return isEnabled && hasApiKey;
 }

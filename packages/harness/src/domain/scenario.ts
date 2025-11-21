@@ -4,6 +4,7 @@ import YAML from 'yaml';
 import chalk from 'chalk';
 import { log } from '@clack/prompts';
 import { findRepoRoot } from '../lib/workspace-utils.ts';
+import { logger } from '@ze/logger';
 
 // ============================================================================
 // SCENARIO DOMAIN LOGIC
@@ -43,19 +44,19 @@ export function loadScenario(suite: string, scenario: string) {
 	const scenarioPath = join(root, 'suites', suite, 'scenarios', scenario, 'scenario.yaml');
 
 	// Log scenario loading attempt
-	console.log(chalk.gray('[DEBUG] loadScenario()'));
-	console.log(chalk.gray(`  Suite: ${suite}, Scenario: ${scenario}`));
-	console.log(chalk.gray(`  Scenario path: ${scenarioPath}`));
-	console.log(chalk.gray(`  File exists: ${existsSync(scenarioPath)}`));
+	logger.scenario.debug('loadScenario()');
+	logger.scenario.debug(`Suite: ${suite}, Scenario: ${scenario}`);
+	logger.scenario.debug(`Scenario path: ${scenarioPath}`);
+	logger.scenario.debug(`File exists: ${existsSync(scenarioPath)}`);
 
 	try {
 		const yamlText = readFileSync(scenarioPath, 'utf8');
-		console.log(chalk.gray(`  YAML loaded successfully (${yamlText.length} bytes)`));
+		logger.scenario.debug(`YAML loaded successfully (${yamlText.length} bytes)`);
 		const parsed = YAML.parse(yamlText);
-		console.log(chalk.gray(`  YAML parsed successfully`));
+		logger.scenario.debug('YAML parsed successfully');
 		return parsed;
 	} catch (error) {
-		console.error(chalk.red(`[DEBUG] Failed to load scenario: ${error instanceof Error ? error.message : String(error)}`));
+		logger.scenario.error(`Failed to load scenario: ${error instanceof Error ? error.message : String(error)}`);
 		throw error;
 	}
 }
@@ -65,10 +66,10 @@ export function getScenarioDir(suite: string, scenario: string) {
 	const scenarioDir = join(root, 'suites', suite, 'scenarios', scenario);
 
 	// Log scenario dir resolution
-	console.log(chalk.gray('[DEBUG] getScenarioDir()'));
-	console.log(chalk.gray(`  Suite: ${suite}, Scenario: ${scenario}`));
-	console.log(chalk.gray(`  Computed path: ${scenarioDir}`));
-	console.log(chalk.gray(`  Path exists: ${existsSync(scenarioDir)}`));
+	logger.scenario.debug('getScenarioDir()');
+	logger.scenario.debug(`Suite: ${suite}, Scenario: ${scenario}`);
+	logger.scenario.debug(`Computed path: ${scenarioDir}`);
+	logger.scenario.debug(`Path exists: ${existsSync(scenarioDir)}`);
 
 	return scenarioDir;
 }
@@ -132,7 +133,7 @@ export function loadPrompt(suite: string, scenario: string, tier: string): strin
 		return readFileSync(promptPath, 'utf8');
 	} catch (err) {
 		log.error('Failed to load prompt file:');
-		console.error(chalk.dim(err instanceof Error ? err.message : String(err)));
+		logger.scenario.debug(err instanceof Error ? err.message : String(err));
 		return null;
 	}
 }

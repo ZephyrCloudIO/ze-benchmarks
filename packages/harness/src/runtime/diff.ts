@@ -1,6 +1,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { globbySync } from 'globby';
+import { logger } from '@ze/logger';
+
+const log = logger.diff;
 
 export interface FileDiff {
   file: string;
@@ -40,7 +43,7 @@ function safeRead(path: string): string | undefined {
   try {
     return readFileSync(path, 'utf8');
   } catch (err) {
-    console.warn('Failed to read file for diff:', path, err);
+    log.warn('Failed to read file for diff:', path, err);
     return undefined;
   }
 }
@@ -51,7 +54,7 @@ function safeJson(path: string): Record<string, any> | undefined {
   try {
     return JSON.parse(text);
   } catch (err) {
-    console.warn('Failed to parse JSON for diff:', path, err);
+    log.warn('Failed to parse JSON for diff:', path, err);
     return undefined;
   }
 }

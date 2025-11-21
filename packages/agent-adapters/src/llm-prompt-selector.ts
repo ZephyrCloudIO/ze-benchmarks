@@ -7,6 +7,9 @@
  */
 
 import type { PromptConfig, Prompts } from 'agency-prompt-creator';
+import { logger } from '@ze/logger';
+
+const log = logger.llmPromptSelector;
 
 /**
  * Result from LLM prompt selection
@@ -337,7 +340,7 @@ export function validateExtractedVariables(vars: ExtractedVariables): ExtractedV
       if (validFrameworks.includes(normalized)) {
         validated.framework = normalized;
       } else {
-        console.warn(`Invalid framework value: ${validated.framework}, using default: Vite`);
+        log.warn(`Invalid framework value: ${validated.framework}, using default: Vite`);
         validated.framework = 'Vite';
       }
     }
@@ -347,7 +350,7 @@ export function validateExtractedVariables(vars: ExtractedVariables): ExtractedV
   if (validated.packageManager) {
     const validManagers = ['pnpm', 'npm', 'yarn', 'bun'];
     if (!validManagers.includes(validated.packageManager.toLowerCase())) {
-      console.warn(`Invalid packageManager value: ${validated.packageManager}, using default: pnpm`);
+      log.warn(`Invalid packageManager value: ${validated.packageManager}, using default: pnpm`);
       validated.packageManager = 'pnpm';
     } else {
       validated.packageManager = validated.packageManager.toLowerCase();
@@ -358,7 +361,7 @@ export function validateExtractedVariables(vars: ExtractedVariables): ExtractedV
   if (validated.baseColor) {
     const validColors = ['slate', 'gray', 'zinc', 'neutral', 'stone'];
     if (!validColors.includes(validated.baseColor.toLowerCase())) {
-      console.warn(`Invalid baseColor value: ${validated.baseColor}, using default: slate`);
+      log.warn(`Invalid baseColor value: ${validated.baseColor}, using default: slate`);
       validated.baseColor = 'slate';
     } else {
       validated.baseColor = validated.baseColor.toLowerCase() as any;

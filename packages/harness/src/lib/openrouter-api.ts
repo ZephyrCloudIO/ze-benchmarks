@@ -1,4 +1,7 @@
 import { OpenAI } from 'openai';
+import { logger } from '@ze/logger';
+
+const log = logger.openrouterApi;
 
 export interface OpenRouterModel {
   id: string;
@@ -24,7 +27,7 @@ export class OpenRouterAPI {
 
   constructor(apiKey: string) {
     // Debug: Log environment variable
-    console.log(`[env] OpenRouterAPI - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
+    log.debug(`[env] OpenRouterAPI - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
 
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
@@ -41,7 +44,7 @@ export class OpenRouterAPI {
     try {
       // Debug: Log environment variable usage
       const apiKey = process.env.OPENROUTER_API_KEY;
-      console.log(`[env] OpenRouterAPI.getModelsWithToolSupport - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
+      log.debug(`[env] OpenRouterAPI.getModelsWithToolSupport - OPENROUTER_API_KEY=${apiKey ? '***set***' : '(not set)'}`);
 
       // Fetch models from OpenRouter API
       const response = await fetch('https://openrouter.ai/api/v1/models', {
@@ -64,7 +67,7 @@ export class OpenRouterAPI {
 
       return toolSupportedModels;
     } catch (error) {
-      console.error('Failed to fetch OpenRouter models:', error);
+      log.error('Failed to fetch OpenRouter models:', error);
       // Return empty array on error
       return [];
     }

@@ -10,6 +10,9 @@ import {
 } from './utils.js';
 import { loadBenchmarkResults, loadBenchmarkBatch } from './benchmark-loader.js';
 import { resolveTemplatePath } from './template-resolver.js';
+import { logger } from '@ze/logger';
+
+const log = logger.specialistMint;
 
 /**
  * Main function to mint a snapshot from a template and benchmark batch results
@@ -22,17 +25,17 @@ export async function mintSnapshot(
     workerUrl?: string;
   }
 ): Promise<MintResult> {
-  console.log(chalk.blue('📋 Step 1: Loading and validating template...'));
+  log.debug(chalk.blue('📋 Step 1: Loading and validating template...'));
 
   // Resolve template path (automatically use enriched version if available)
   const { path: resolvedTemplatePath, isEnriched } = resolveTemplatePath(templatePath);
   const template: SpecialistTemplate = loadJSON5(resolvedTemplatePath);
 
-  console.log(chalk.gray(`   Template: ${template.name} v${template.version}`));
+  log.debug(chalk.gray(`   Template: ${template.name} v${template.version}`));
   if (isEnriched) {
-    console.log(chalk.green('   ✓ Using enriched template'));
+    log.debug(chalk.green('   ✓ Using enriched template'));
   } else {
-    console.log(chalk.yellow('   ⚠️  Using non-enriched template (consider running enrichment)'));
+    log.debug(chalk.yellow('   ⚠️  Using non-enriched template (consider running enrichment)'));
   }
 
   // Validate template against schema
@@ -41,20 +44,20 @@ export async function mintSnapshot(
     throw new Error(`Template validation failed:\n${templateValidation.errors}`);
   }
 
-  console.log(chalk.green('   ✓ Template loaded and validated successfully'));
+  log.debug(chalk.green('   ✓ Template loaded and validated successfully'));
 
   // Load benchmark results (optional)
-  console.log(chalk.blue('\n📊 Step 2: Loading benchmark results...'));
+  log.debug(chalk.blue('\n📊 Step 2: Loading benchmark results...'));
 
   let benchmarkRuns: BenchmarkRun[] | null = null;
 
   if (options?.batchId) {
     // Batch mode: load all runs from the batch via Worker API
-    console.log(chalk.gray(`   Loading batch: ${options.batchId}`));
+    log.debug(chalk.gray(`   Loading batch: ${options.batchId}`));
     benchmarkRuns = await loadBenchmarkBatch(options.batchId, options.workerUrl);
   } else {
     // Legacy mode: load single most recent result via Worker API
-    console.log(chalk.gray('   Loading most recent result (legacy mode)'));
+    log.debug(chalk.gray('   Loading most recent result (legacy mode)'));
     const singleResult = await loadBenchmarkResults(options?.workerUrl);
     if (singleResult) {
       benchmarkRuns = [singleResult];
@@ -62,7 +65,7 @@ export async function mintSnapshot(
   }
 
   // Create snapshot by combining template and benchmark results
-  console.log(chalk.blue('\n🔧 Step 3: Creating snapshot...'));
+  log.debug(chalk.blue('\n🔧 Step 3: Creating snapshot...'));
 
   const snapshot: SpecialistSnapshot = {
     ...template,
@@ -74,19 +77,19 @@ export async function mintSnapshot(
     }
   };
 
-  console.log(chalk.gray('   ✓ Snapshot structure created'));
+  log.debug(chalk.gray('   ✓ Snapshot structure created'));
 
   // Validate snapshot against schema
-  console.log(chalk.blue('\n✅ Step 4: Validating snapshot...'));
+  log.debug(chalk.blue('\n✅ Step 4: Validating snapshot...'));
   const snapshotValidation = validateSnapshotSchema(snapshot);
   if (!snapshotValidation.valid) {
     throw new Error(`Snapshot validation failed:\n${snapshotValidation.errors}`);
   }
 
-  console.log(chalk.green('   ✓ Snapshot validated successfully'));
+  log.debug(chalk.green('   ✓ Snapshot validated successfully'));
 
   // Determine output path with auto-incremented snapshot ID
-  console.log(chalk.blue('\n📁 Step 5: Determining output path...'));
+  log.debug(chalk.blue('\n📁 Step 5: Determining output path...'));
 
   const resolvedOutputDir = resolve(outputDir);
 
@@ -101,17 +104,17 @@ export async function mintSnapshot(
   const snapshotId = getNextSnapshotId(snapshotDir);
   const outputPath = join(snapshotDir, `snapshot-${snapshotId}.json5`);
 
-  console.log(chalk.gray(`   Snapshot directory: ${snapshotDir}`));
-  console.log(chalk.gray(`   Snapshot ID: ${snapshotId}`));
-  console.log(chalk.gray(`   Output path: ${outputPath}`));
+  log.debug(chalk.gray(`   Snapshot directory: ${snapshotDir}`));
+  log.debug(chalk.gray(`   Snapshot ID: ${snapshotId}`));
+  log.debug(chalk.gray(`   Output path: ${outputPath}`));
 
   // No need to update snapshot ID in runs - it's in metadata
 
   // Write snapshot to file
-  console.log(chalk.blue('\n💾 Step 6: Writing snapshot to disk...'));
+  log.debug(chalk.blue('\n💾 Step 6: Writing snapshot to disk...'));
   writeJSON5(outputPath, snapshot);
 
-  console.log(chalk.green('   ✓ Snapshot written successfully'));
+  log.debug(chalk.green('   ✓ Snapshot written successfully'));
 
   return {
     snapshotId,
@@ -163,22 +166,22 @@ function createBenchmarksSection(
       benchmarksSection.comparison = comparison;
 
       // Log comparison summary
-      console.log(chalk.blue('\n📈 Comparison Summary:'));
+      log.debug(chalk.blue('\n📈 Comparison Summary:'));
       if (comparison.baseline_avg_score !== undefined) {
-        console.log(chalk.gray(`   Baseline avg score: ${comparison.baseline_avg_score.toFixed(3)}`));
+        log.debug(chalk.gray(`   Baseline avg score: ${comparison.baseline_avg_score.toFixed(3)}`));
       }
       if (comparison.specialist_avg_score !== undefined) {
-        console.log(chalk.gray(`   Specialist avg score: ${comparison.specialist_avg_score.toFixed(3)}`));
+        log.debug(chalk.gray(`   Specialist avg score: ${comparison.specialist_avg_score.toFixed(3)}`));
       }
       if (comparison.improvement !== undefined) {
         const sign = comparison.improvement >= 0 ? '+' : '';
-        console.log(chalk.gray(`   Improvement: ${sign}${comparison.improvement.toFixed(3)} (${sign}${comparison.improvement_pct?.toFixed(1)}%)`));
+        log.debug(chalk.gray(`   Improvement: ${sign}${comparison.improvement.toFixed(3)} (${sign}${comparison.improvement_pct?.toFixed(1)}%)`));
       }
     }
   } else {
     // No benchmark results available - create a placeholder test suite
-    console.log(chalk.yellow('   ⚠️  No benchmark results found'));
-    console.log(chalk.yellow('   Creating snapshot with placeholder test suite'));
+    log.debug(chalk.yellow('   ⚠️  No benchmark results found'));
+    log.debug(chalk.yellow('   Creating snapshot with placeholder test suite'));
 
     benchmarksSection.test_suites.push({
       name: 'placeholder',

@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { intro, outro } from '@clack/prompts';
 import { createTitle } from '../lib/display.ts';
+import { logger } from '@ze/logger';
 
 // ============================================================================
 // COMMAND-LINE ARGUMENT PARSING
@@ -98,41 +99,41 @@ export function parseArgs(argv: string[]) {
 }
 
 export function showHelp() {
-	console.log(chalk.cyan(createTitle()));
+	logger.cli.info(createTitle());
 	intro(chalk.bgBlue(' CLI Help '));
 
-	console.log('\n' + chalk.bold('Usage:'));
-	console.log(`  ${chalk.cyan('pnpm bench')} <suite> <scenario> [options]`);
+	logger.cli.raw('\n' + chalk.bold('Usage:'));
+	logger.cli.raw(`  ${chalk.cyan('pnpm bench')} <suite> <scenario> [options]`);
 
-	console.log('\n' + chalk.bold('Commands:'));
-	console.log(`  ${chalk.cyan('--history')} [limit]              Show recent runs`);
-	console.log(`  ${chalk.cyan('--evaluators')}                  Show evaluator stats`);
-	console.log(`  ${chalk.cyan('--stats')} suite <name>          Suite statistics`);
-	console.log(`  ${chalk.cyan('--stats')} scenario <s> <sc>     Scenario statistics`);
-	console.log(`  ${chalk.cyan('--stats')} run <id>              Run details`);
-	console.log(`  ${chalk.cyan('--batches')} [limit]             List recent batches`);
-	console.log(`  ${chalk.cyan('--batch-details')} <id>          Detailed batch analytics`);
-	console.log(`  ${chalk.cyan('--compare-batches')} <id1> <id2> Compare multiple batches`);
-	console.log(`  ${chalk.cyan('--new-suite')} [name]            Create a new benchmark suite`);
-	console.log(`  ${chalk.cyan('--new-scenario')} [suite] [name] Create a new scenario in a suite`);
-	console.log(`  ${chalk.cyan('--clear-db')}                    Clear database`);
+	logger.cli.raw('\n' + chalk.bold('Commands:'));
+	logger.cli.raw(`  ${chalk.cyan('--history')} [limit]              Show recent runs`);
+	logger.cli.raw(`  ${chalk.cyan('--evaluators')}                  Show evaluator stats`);
+	logger.cli.raw(`  ${chalk.cyan('--stats')} suite <name>          Suite statistics`);
+	logger.cli.raw(`  ${chalk.cyan('--stats')} scenario <s> <sc>     Scenario statistics`);
+	logger.cli.raw(`  ${chalk.cyan('--stats')} run <id>              Run details`);
+	logger.cli.raw(`  ${chalk.cyan('--batches')} [limit]             List recent batches`);
+	logger.cli.raw(`  ${chalk.cyan('--batch-details')} <id>          Detailed batch analytics`);
+	logger.cli.raw(`  ${chalk.cyan('--compare-batches')} <id1> <id2> Compare multiple batches`);
+	logger.cli.raw(`  ${chalk.cyan('--new-suite')} [name]            Create a new benchmark suite`);
+	logger.cli.raw(`  ${chalk.cyan('--new-scenario')} [suite] [name] Create a new scenario in a suite`);
+	logger.cli.raw(`  ${chalk.cyan('--clear-db')}                    Clear database`);
 
-	console.log('\n' + chalk.bold('Options:'));
-	console.log(`  ${chalk.cyan('--tier')} <tier>                   Difficulty tier (varies by scenario)`);
-	console.log(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
-	console.log(`  ${chalk.cyan('--model')} <name>                Model name`);
-	console.log(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
-	console.log(`  ${chalk.cyan('--iterations')} <n>             Number of times to run benchmark (default: 1)`);
-	console.log(`  ${chalk.cyan('--enrich-template')} <path>     Template path to enrich after benchmarks`);
-	console.log(`  ${chalk.cyan('--skip-warmup')}                  Skip warmup phase (for parallel execution)`);
-	console.log(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
-	console.log(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);
-	console.log(`  ${chalk.cyan('--llm-judge-only')}               Only run LLM judge evaluator (skip other evaluators)`);
+	logger.cli.raw('\n' + chalk.bold('Options:'));
+	logger.cli.raw(`  ${chalk.cyan('--tier')} <tier>                   Difficulty tier (varies by scenario)`);
+	logger.cli.raw(`  ${chalk.cyan('--agent')} <echo|anthropic|openrouter|claude-code>      Agent to use`);
+	logger.cli.raw(`  ${chalk.cyan('--model')} <name>                Model name`);
+	logger.cli.raw(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
+	logger.cli.raw(`  ${chalk.cyan('--iterations')} <n>             Number of times to run benchmark (default: 1)`);
+	logger.cli.raw(`  ${chalk.cyan('--enrich-template')} <path>     Template path to enrich after benchmarks`);
+	logger.cli.raw(`  ${chalk.cyan('--skip-warmup')}                  Skip warmup phase (for parallel execution)`);
+	logger.cli.raw(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
+	logger.cli.raw(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);
+	logger.cli.raw(`  ${chalk.cyan('--llm-judge-only')}               Only run LLM judge evaluator (skip other evaluators)`);
 
-	console.log('\n' + chalk.bold('Model Selection:'));
-	console.log(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
-	console.log(`  ${chalk.gray('Search by:')} model name, provider, or description`);
-	console.log(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
+	logger.cli.raw('\n' + chalk.bold('Model Selection:'));
+	logger.cli.raw(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);
+	logger.cli.raw(`  ${chalk.gray('Search by:')} model name, provider, or description`);
+	logger.cli.raw(`  ${chalk.gray('Example searches:')} "gpt-4o", "llama-3", "gemma free", "claude sonnet"`);
 
 	outro(chalk.gray('Run any command to get started'));
 }

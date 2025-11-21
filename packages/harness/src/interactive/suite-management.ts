@@ -6,6 +6,7 @@ import chalk from 'chalk';
 // Import helper functions
 import { findRepoRoot } from '../lib/workspace-utils.ts';
 import { validateName, checkSuiteExists, checkScenarioExists } from '../domain/scenario.ts';
+import { logger } from '@ze/logger';
 
 async function createNewSuite(name?: string): Promise<void> {
 	const root = findRepoRoot();
@@ -73,8 +74,8 @@ async function createNewSuite(name?: string): Promise<void> {
 
 		// Show relative path
 		const relativePath = join('suites', finalSuiteName);
-		console.log(`\n${chalk.green('✓')} Suite created at: ${chalk.cyan(relativePath)}`);
-		console.log(`   ${chalk.gray('Structure:')} ${relativePath}/{prompts,scenarios}`);
+		logger.suite.raw(`\n${chalk.green('✓')} Suite created at: ${chalk.cyan(relativePath)}`);
+		logger.suite.raw(`   ${chalk.gray('Structure:')} ${relativePath}/{prompts,scenarios}`);
 
 		outro(chalk.green(`Suite "${finalSuiteName}" created successfully`));
 	} catch (error) {
@@ -280,24 +281,24 @@ This directory contains the starting codebase state for this scenario.
 		const scenarioRelativePath = join('suites', suiteName, 'scenarios', finalName);
 		const promptsRelativePath = join('suites', suiteName, 'prompts', finalName);
 
-		console.log(`\n${chalk.green('✓')} Scenario created:`);
-		console.log(`   ${chalk.cyan('Scenario:')} ${scenarioRelativePath}/`);
-		console.log(`   ${chalk.cyan('Prompts:')} ${promptsRelativePath}/`);
+		logger.suite.raw(`\n${chalk.green('✓')} Scenario created:`);
+		logger.suite.raw(`   ${chalk.cyan('Scenario:')} ${scenarioRelativePath}/`);
+		logger.suite.raw(`   ${chalk.cyan('Prompts:')} ${promptsRelativePath}/`);
 		const repoFixtureRelativePath = join('suites', suiteName, 'scenarios', finalName, 'repo-fixture');
 
-		console.log(`\n${chalk.gray('Created files:')}`);
-		console.log(`   - ${scenarioRelativePath}/scenario.yaml`);
-		console.log(`   - ${scenarioRelativePath}/oracle-answers.json`);
-		console.log(`   - ${repoFixtureRelativePath}/README.md ${chalk.dim('(setup guide)')}`);
-		console.log(`   - ${repoFixtureRelativePath}/ ${chalk.dim('(empty - add your fixture files here)')}`);
-		console.log(`   - ${promptsRelativePath}/L0-minimal.md`);
-		console.log(`   - ${promptsRelativePath}/L1-basic.md`);
-		console.log(`   - ${promptsRelativePath}/L2-directed.md`);
-		console.log(`\n${chalk.yellow('Next steps:')}`);
-		console.log(`   ${chalk.cyan('1.')} Read ${chalk.bold('repo-fixture/README.md')} for setup instructions`);
-		console.log(`   ${chalk.cyan('2.')} Add your starting codebase to ${chalk.bold('repo-fixture/')} directory`);
-		console.log(`   ${chalk.cyan('3.')} Customize ${chalk.bold('scenario.yaml')} with your scenario configuration`);
-		console.log(`   ${chalk.cyan('4.')} Update prompt files in ${chalk.bold('prompts/')} directory`);
+		logger.suite.raw(`\n${chalk.gray('Created files:')}`);
+		logger.suite.raw(`   - ${scenarioRelativePath}/scenario.yaml`);
+		logger.suite.raw(`   - ${scenarioRelativePath}/oracle-answers.json`);
+		logger.suite.raw(`   - ${repoFixtureRelativePath}/README.md ${chalk.dim('(setup guide)')}`);
+		logger.suite.raw(`   - ${repoFixtureRelativePath}/ ${chalk.dim('(empty - add your fixture files here)')}`);
+		logger.suite.raw(`   - ${promptsRelativePath}/L0-minimal.md`);
+		logger.suite.raw(`   - ${promptsRelativePath}/L1-basic.md`);
+		logger.suite.raw(`   - ${promptsRelativePath}/L2-directed.md`);
+		logger.suite.raw(`\n${chalk.yellow('Next steps:')}`);
+		logger.suite.raw(`   ${chalk.cyan('1.')} Read ${chalk.bold('repo-fixture/README.md')} for setup instructions`);
+		logger.suite.raw(`   ${chalk.cyan('2.')} Add your starting codebase to ${chalk.bold('repo-fixture/')} directory`);
+		logger.suite.raw(`   ${chalk.cyan('3.')} Customize ${chalk.bold('scenario.yaml')} with your scenario configuration`);
+		logger.suite.raw(`   ${chalk.cyan('4.')} Update prompt files in ${chalk.bold('prompts/')} directory`);
 
 		outro(chalk.green(`Scenario "${finalName}" created successfully in suite "${suiteName}"`));
 	} catch (error) {

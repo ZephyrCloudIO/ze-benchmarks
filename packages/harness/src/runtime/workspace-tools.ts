@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from '
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
+import { logger } from '@ze/logger';
 
 export type ToolDefinition = {
 	name: string;
@@ -119,7 +120,7 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 	// readFile handler
 	handlers.set('readFile', async (input: { path: string }): Promise<string> => {
-		console.log(chalk.blue(`[readFile] Reading: ${input.path}`));
+		logger.workspace.info(`[readFile] Reading: ${input.path}`);
 
 		const fullPath = join(workspaceDir, input.path);
 
@@ -145,17 +146,17 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 		try {
 			const content = readFileSync(fullPath, 'utf8');
-			console.log(chalk.green(`[readFile] ✓ Read ${input.path} (${content.length} bytes)`));
+			logger.workspace.success(`[readFile] ✓ Read ${input.path} (${content.length} bytes)`);
 			return content;
 		} catch (error) {
-			console.error(chalk.red(`[readFile] ❌ Failed to read ${input.path}:`), error);
+			logger.workspace.error(`[readFile] ❌ Failed to read ${input.path}:`, error);
 			return `Error reading file: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
 
 	// writeFile handler
 	handlers.set('writeFile', async (input: { path: string; content: string }): Promise<string> => {
-		console.log(chalk.blue(`[writeFile] Writing to: ${input.path} (${input.content.length} bytes)`));
+		logger.workspace.info(`[writeFile] Writing to: ${input.path} (${input.content.length} bytes)`);
 
 		const fullPath = join(workspaceDir, input.path);
 
@@ -172,10 +173,10 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 		try {
 			writeFileSync(fullPath, input.content, 'utf8');
-			console.log(chalk.green(`[writeFile] ✓ Successfully wrote ${input.path}`));
+			logger.workspace.success(`[writeFile] ✓ Successfully wrote ${input.path}`);
 			return `Successfully wrote to ${input.path}`;
 		} catch (error) {
-			console.error(chalk.red(`[writeFile] ❌ Failed to write ${input.path}:`), error);
+			logger.workspace.error(`[writeFile] ❌ Failed to write ${input.path}:`, error);
 			return `Error writing file: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
@@ -183,7 +184,7 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 	// runCommand handler
 	handlers.set('runCommand', async (input: { command: string; description?: string }): Promise<string> => {
 		const desc = input.description || input.command;
-		console.log(chalk.blue(`[runCommand] Starting: ${desc}`));
+		logger.workspace.info(`[runCommand] Starting: ${desc}`);
 
 		try {
 			const output = execSync(input.command, {
@@ -194,21 +195,21 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 				stdio: 'pipe'
 			});
 
-			console.log(chalk.green(`[runCommand] ✓ Completed: ${desc}`));
+			logger.workspace.success(`[runCommand] ✓ Completed: ${desc}`);
 			const preview = output ? output.substring(0, 200) : '(no output)';
-			console.log(chalk.gray(`[runCommand] Output: ${preview}${output && output.length > 200 ? '...' : ''}`));
+			logger.workspace.debug(`[runCommand] Output: ${preview}${output && output.length > 200 ? '...' : ''}`);
 			return output || 'Command completed successfully (no output)';
 		} catch (error: any) {
 			const message = error.stderr || error.stdout || error.message || String(error);
-			console.error(chalk.red(`[runCommand] ❌ Failed: ${desc}`));
-			console.error(chalk.gray(`[runCommand] Error: ${message.slice(0, 200)}`));
+			logger.workspace.error(`[runCommand] ❌ Failed: ${desc}`);
+			logger.workspace.debug(`[runCommand] Error: ${message.slice(0, 200)}`);
 			return `Command failed: ${message}`;
 		}
 	});
 
 	// listFiles handler
 	handlers.set('listFiles', async (input: { path: string }): Promise<string> => {
-		console.log(chalk.blue(`[listFiles] Listing: ${input.path}`));
+		logger.workspace.info(`[listFiles] Listing: ${input.path}`);
 
 		const fullPath = join(workspaceDir, input.path);
 
@@ -237,23 +238,23 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 				return `${type.padEnd(4)} ${entry}`;
 			});
 
-			console.log(chalk.green(`[listFiles] ✓ Found ${details.length} entries in ${input.path}`));
+			logger.workspace.success(`[listFiles] ✓ Found ${details.length} entries in ${input.path}`);
 			return details.join('\n');
 		} catch (error) {
-			console.error(chalk.red(`[listFiles] ❌ Failed to list ${input.path}:`), error);
+			logger.workspace.error(`[listFiles] ❌ Failed to list ${input.path}:`, error);
 			return `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});
 
 	// fetchUrl handler
 	handlers.set('fetchUrl', async (input: { url: string }): Promise<string> => {
-		console.log(chalk.blue(`[fetchUrl] Fetching: ${input.url}`));
+		logger.workspace.info(`[fetchUrl] Fetching: ${input.url}`);
 
 		try {
 			const response = await fetch(input.url);
 
 			if (!response.ok) {
-				console.error(chalk.red(`[fetchUrl] ❌ HTTP ${response.status}: ${input.url}`));
+				logger.workspace.error(`[fetchUrl] ❌ HTTP ${response.status}: ${input.url}`);
 				return `Error: HTTP ${response.status} - ${response.statusText}`;
 			}
 
@@ -270,16 +271,16 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 					.replace(/\s+/g, ' ')
 					.trim();
 
-				console.log(chalk.green(`[fetchUrl] ✓ Fetched HTML from ${input.url} (${cleaned.length} chars)`));
+				logger.workspace.success(`[fetchUrl] ✓ Fetched HTML from ${input.url} (${cleaned.length} chars)`);
 				return cleaned;
 			} else {
 				// For other content types, return as text
 				const text = await response.text();
-				console.log(chalk.green(`[fetchUrl] ✓ Fetched ${input.url} (${text.length} chars)`));
+				logger.workspace.success(`[fetchUrl] ✓ Fetched ${input.url} (${text.length} chars)`);
 				return text;
 			}
 		} catch (error) {
-			console.error(chalk.red(`[fetchUrl] ❌ Failed to fetch ${input.url}:`), error);
+			logger.workspace.error(`[fetchUrl] ❌ Failed to fetch ${input.url}:`, error);
 			return `Error fetching URL: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	});

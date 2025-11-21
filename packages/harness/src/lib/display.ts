@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import { spinner } from '@clack/prompts';
 import { TABLE_WIDTH, SCORE_THRESHOLDS, TOTAL_STAGES, type ProgressState } from './constants.ts';
+import { logger } from '@ze/logger';
 
 // ============================================================================
 // PROGRESS TRACKING
@@ -70,10 +71,10 @@ export function displayLLMJudgeScores(
   try {
     const parsedDetails = JSON.parse(details);
     if (parsedDetails.scores && Array.isArray(parsedDetails.scores)) {
-      console.log(`\n${chalk.bold.underline('LLM Judge Detailed Scores')}`);
-      console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-      console.log(`│ ${chalk.bold('Category'.padEnd(40))} ${chalk.bold('Score'.padEnd(8))} ${chalk.bold('Status'.padEnd(15))} │`);
-      console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+      logger.display.raw(`\n${chalk.bold.underline('LLM Judge Detailed Scores')}`);
+      logger.display.raw(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+      logger.display.raw(`│ ${chalk.bold('Category'.padEnd(40))} ${chalk.bold('Score'.padEnd(8))} ${chalk.bold('Status'.padEnd(15))} │`);
+      logger.display.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
 
       // Get category names from scenario configuration
       const categoryNames = scenario?.llm_judge?.categories || [];
@@ -110,27 +111,27 @@ export function displayLLMJudgeScores(
           const status = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'Excellent' : percent >= SCORE_THRESHOLDS.GOOD ? 'Good' : 'Needs Work';
           const statusColor = percent >= SCORE_THRESHOLDS.EXCELLENT ? 'green' : percent >= SCORE_THRESHOLDS.GOOD ? 'yellow' : 'red';
 
-          console.log(`│ ${chalk.cyan(displayName.padEnd(40))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
+          logger.display.raw(`│ ${chalk.cyan(displayName.padEnd(40))} ${chalk[color]((score.score.toFixed(1)).padEnd(8))} ${chalk[statusColor](status.padEnd(15))} │`);
         } else {
-          console.log(`│ ${chalk.red(displayName.padEnd(40))} ${chalk.red('N/A'.padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
+          logger.display.raw(`│ ${chalk.red(displayName.padEnd(40))} ${chalk.red('N/A'.padEnd(8))} ${chalk.red('Missing'.padEnd(15))} │`);
         }
       });
 
-      console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+      logger.display.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
       if (parsedDetails.overall_assessment) {
-        console.log(`\n${chalk.bold('LLM Judge Assessment:')}`);
-        console.log(chalk.gray(parsedDetails.overall_assessment));
+        logger.display.raw(`\n${chalk.bold('LLM Judge Assessment:')}`);
+        logger.display.debug(parsedDetails.overall_assessment);
       }
 
       if (parsedDetails.input_tokens) {
-        console.log(`\n${chalk.bold('Token Usage:')}`);
-        console.log(chalk.blue(`Input tokens: ${parsedDetails.input_tokens}`));
+        logger.display.raw(`\n${chalk.bold('Token Usage:')}`);
+        logger.display.info(`Input tokens: ${parsedDetails.input_tokens}`);
       }
     }
   } catch (error) {
-    console.log(`\n${chalk.bold('LLM Judge Details:')}`);
-    console.log(chalk.gray(details));
+    logger.display.raw(`\n${chalk.bold('LLM Judge Details:')}`);
+    logger.display.debug(details);
   }
 }
 
@@ -144,28 +145,28 @@ export function displayRunInfo(run: { status: string; suite: string; scenario: s
     ? chalk.yellow('◐')
     : chalk.blue('○');
 
-  console.log(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
-  console.log(`   ${formatStats('Agent', run.agent + (run.model ? ` (${run.model})` : ''))}`);
-  console.log(`   ${formatStats('Score', run.weightedScore?.toFixed(4) || 'N/A', 'green')}`);
-  console.log(`   ${chalk.gray(new Date(run.startedAt).toLocaleString())}`);
-  console.log(`   ${chalk.dim(`ID: ${run.runId.substring(0, 8)}...`)}`);
+  logger.display.raw(`\n${chalk.bold(`${index + 1}.`)} ${status} ${chalk.cyan(run.suite)}/${chalk.cyan(run.scenario)} ${chalk.gray(`(${run.tier})`)}`);
+  logger.display.raw(`   ${formatStats('Agent', run.agent + (run.model ? ` (${run.model})` : ''))}`);
+  logger.display.raw(`   ${formatStats('Score', run.weightedScore?.toFixed(4) || 'N/A', 'green')}`);
+  logger.display.raw(`   ${chalk.gray(new Date(run.startedAt).toLocaleString())}`);
+  logger.display.raw(`   ${chalk.dim(`ID: ${run.runId.substring(0, 8)}...`)}`);
 }
 
 
 export function displayModelPerformance(modelStats: Array<{ model: string; avgScore: number; runs: number }>) {
   if (modelStats.length === 0) return;
 
-  console.log('\n' + chalk.underline('Model Performance'));
+  logger.display.raw('\n' + chalk.underline('Model Performance'));
   modelStats.forEach((model, index) => {
     const rank = index + 1;
     const rankDisplay = rank <= 3 ? `#${rank}` : `${rank}.`;
     const percent = model.avgScore > 1 ? model.avgScore.toFixed(1) : (model.avgScore * 100).toFixed(1);
     const color = model.avgScore >= 0.9 ? 'green' : model.avgScore >= 0.7 ? 'yellow' : 'red';
 
-    console.log(`  ${rankDisplay} ${chalk.bold(model.model.padEnd(35))} ${chalk[color](percent + '%')} ${chalk.gray(`(${model.runs} runs)`)}`);
+    logger.display.raw(`  ${rankDisplay} ${chalk.bold(model.model.padEnd(35))} ${chalk[color](percent + '%')} ${chalk.gray(`(${model.runs} runs)`)}`);
   });
 
   const bestModel = modelStats[0];
   const bestPercent = bestModel.avgScore > 1 ? bestModel.avgScore.toFixed(1) : (bestModel.avgScore * 100).toFixed(1);
-  console.log(`\n  ${chalk.cyan('Top Model:')} ${chalk.bold(bestModel.model)} ${chalk.green(bestPercent + '%')} ${chalk.gray(`(${bestModel.runs} runs)`)}`);
+  logger.display.raw(`\n  ${chalk.cyan('Top Model:')} ${chalk.bold(bestModel.model)} ${chalk.green(bestPercent + '%')} ${chalk.gray(`(${bestModel.runs} runs)`)}`);
 }

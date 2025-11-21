@@ -11,12 +11,18 @@ importers:
       '@clack/prompts':
         specifier: ^0.11.0
         version: 0.11.0
+      '@types/debug':
+        specifier: ^4.1.12
+        version: 4.1.12
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
       cli-progress:
         specifier: ^3.12.0
         version: 3.12.0
+      debug:
+        specifier: ^4.4.3
+        version: 4.4.3
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -179,6 +185,9 @@ importers:
 
   packages/agency-prompt-creator:
     dependencies:
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       json5:
         specifier: ^2.2.3
         version: 2.2.3
@@ -204,6 +213,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.65.0
         version: 0.65.0(zod@3.25.76)
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       agency-prompt-creator:
         specifier: workspace:*
         version: link:../agency-prompt-creator
@@ -226,6 +238,9 @@ importers:
 
   packages/evaluators:
     dependencies:
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -254,6 +269,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.17.0
         version: 1.22.0
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@ze/worker-client':
         specifier: workspace:*
         version: link:../worker-client
@@ -280,8 +298,33 @@ importers:
         specifier: ^5.5.4
         version: 5.9.3
 
+  packages/logger:
+    dependencies:
+      '@clack/prompts':
+        specifier: ^0.11.0
+        version: 0.11.0
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
+      debug:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/debug':
+        specifier: ^4.1.12
+        version: 4.1.12
+      '@types/node':
+        specifier: ^20.14.10
+        version: 20.19.19
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.3
+
   packages/specialist-mint:
     dependencies:
+      '@ze/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@ze/worker-client':
         specifier: workspace:*
         version: link:../worker-client
@@ -2640,6 +2683,9 @@ packages:
   '@types/d3-timer@3.0.2':
     resolution: {integrity: sha512-Ps3T8E8dZDam6fUyNiMkekK3XUsaUEik+idO9/YjPtfj2qruF8tFBXS7XhtE4iIXBLxhmLjP3SXpLhVf21I9Lw==}
 
+  '@types/debug@4.1.12':
+    resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
+
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
@@ -2657,6 +2703,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/ms@2.1.0':
+    resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
   '@types/node-fetch@2.6.13':
     resolution: {integrity: sha512-QGpRVpzSaUs30JBSGPjOg4Uveu384erbHBoT1zeONvyCfwQxIkUshLAOqN/k9EjGviPRmWTTe6aH2qySWKTVSw==}
@@ -7282,6 +7331,10 @@ snapshots:
 
   '@types/d3-timer@3.0.2': {}
 
+  '@types/debug@4.1.12':
+    dependencies:
+      '@types/ms': 2.1.0
+
   '@types/deep-eql@4.0.2': {}
 
   '@types/eslint-scope@3.7.7':
@@ -7299,6 +7352,8 @@ snapshots:
   '@types/figlet@1.7.0': {}
 
   '@types/json-schema@7.0.15': {}
+
+  '@types/ms@2.1.0': {}
 
   '@types/node-fetch@2.6.13':
     dependencies:
@@ -7560,7 +7615,7 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
-  axios-retry@4.5.0(axios@1.13.2):
+  axios-retry@4.5.0(axios@1.13.2(debug@4.4.3)):
     dependencies:
       axios: 1.13.2(debug@4.4.3)
       is-retry-allowed: 2.2.0
@@ -10140,7 +10195,7 @@ snapshots:
   zephyr-agent@0.1.1:
     dependencies:
       axios: 1.13.2(debug@4.4.3)
-      axios-retry: 4.5.0(axios@1.13.2)
+      axios-retry: 4.5.0(axios@1.13.2(debug@4.4.3))
       cloudflare: 3.5.0
       debug: 4.4.3
       eventsource: 4.0.0
