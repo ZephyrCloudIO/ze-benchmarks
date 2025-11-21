@@ -7,6 +7,39 @@ import { Env } from '../types';
 
 type CF = [env: Env, ctx: ExecutionContext];
 
+// Helper function to extract JSON from AI response
+function extractJSON(content: string): any {
+  let cleaned = content.trim();
+
+  // Remove all markdown code block markers
+  cleaned = cleaned.replace(/```json\n?/g, '');
+  cleaned = cleaned.replace(/```\n?/g, '');
+  cleaned = cleaned.trim();
+
+  // If still doesn't start with { or [, try to find JSON object
+  if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+    const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[1].trim();
+    }
+  }
+
+  // Fix line breaks in JSON strings by normalizing whitespace in string values
+  // This regex finds string values and replaces line breaks with spaces
+  try {
+    // First attempt: try parsing as-is
+    return JSON.parse(cleaned);
+  } catch (firstError) {
+    // Second attempt: normalize line breaks in strings
+    // Replace newlines followed by indentation with a space
+    cleaned = cleaned.replace(/"\s*\n\s+/g, '" ');
+    cleaned = cleaned.replace(/:\s*"([^"]*)\n\s+([^"]*)"/g, ': "$1 $2"');
+
+    // Try parsing again
+    return JSON.parse(cleaned);
+  }
+}
+
 // List all RoleDefs
 export async function listRoleDefs(request: IRequest, ...[env]: CF) {
   try {
@@ -150,8 +183,7 @@ Generate comprehensive role definition details.`;
     // Parse AI response
     let aiData;
     try {
-      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      aiData = JSON.parse(cleanContent);
+      aiData = extractJSON(content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       return body;
@@ -360,6 +392,8 @@ Analyze the document and extract:
 - Capabilities and expertise areas (for capabilities)
 - Best practices and considerations
 
+CRITICAL: Return ONLY valid JSON without any markdown code blocks or formatting. All string values must be on a single line without line breaks.
+
 Return a JSON object with this structure:
 {
   "persona": {
@@ -369,7 +403,7 @@ Return a JSON object with this structure:
   },
   "capabilities": {
     "tags": ["array of capability tags"],
-    "descriptions": {"tag1": "description", ...},
+    "descriptions": {"tag1": "single line description without line breaks", ...},
     "considerations": ["array of best practices and guidelines"]
   },
   "documentation": [
@@ -379,7 +413,7 @@ Return a JSON object with this structure:
 
 Only include information that is clearly mentioned or strongly implied in the document.`;
 
-    const userPrompt = `Document content:\n\n${fileContent}\n\nExtract relevant information for an AI agent role definition.`;
+    const userPrompt = `Document content:\n\n${fileContent}\n\nExtract relevant information for an AI agent role definition. Return ONLY the JSON object without any markdown formatting or code blocks.`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -388,7 +422,7 @@ Only include information that is clearly mentioned or strongly implied in the do
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'anthropic/claude-sonnet-4.5',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -411,8 +445,7 @@ Only include information that is clearly mentioned or strongly implied in the do
 
     let enrichedData;
     try {
-      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      enrichedData = JSON.parse(cleanContent);
+      enrichedData = extractJSON(content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       return errorResponse('Failed to parse AI response', 500);
@@ -455,6 +488,8 @@ Analyze the content and extract:
 - Best practices and guidelines (for considerations)
 - Documentation references
 
+CRITICAL: Return ONLY valid JSON without any markdown code blocks or formatting. All string values must be on a single line without line breaks.
+
 Return a JSON object with this structure:
 {
   "persona": {
@@ -462,7 +497,7 @@ Return a JSON object with this structure:
   },
   "capabilities": {
     "tags": ["array of capability tags"],
-    "descriptions": {"tag1": "description", ...},
+    "descriptions": {"tag1": "single line description without line breaks", ...},
     "considerations": ["array of best practices"]
   },
   "documentation": [
@@ -470,7 +505,7 @@ Return a JSON object with this structure:
   ]
 }`;
 
-    const userPrompt = `Web page content:\n\n${content.substring(0, 10000)}\n\nExtract relevant information for an AI agent role definition.`;
+    const userPrompt = `Web page content:\n\n${content.substring(0, 10000)}\n\nExtract relevant information for an AI agent role definition. Return ONLY the JSON object without any markdown formatting or code blocks.`;
 
     const aiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -479,7 +514,7 @@ Return a JSON object with this structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'anthropic/claude-sonnet-4.5',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -502,8 +537,7 @@ Return a JSON object with this structure:
 
     let enrichedData;
     try {
-      const cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      enrichedData = JSON.parse(cleanContent);
+      enrichedData = extractJSON(aiContent);
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiContent);
       return errorResponse('Failed to parse AI response', 500);
@@ -580,8 +614,7 @@ Return a JSON object with this structure:
 
     let enrichedData;
     try {
-      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      enrichedData = JSON.parse(cleanContent);
+      enrichedData = extractJSON(content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       return errorResponse('Failed to parse AI response', 500);
@@ -608,19 +641,26 @@ export async function getSuggestedCriteria(request: IRequest, ...[env]: CF) {
 
     // Build the prompt for GPT-4o-mini
     const systemPrompt = `You are an AI assistant that suggests evaluation criteria for different roles and categories.
-Return a JSON array of criteria objects, each with:
+Return a JSON object with a "criteria" field containing an array of criteria objects, each with:
 - name: string (criterion name)
 - description: string (brief description)
 - category: string (one of: technical, communication, architecture, devops, soft-skills, domain)
 - defaultScore: number (1-5, suggested default score)
 
-Suggest 8-12 relevant criteria based on the role and category provided.`;
+Suggest 8-12 relevant criteria based on the role and category provided.
+
+Example format:
+{
+  "criteria": [
+    {"name": "...", "description": "...", "category": "...", "defaultScore": 3}
+  ]
+}`;
 
     const userPrompt = `Suggest evaluation criteria for:
 Role: ${role}
 Category: ${category === 'all' ? 'all categories' : category}
 
-Return only valid JSON array without any markdown formatting.`;
+Return only valid JSON object without any markdown formatting.`;
 
     // Call OpenRouter API with gpt-4o-mini
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -654,15 +694,16 @@ Return only valid JSON array without any markdown formatting.`;
     }
 
     // Parse the JSON response
-    let criteria;
+    let result;
     try {
-      // Remove markdown code blocks if present
-      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      criteria = JSON.parse(cleanContent);
+      result = extractJSON(content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       return errorResponse('Failed to parse AI suggestions', 500);
     }
+
+    // Extract criteria array from the result
+    const criteria = result.criteria || result;
 
     // Validate the response format
     if (!Array.isArray(criteria)) {
