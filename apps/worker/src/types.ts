@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   API_SECRET_KEY?: string;
+  OPENROUTER_API_KEY?: string;
   ENVIRONMENT: string;
 }
 

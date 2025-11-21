@@ -1,11 +1,20 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import RoleSelection from './pages/RoleSelection';
+import EvaluationCriteria from './pages/EvaluationCriteria';
+import RoleDefDetail from './pages/RoleDefDetail';
 import './App.css';
 
 const App = () => {
   return (
-    <div className="content">
-      <h1>Rsbuild with React</h1>
-      <p>Start building amazing things with Rsbuild.</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/create" element={<RoleSelection />} />
+        <Route path="/create/criteria" element={<EvaluationCriteria />} />
+        <Route path="/roledef/:id" element={<RoleDefDetail />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 

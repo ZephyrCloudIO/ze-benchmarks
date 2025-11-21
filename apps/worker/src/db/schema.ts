@@ -105,3 +105,62 @@ export type NewEvaluationResult = typeof evaluationResults.$inferInsert;
 
 export type RunTelemetry = typeof runTelemetry.$inferSelect;
 export type NewRunTelemetry = typeof runTelemetry.$inferInsert;
+
+// RoleDef tables
+export const roleDefs = sqliteTable('role_defs', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  version: text('version').notNull(),
+  schemaVersion: text('schema_version').notNull().default('0.0.1'),
+  license: text('license').default('MIT'),
+  availability: text('availability').default('public'),
+
+  // JSON fields
+  maintainers: text('maintainers').notNull(), // JSON array
+  persona: text('persona').notNull(), // JSON object
+  capabilities: text('capabilities').notNull(), // JSON object
+  dependencies: text('dependencies').notNull(), // JSON object
+  documentation: text('documentation').notNull(), // JSON array
+  preferredModels: text('preferred_models').notNull(), // JSON array
+  prompts: text('prompts').notNull(), // JSON object
+  spawnableSubAgents: text('spawnable_sub_agents').notNull(), // JSON array
+
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => ({
+  nameIdx: index('idx_roledefs_name').on(table.name),
+  createdAtIdx: index('idx_roledefs_created_at').on(table.createdAt),
+}));
+
+export const evaluationCriteria = sqliteTable('evaluation_criteria', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  roleDefId: text('role_def_id').notNull().references(() => roleDefs.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  score: integer('score').notNull(), // 1-5
+  category: text('category'), // for grouping criteria
+  isCustom: integer('is_custom', { mode: 'boolean' }).default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => ({
+  roleDefIdIdx: index('idx_criteria_roledef_id').on(table.roleDefId),
+}));
+
+// Relations
+export const roleDefsRelations = relations(roleDefs, ({ many }) => ({
+  evaluationCriteria: many(evaluationCriteria),
+}));
+
+export const evaluationCriteriaRelations = relations(evaluationCriteria, ({ one }) => ({
+  roleDef: one(roleDefs, {
+    fields: [evaluationCriteria.roleDefId],
+    references: [roleDefs.id],
+  }),
+}));
+
+// Export types
+export type RoleDef = typeof roleDefs.$inferSelect;
+export type NewRoleDef = typeof roleDefs.$inferInsert;
+
+export type EvaluationCriteria = typeof evaluationCriteria.$inferSelect;
+export type NewEvaluationCriteria = typeof evaluationCriteria.$inferInsert;

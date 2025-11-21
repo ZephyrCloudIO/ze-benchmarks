@@ -1,0 +1,207 @@
+/* Evaluation Criteria Page Styles */
+
+.criteria-filters {
+  background: var(--background);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.criteria-filters label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.criteria-section {
+  background: var(--background);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.section-help {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.criteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.criteria-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  transition: all 0.2s ease;
+}
+
+.criteria-item.selected {
+  border-color: var(--primary);
+  background: rgba(49, 130, 246, 0.03);
+}
+
+.criteria-checkbox {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.criteria-checkbox input[type="checkbox"] {
+  margin-top: 4px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.criteria-checkbox label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.criteria-checkbox label strong {
+  font-size: 16px;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.criteria-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: var(--spacing-xs) 0;
+  line-height: 1.5;
+}
+
+.criteria-category {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--primary);
+  background: rgba(49, 130, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: var(--spacing-xs);
+}
+
+.criteria-score {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.criteria-score label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.score-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.score-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.score-btn:hover {
+  border-color: var(--primary);
+  background: rgba(49, 130, 246, 0.05);
+}
+
+.score-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Custom Criteria Form */
+.custom-criteria-form {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: var(--spacing-md);
+  align-items: start;
+}
+
+.custom-criteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.custom-criteria-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  background: var(--secondary);
+  border-radius: var(--radius-md);
+}
+
+.custom-criteria-item strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.custom-criteria-item p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: var(--spacing-xs);
+}
+
+.btn-remove {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 20px;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
+}
+
+.btn-remove:hover {
+  background: rgba(240, 68, 82, 0.1);
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .criteria-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
