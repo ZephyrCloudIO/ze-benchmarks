@@ -27,7 +27,7 @@ function loadJSON5(filePath: string): any {
 }
 
 // Load schemas
-const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.json5');
+const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.jsonc');
 const snapshotSchemaPath = join(__dirname, 'schemas', 'snapshot.schema.json5');
 
 const templateSchema = loadJSON5(templateSchemaPath);
