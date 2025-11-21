@@ -4,6 +4,9 @@ import * as path from 'node:path';
 import * as semver from 'semver';
 import chalk from 'chalk';
 import { findProjectDir } from '../utils/workspace.ts';
+import { logger } from '@ze/logger';
+
+const log = logger.dependencyProximity;
 
 export class DependencyProximityEvaluator implements Evaluator {
 	meta = { name: 'DependencyProximityEvaluator' } as const;
@@ -11,13 +14,13 @@ export class DependencyProximityEvaluator implements Evaluator {
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
 			// Log the paths received from context
-			console.log(chalk.blue(`[DependencyProximityEvaluator] Suites dir from context: ${ctx.suitesDir || 'not provided'}`));
-			console.log(chalk.blue(`[DependencyProximityEvaluator] Reference path from context: ${ctx.referencePath || 'not provided'}`));
-			console.log(chalk.blue(`[DependencyProximityEvaluator] Workspace dir: ${ctx.workspaceDir}`));
+			log.debug(chalk.blue(`[DependencyProximityEvaluator] Suites dir from context: ${ctx.suitesDir || 'not provided'}`));
+			log.debug(chalk.blue(`[DependencyProximityEvaluator] Reference path from context: ${ctx.referencePath || 'not provided'}`));
+			log.debug(chalk.blue(`[DependencyProximityEvaluator] Workspace dir: ${ctx.workspaceDir}`));
 
 			// Use reference path from context (no filesystem traversal needed)
 			if (!ctx.referencePath || !fs.existsSync(ctx.referencePath)) {
-				console.error(chalk.red(`[DependencyProximityEvaluator] ❌ Reference not found: ${ctx.referencePath || 'undefined'}`));
+				log.error(chalk.red(`[DependencyProximityEvaluator] ❌ Reference not found: ${ctx.referencePath || 'undefined'}`));
 				return {
 					name: this.meta.name,
 					score: 0,
@@ -26,8 +29,8 @@ export class DependencyProximityEvaluator implements Evaluator {
 			}
 
 			const contents = fs.readdirSync(ctx.referencePath);
-			console.log(chalk.green(`[DependencyProximityEvaluator] ✓ Reference found`));
-			console.log(chalk.blue(`[DependencyProximityEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
+			log.debug(chalk.green(`[DependencyProximityEvaluator] ✓ Reference found`));
+			log.debug(chalk.blue(`[DependencyProximityEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
 
 			// Find the generated project directory (not 'control')
 			const projectDir = findProjectDir(ctx.workspaceDir);

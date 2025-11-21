@@ -9,6 +9,10 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, isAbsolute } from 'node:path';
 import type { SpecialistTemplate, LoadTemplateOptions } from './types.js';
+import { logger } from '@ze/logger';
+
+const log = logger.templateLoader;
+
 import {
   mergeTemplates,
   validateTemplate,
@@ -100,10 +104,10 @@ async function loadTemplateRecursive(
   } catch (error) {
     // Parent template not found or failed to load - use template without inheritance
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(
+    log.warn(
       `[Template Loader] Parent template '${template.from}' not found or failed to load: ${errorMessage}`
     );
-    console.warn(
+    log.warn(
       `[Template Loader] Continuing without inheritance for: ${resolvedPath}`
     );
 
@@ -132,7 +136,13 @@ function resolveTemplatePath(templatePath: string, baseDir: string): string {
 
   // Scoped package reference
   if (templatePath.startsWith('@')) {
-    return join(baseDir, 'personas', `${templatePath}.json5`);
+    // Try .jsonc first, then .json5
+    const jsoncPath = join(baseDir, 'personas', `${templatePath}.jsonc`);
+    const json5Path = join(baseDir, 'personas', `${templatePath}.json5`);
+    if (existsSync(jsoncPath)) {
+      return jsoncPath;
+    }
+    return json5Path;
   }
 
   // Relative path
@@ -171,8 +181,8 @@ async function loadTemplateFile(filePath: string): Promise<any> {
       JSON5 = json5Module.default || json5Module;
     }
     
-    if (hasComments || hasTrailingCommas || filePath.endsWith('.json5')) {
-      // Use JSON5 for .json5 files or files with comments
+    if (hasComments || hasTrailingCommas || filePath.endsWith('.json5') || filePath.endsWith('.jsonc')) {
+      // Use JSON5 for .json5/.jsonc files or files with comments
       try {
         return JSON5.parse(content);
       } catch (json5Error) {

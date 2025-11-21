@@ -5,6 +5,9 @@ import JSON5 from 'json5';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from '@ze/logger';
+
+const log = logger.validateSchemas;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,7 +27,7 @@ function loadJSON5(filePath: string): any {
 }
 
 // Load schemas
-const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.json5');
+const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.jsonc');
 const snapshotSchemaPath = join(__dirname, 'schemas', 'snapshot.schema.json5');
 
 const templateSchema = loadJSON5(templateSchemaPath);
@@ -40,45 +43,45 @@ const exampleFiles = {
   nxSnapshot: join(__dirname, '..', '..', 'generic_nx_snapshot_example.json5'),
 };
 
-console.log('🔍 Validating Specialist Schemas\n');
-console.log('Note: Both example files are snapshots (include benchmarks section)\n');
+log.debug('🔍 Validating Specialist Schemas\n');
+log.debug('Note: Both example files are snapshots (include benchmarks section)\n');
 
 // Validate shadcn snapshot
-console.log('📄 Validating Snapshot: shadcn-specialist.json5');
+log.debug('📄 Validating Snapshot: shadcn-specialist.json5');
 const shadcnSnapshot = loadJSON5(exampleFiles.shadcnSnapshot);
 const isShadcnValid = validateSnapshot(shadcnSnapshot);
 
 if (isShadcnValid) {
-  console.log('✅ shadcn-specialist validation passed!\n');
+  log.debug('✅ shadcn-specialist validation passed!\n');
 } else {
-  console.log('❌ shadcn-specialist validation failed:');
-  console.log(JSON.stringify(validateSnapshot.errors, null, 2));
-  console.log();
+  log.debug('❌ shadcn-specialist validation failed:');
+  log.debug(JSON.stringify(validateSnapshot.errors, null, 2));
+  log.debug();
 }
 
 // Validate nx snapshot
-console.log('📄 Validating Snapshot: generic_nx_snapshot_example.json5');
+log.debug('📄 Validating Snapshot: generic_nx_snapshot_example.json5');
 const nxSnapshot = loadJSON5(exampleFiles.nxSnapshot);
 const isNxValid = validateSnapshot(nxSnapshot);
 
 if (isNxValid) {
-  console.log('✅ generic_nx_snapshot validation passed!\n');
+  log.debug('✅ generic_nx_snapshot validation passed!\n');
 } else {
-  console.log('❌ generic_nx_snapshot validation failed:');
-  console.log(JSON.stringify(validateSnapshot.errors, null, 2));
-  console.log();
+  log.debug('❌ generic_nx_snapshot validation failed:');
+  log.debug(JSON.stringify(validateSnapshot.errors, null, 2));
+  log.debug();
 }
 
 // Summary
-console.log('📊 Summary:');
-console.log(`shadcn-specialist.json5: ${isShadcnValid ? '✅ Valid' : '❌ Invalid'}`);
-console.log(`generic_nx_snapshot_example.json5: ${isNxValid ? '✅ Valid' : '❌ Invalid'}`);
+log.debug('📊 Summary:');
+log.debug(`shadcn-specialist.json5: ${isShadcnValid ? '✅ Valid' : '❌ Invalid'}`);
+log.debug(`generic_nx_snapshot_example.json5: ${isNxValid ? '✅ Valid' : '❌ Invalid'}`);
 
 // Exit with error code if validation failed
 if (!isShadcnValid || !isNxValid) {
   process.exit(1);
 }
 
-console.log('\n🎉 All snapshot schemas validated successfully!');
-console.log('\nNote: Template schema can be used for specialists without benchmarks.');
-console.log('The template schema validates all required fields and is a subset of the snapshot schema.');
+log.debug('\n🎉 All snapshot schemas validated successfully!');
+log.debug('\nNote: Template schema can be used for specialists without benchmarks.');
+log.debug('The template schema validates all required fields and is a subset of the snapshot schema.');

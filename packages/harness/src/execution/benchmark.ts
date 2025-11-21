@@ -26,6 +26,7 @@ import { createAgentAdapter } from '../domain/agent.ts';
 import { computeWeightedTotals, calculateSuccess } from '../domain/scoring.ts';
 import { displayLLMJudgeScores, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
 import { TABLE_WIDTH, SCORE_THRESHOLDS } from '../lib/constants.ts';
+import { logger } from '@ze/logger';
 
 // Get workspace root for specialist template resolution
 const workspaceRoot = findWorkspaceRoot(process.cwd());
@@ -64,13 +65,13 @@ export async function executeBenchmark(
 	llmJudgeOnly: boolean = true
 ) {
 	// Initialize logger
-	const logger = BenchmarkLogger.getInstance();
+	const benchmarkLogger = BenchmarkLogger.getInstance();
 
 	// Determine the agent name to log (will be updated if specialist is used)
 	// Use 'auto-detect' as placeholder if agent is undefined and specialist is provided
 	let agentName = agent || (specialist ? 'auto-detect' : 'echo');
 	const agentDisplay = agent || 'auto-detect'; // For display purposes throughout the function
-	const runId = logger.startRun(suite, scenario, tier, agentName, model, batchId);
+	const runId = await benchmarkLogger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
 	
 	// Store run data locally to avoid race conditions in parallel execution
@@ -112,19 +113,33 @@ export async function executeBenchmark(
 		const timeoutMs = Math.max(1, scenarioTimeoutMin) * 60 * 1000;
 		timeoutId = setTimeout(() => {
 			try {
-				logger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
-				if (!quiet) console.log(chalk.yellow(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`));
+				benchmarkLogger.markRunIncomplete(`Run exceeded timeout (${scenarioTimeoutMin} minutes)`, 'timeout');
+				if (!quiet) logger.execution.warn(`⚠ Run timed out after ${scenarioTimeoutMin} minutes`);
 			} catch {}
 		}, timeoutMs);
 
 		if (progress) updateProgress(progress, 1, 'Loading prompt');
-	const promptContent = loadPrompt(suite, scenario, tier);
+	let promptContent = loadPrompt(suite, scenario, tier);
+	
+	// Inject artifact information into prompt if this is an artifact scenario
+	if (promptContent && scenarioCfg.artifact?.type === 'figma' && scenarioCfg.artifact.figma_file_id) {
+		const fileId = scenarioCfg.artifact.figma_file_id;
+		const nodeId = scenarioCfg.artifact.figma_file_key; // Could be node ID if provided
+		
+		// Add artifact context to the prompt
+		const artifactContext = `\n\n## Artifact Information\n\n**Figma File ID**: ${fileId}${nodeId ? `\n**Node ID**: ${nodeId}` : ''}\n\nUse the \`figma_get_file\` MCP tool with file_id: "${fileId}"${nodeId ? ` and node_ids: "${nodeId}"` : ''} to fetch the design file.\n`;
+		promptContent = promptContent + artifactContext;
+		
+		if (!quiet) {
+			logger.execution.raw(chalk.blue(`[Benchmark] Injected Figma file ID into prompt: ${fileId}`));
+		}
+	}
 
 		// Early failure check: prompt missing for non-echo agents
 		if (!promptContent && agent !== 'echo' && agent !== undefined) {
-			logger.failRun('Prompt file not found', 'prompt');
-			if (!quiet) console.log(chalk.red('✗ Prompt file not found'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`));
+			benchmarkLogger.failRun('Prompt file not found', 'prompt');
+			if (!quiet) logger.execution.error('✗ Prompt file not found');
+			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`);
 			return;
 		}
 
@@ -132,48 +147,67 @@ export async function executeBenchmark(
 	if (!skipWarmup) {
 		if (progress) updateProgress(progress, 1, 'Running warmup phase');
 		if (!quiet) {
-			console.log(chalk.blue('[Benchmark] Running warmup phase...'));
+			logger.execution.info('[Benchmark] Running warmup phase...');
 		}
 		const warmupResult = await executeWarmup(suite, scenario, scenarioCfg, createAgentAdapter, quiet);
 		if (!warmupResult.success) {
-			logger.failRun(`Warmup failed: ${warmupResult.error}`, 'warmup');
+			benchmarkLogger.failRun(`Warmup failed: ${warmupResult.error}`, 'warmup');
 			if (!quiet) {
-				console.log(chalk.red(`[Benchmark] ✗ Warmup failed: ${warmupResult.error}`));
+				logger.execution.error(`[Benchmark] ✗ Warmup failed: ${warmupResult.error}`);
 				if (warmupResult.agentError) {
-					console.log(chalk.red(`[Benchmark] Agent error: ${warmupResult.agentError}`));
+					logger.execution.error(`[Benchmark] Agent error: ${warmupResult.agentError}`);
 				}
 			}
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`));
+			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`);
 			return;
 		}
 		if (!quiet) {
-			console.log(chalk.green('[Benchmark] ✓ Warmup completed successfully'));
+			logger.execution.success('[Benchmark] ✓ Warmup completed successfully');
 		}
 	} else {
 		if (!quiet) {
-			console.log(chalk.yellow('[Benchmark] Skipping warmup (--skip-warmup flag set)'));
-			console.log(chalk.gray('[Benchmark] Note: Not validating control folder structure - it varies by scenario'));
+			logger.execution.warn('[Benchmark] Skipping warmup (--skip-warmup flag set)');
+			logger.execution.debug('[Benchmark] Note: Not validating control folder structure - it varies by scenario');
 		}
 	}
 
-	// Stage 2: Workspace
+	// Stage 2: Workspace (optional for artifact-based scenarios)
 		if (progress) updateProgress(progress, 2, 'Preparing workspace');
-	const workspacePrep = prepareWorkspaceFromFixture(suite, scenario, getScenarioDir);
+	
+	// Check if this is an artifact-based scenario
+	const isArtifactScenario = !!scenarioCfg.artifact?.type;
+	const workspaceRequired = scenarioCfg.workspace?.required !== false; // Default to true for backward compatibility
+	
+	let workspaceDir: string | undefined;
+	let fixtureDir: string | undefined;
+	
+	if (!isArtifactScenario && workspaceRequired) {
+		const workspacePrep = prepareWorkspaceFromFixture(suite, scenario, getScenarioDir);
 
-		// Early failure check: workspace preparation failed
+		// Early failure check: workspace preparation failed (only fail if workspace is required)
 		if (!workspacePrep) {
-			logger.failRun('Workspace preparation failed', 'workspace');
-			if (!quiet) console.log(chalk.red('✗ Workspace preparation failed'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`));
+			benchmarkLogger.failRun('Workspace preparation failed', 'workspace');
+			if (!quiet) logger.execution.error('✗ Workspace preparation failed');
+			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`);
 			return;
 		}
 
-		const workspaceDir = workspacePrep.workspaceDir;
-		const fixtureDir = workspacePrep.fixtureDir;
+		workspaceDir = workspacePrep.workspaceDir;
+		fixtureDir = workspacePrep.fixtureDir;
 
-		console.log(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
-		console.log(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
-		console.log(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+		logger.execution.raw(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
+		logger.execution.raw(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
+		logger.execution.raw(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+	} else if (isArtifactScenario) {
+		if (!quiet) {
+			logger.execution.raw(chalk.blue('[Benchmark] Artifact-based scenario detected - skipping workspace preparation'));
+			logger.execution.raw(chalk.gray(`  Artifact type: ${scenarioCfg.artifact.type}`));
+		}
+	} else {
+		if (!quiet) {
+			logger.execution.raw(chalk.yellow('[Benchmark] Workspace not required for this scenario - skipping workspace preparation'));
+		}
+	}
 
 	// Initialize result structure
 	const result = {
@@ -201,16 +235,16 @@ export async function executeBenchmark(
 
 
 	// Stage 3: Agent Execution
-	console.log(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
+	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
 	// Allow agent execution if:
 	// 1. We have prompt content
 	// 2. Agent is not 'echo'
 	// 3. Either agent is defined OR specialist is provided (specialist will auto-detect agent via createAgentAdapter)
 	if (promptContent && agent !== 'echo' && (agent !== undefined || specialist)) {
-		console.log(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
+		logger.execution.raw(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
-			console.log(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
+			logger.execution.raw(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
 			// Create agent adapter (agent can be undefined if specialist will auto-detect)
 		const agentAdapter = await createAgentAdapter(agent, model, specialist, workspaceRoot);
 
@@ -218,7 +252,7 @@ export async function executeBenchmark(
 			// (for specialists, this will be "specialist:template-name:base-adapter")
 			agentName = agentAdapter.name; // Update local runData too
 			runData.agent = agentName; // Update for completeRun
-			logger.updateAgent(agentAdapter.name, runId);
+			benchmarkLogger.updateAgent(agentAdapter.name, runId);
 
 			// Show selected model info - ALWAYS for OpenRouter
 			if ((agent === 'openrouter' || (!agent && specialist)) && 'getModel' in agentAdapter) {
@@ -228,25 +262,25 @@ export async function executeBenchmark(
 					: 'unknown';
 
 				if (modelSource === 'default') {
-					console.log(chalk.yellow(`  ⚠️  Using default model: ${chalk.cyan(adapterModel)}`));
-					console.log(chalk.gray(`     Tip: Search and select a model in interactive mode or use --model flag`));
+					logger.execution.warn(`  ⚠️  Using default model: ${chalk.cyan(adapterModel)}`);
+					logger.execution.debug(`     Tip: Search and select a model in interactive mode or use --model flag`);
 				} else if (modelSource === 'environment') {
-					console.log(chalk.blue(`  ℹ️  Using model from environment: ${chalk.cyan(adapterModel)}`));
+					logger.execution.info(`  ℹ️  Using model from environment: ${chalk.cyan(adapterModel)}`);
 				} else if (model && modelSource === 'parameter') {
-					console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(model)}`));
+					logger.execution.debug(`  📋 Using model: ${chalk.cyan(model)}`);
 
 					// Verify match
 					if (adapterModel !== model) {
-						console.log(chalk.yellow(`  ⚠️  Warning: Model mismatch - requested: ${model}, adapter: ${adapterModel}`));
+						logger.execution.warn(`  ⚠️  Warning: Model mismatch - requested: ${model}, adapter: ${adapterModel}`);
 					} else {
-						console.log(chalk.green(`  ✅ Model confirmed: ${adapterModel}`));
+						logger.execution.success(`  ✅ Model confirmed: ${adapterModel}`);
 					}
 				} else {
-					console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(adapterModel)}`));
+					logger.execution.debug(`  📋 Using model: ${chalk.cyan(adapterModel)}`);
 				}
 			} else if (model && agent !== 'openrouter' && agent !== undefined) {
 				// For non-OpenRouter agents, show model if provided
-				console.log(chalk.gray(`  📋 Using model: ${chalk.cyan(model)}`));
+				logger.execution.debug(`  📋 Using model: ${chalk.cyan(model)}`);
 			}
 
 			// Agent info is shown in progress bar
@@ -282,21 +316,92 @@ export async function executeBenchmark(
 			// Add tools if agent supports them (Anthropic and OpenRouter)
 			// Also support when agent is undefined but specialist will auto-detect (will be determined in createAgentAdapter)
 			const supportsTools = agent === 'anthropic' || agent === 'openrouter' || (!agent && specialist);
-			if (supportsTools && workspaceDir) {
-				// Create workspace tool handlers
-				const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
+			if (supportsTools) {
+				const tools: any[] = [];
+				const toolHandlers = new Map<string, any>();
 
-				// Start with workspace tools
-				const tools = getAllWorkspaceTools();
-				const toolHandlers = workspaceHandlers;
+				// Add workspace tools if workspace is available
+				if (workspaceDir) {
+					// Create workspace tool handlers
+					const workspaceHandlers = createWorkspaceToolHandlers(workspaceDir);
 
-				// Add askUser tool if oracle is available
-				if (oracle) {
-					tools.push(createAskUserToolDefinition());
-					toolHandlers.set('askUser', createAskUserHandler(oracle));
-					// Tools: readFile, writeFile, runCommand, listFiles, askUser
-				} else {
-					// Tools: readFile, writeFile, runCommand, listFiles
+					// Start with workspace tools
+					const workspaceTools = getAllWorkspaceTools();
+					tools.push(...workspaceTools);
+					workspaceHandlers.forEach((handler, name) => {
+						toolHandlers.set(name, handler);
+					});
+
+					// Add askUser tool if oracle is available
+					if (oracle) {
+						tools.push(createAskUserToolDefinition());
+						toolHandlers.set('askUser', createAskUserHandler(oracle));
+					}
+				}
+
+				// Note: For Figma artifacts, we rely on MCP tools (figma_get_file) from the specialist template
+				// The old custom fetchFigmaFile tool has been removed in favor of MCP tools
+
+				// Add MCP tools if specialist template defines them
+				let mcpClients: Map<string, any> | null = null;
+				if (specialist && workspaceRoot) {
+					try {
+						const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+						const templatePath = resolveSpecialistTemplatePath(specialist, workspaceRoot);
+						
+						// Load template to extract MCP configs
+						const { loadTemplate } = await import('../../../agency-prompt-creator/src/loader.js');
+						const template = await loadTemplate(templatePath, {
+							baseDir: workspaceRoot
+						});
+
+						// Extract MCP configs from template
+						const mcpDefs = template.dependencies?.mcps || [];
+						
+						if (mcpDefs.length > 0) {
+							if (!quiet) {
+								logger.execution.raw(chalk.blue(`[Benchmark] Found ${mcpDefs.length} MCP server(s) in specialist template`));
+							}
+
+							const {
+								resolveMCPConfig,
+								initializeMCPClients,
+								loadMCPTools,
+								cleanupMCPClients,
+							} = await import('../runtime/mcp-tools.ts');
+
+							// Resolve MCP configs
+							const mcpConfigs = mcpDefs.map(resolveMCPConfig);
+
+							// Initialize MCP clients
+							mcpClients = await initializeMCPClients(mcpConfigs, quiet);
+
+							// Load tools from MCP servers
+							const { tools: mcpTools, handlers: mcpHandlers } = await loadMCPTools(mcpClients, quiet);
+
+							// Add MCP tools to the tools array
+							tools.push(...mcpTools);
+							mcpHandlers.forEach((handler, name) => {
+								toolHandlers.set(name, handler);
+							});
+
+							if (!quiet) {
+								logger.execution.raw(chalk.green(`[Benchmark] Added ${mcpTools.length} MCP tool(s) from ${mcpDefs.length} server(s)`));
+							}
+
+							// Store cleanup function for later
+							// We'll clean up MCP clients after agent execution completes
+							(globalThis as any).__mcpCleanup = async () => {
+								if (mcpClients) {
+									await cleanupMCPClients(mcpClients);
+									mcpClients = null;
+								}
+							};
+						}
+					} catch (error) {
+						logger.execution.error(chalk.yellow(`[Benchmark] Failed to load MCP tools: ${error instanceof Error ? error.message : String(error)}`));
+						// Don't fail the benchmark if MCP loading fails (unless required)
+					}
 				}
 
 				// Convert tools to adapter-specific format
@@ -318,6 +423,30 @@ export async function executeBenchmark(
 				}
 
 				request.toolHandlers = toolHandlers;
+				
+				// Log tools being sent to agent
+				if (!quiet) {
+					// Categorize tools for better visibility
+					const workspaceToolNames = workspaceDir ? getAllWorkspaceTools().map(t => t.name) : [];
+					const mcpToolNames = tools
+						.map(t => t.name)
+						.filter(name => !workspaceToolNames.includes(name) && name !== 'askUser');
+					
+					logger.execution.raw(chalk.cyan(`[Benchmark] ========== TOOLS CONFIGURATION ==========`));
+					logger.execution.raw(chalk.cyan(`[Benchmark] Total tools: ${tools.length}`));
+					logger.execution.raw(chalk.cyan(`[Benchmark] Tool handlers: ${toolHandlers.size}`));
+					if (workspaceToolNames.length > 0) {
+						logger.execution.raw(chalk.cyan(`[Benchmark] Workspace tools (${workspaceToolNames.length}): ${workspaceToolNames.join(', ')}`));
+					}
+					if (mcpToolNames.length > 0) {
+						logger.execution.raw(chalk.green(`[Benchmark] MCP tools (${mcpToolNames.length}): ${mcpToolNames.join(', ')}`));
+					}
+					if (oracle) {
+						logger.execution.raw(chalk.cyan(`[Benchmark] Oracle tool: askUser`));
+					}
+					logger.execution.raw(chalk.cyan(`[Benchmark] All tools: ${tools.map(t => t.name).join(', ')}`));
+					logger.execution.raw(chalk.cyan(`[Benchmark] =========================================`));
+				}
 			}
 
 			// Execute agent request
@@ -336,26 +465,26 @@ export async function executeBenchmark(
 			const promptSent = JSON.stringify(messagesForLogging);
 
 			// Debug: Log promptSent details
-			console.log(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
-			console.log(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
-			console.log(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
+			logger.execution.raw(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
+			logger.execution.raw(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
+			logger.execution.raw(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
 			if (messagesForLogging.length > 0) {
 				messagesForLogging.forEach((msg, idx) => {
-					console.log(chalk.magenta(`  Message ${idx + 1}: role=${msg.role}, content_length=${msg.content?.length || 0} chars`));
+					logger.execution.raw(chalk.magenta(`  Message ${idx + 1}: role=${msg.role}, content_length=${msg.content?.length || 0} chars`));
 					if (msg.role === 'system' && msg.content) {
-						console.log(chalk.magenta(`    System prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+						logger.execution.raw(chalk.magenta(`    System prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
 					}
 					if (msg.role === 'user' && msg.content) {
-						console.log(chalk.magenta(`    User prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+						logger.execution.raw(chalk.magenta(`    User prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
 					}
 				});
 			}
-			console.log(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
-			console.log(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
-			console.log(chalk.magenta('🔍 END DEBUG: promptSent\n'));
+			logger.execution.raw(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
+			logger.execution.raw(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
+			logger.execution.raw(chalk.magenta('🔍 END DEBUG: promptSent\n'));
 
 			// Show summary after agent completes
-			console.log(chalk.gray(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`));
+			logger.execution.debug(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`);
 
 			// Update result with agent response
 			result.agent_response = response.content;
@@ -386,81 +515,103 @@ export async function executeBenchmark(
 			// Telemetry is shown in final results
 
 		} catch (error) {
-			console.log(chalk.magenta('🔍 DEBUG: Agent execution threw error:', error));
-			logger.failRun(error instanceof Error ? error.message : String(error), 'agent');
-			if (!quiet) console.log(chalk.red('✗ Agent execution failed'));
-			if (quiet) console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`));
+			logger.execution.raw(chalk.magenta('🔍 DEBUG: Agent execution threw error:', JSON.stringify(error, null, 2)));
+			benchmarkLogger.failRun(error instanceof Error ? error.message : String(error), 'agent');
+			if (!quiet) logger.execution.error('✗ Agent execution failed');
+			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`);
 			return; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
-		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
+		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
 	} else if (agent === 'echo' || (agent === undefined && !specialist)) {
-		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or no specialist provided'));
+		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or no specialist provided'));
 	} else {
-		console.log(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
+		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
 	}
 
-	// Stage 4: Validation
-	console.log(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
-	if (progress) updateProgress(progress, 4, 'Running validation commands');
-	const commandLog = workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
+	// Stage 4: Validation (skip for artifact scenarios or if validation not required)
+	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
+	const validationRequired = scenarioCfg.validation?.required !== false; // Default to true for backward compatibility
+	const shouldRunValidation = !isArtifactScenario && workspaceDir && validationRequired;
+	
+	if (progress) updateProgress(progress, 4, shouldRunValidation ? 'Running validation commands' : 'Skipping validation');
+	const commandLog = shouldRunValidation && workspaceDir ? runValidationCommands(workspaceDir, scenarioCfg.validation?.commands) : [];
 	const diffArtifacts = workspaceDir && fixtureDir ? buildDiffArtifacts(fixtureDir, workspaceDir) : { diffSummary: [], depsDelta: [] };
+	
+	if (!shouldRunValidation && !quiet) {
+		if (isArtifactScenario) {
+			logger.execution.raw(chalk.blue('[Benchmark] Skipping validation commands (artifact-based scenario)'));
+		} else if (!validationRequired) {
+			logger.execution.raw(chalk.blue('[Benchmark] Skipping validation commands (validation.required: false)'));
+		}
+	}
 
 	const passedCommands = commandLog.filter(cmd => cmd.exitCode === 0).length;
-	if (!quiet) console.log(chalk.gray(`  ✓ ${passedCommands}/${commandLog.length} commands passed`));
+	if (!quiet) logger.execution.debug(`  ✓ ${passedCommands}/${commandLog.length} commands passed`);
 
 	// Stage 5: Evaluation
-	console.log(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
+	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
 	if (llmJudgeOnly) {
-		if (!quiet) console.log(chalk.blue('[Benchmark] Running LLM judge only (other evaluators skipped)'));
+		if (!quiet) logger.execution.info('[Benchmark] Running LLM judge only (other evaluators skipped)');
 	}
 	if (progress) updateProgress(progress, 5, llmJudgeOnly ? 'Computing LLM judge scores' : 'Computing scores');
 
 	try {
-		if (workspaceDir) {
-			// Load benchmark config to get suitesDir
-			const { loadBenchmarkConfig } = await import('../lib/config.ts');
-			const config = loadBenchmarkConfig();
+		// Load benchmark config to get suitesDir (needed for both workspace and artifact scenarios)
+		const { loadBenchmarkConfig } = await import('../lib/config.ts');
+		const config = loadBenchmarkConfig();
 
-			// Calculate reference path if scenario has reference_path
-			let referencePath: string | undefined;
-			if (scenarioCfg.reference_path) {
-				const scenarioDir = getScenarioDir(suite, scenario);
-				referencePath = join(scenarioDir, scenarioCfg.reference_path);
-			}
-
-			// Actually run evaluators
-			const ctx = {
-				scenario: scenarioCfg,
-				workspaceDir,
-				suitesDir: config.suitesDir,
-				referencePath,
-				agentResponse: result.agent_response,
-				commandLog,
-				diffSummary: diffArtifacts.diffSummary,
-				depsDelta: diffArtifacts.depsDelta,
-			};
-			const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx, llmJudgeOnly);
-			result.scores = { ...result.scores, ...scoreCard };
-			result.totals = computeWeightedTotals(result.scores, scenarioCfg);
-			(result as any).evaluator_results = evaluatorResults;
-			(result as any).diff_summary = diffArtifacts.diffSummary;
-			(result as any).deps_delta = diffArtifacts.depsDelta;
-
-			// Store evaluation results locally (for parallel execution safety)
-			for (const evalResult of evaluatorResults) {
-				evaluationsData.push({
-					evaluatorName: evalResult.name,
-					score: evalResult.score,
-					maxScore: 1.0,
-					details: evalResult.details,
-				});
-			}
-
-			// Show evaluator summary
-			const avgScore = Object.values(scoreCard).reduce((sum, score) => sum + (score as number), 0) / Object.keys(scoreCard).length;
-			if (!quiet) console.log(chalk.gray(`  ✓ Average score: ${(avgScore * 100).toFixed(1)}%`));
+		// Calculate reference path if scenario has reference_path
+		let referencePath: string | undefined;
+		if (scenarioCfg.reference_path) {
+			const scenarioDir = getScenarioDir(suite, scenario);
+			referencePath = join(scenarioDir, scenarioCfg.reference_path);
 		}
+
+		// Build evaluation context
+		const ctx = {
+			scenario: scenarioCfg,
+			workspaceDir, // May be undefined for artifact scenarios
+			suitesDir: config.suitesDir,
+			referencePath,
+			agentResponse: result.agent_response,
+			commandLog,
+			diffSummary: diffArtifacts.diffSummary,
+			depsDelta: diffArtifacts.depsDelta,
+			...(isArtifactScenario && {
+				artifact: {
+					type: scenarioCfg.artifact!.type,
+					// Artifact data could be fetched here if needed, or left for evaluators to fetch
+				}
+			}),
+		};
+
+		// For artifact scenarios, force LLM judge only (code-based evaluators don't apply)
+		const shouldUseLLMJudgeOnly = isArtifactScenario || llmJudgeOnly;
+		if (isArtifactScenario && !llmJudgeOnly && !quiet) {
+			logger.execution.raw(chalk.blue('[Benchmark] Artifact scenario detected - using LLM judge only'));
+		}
+
+		const { scoreCard, results: evaluatorResults } = await runEvaluators(ctx, shouldUseLLMJudgeOnly);
+		result.scores = { ...result.scores, ...scoreCard };
+		result.totals = computeWeightedTotals(result.scores, scenarioCfg);
+		(result as any).evaluator_results = evaluatorResults;
+		(result as any).diff_summary = diffArtifacts.diffSummary;
+		(result as any).deps_delta = diffArtifacts.depsDelta;
+
+		// Store evaluation results locally (for parallel execution safety)
+		for (const evalResult of evaluatorResults) {
+			evaluationsData.push({
+				evaluatorName: evalResult.name,
+				score: evalResult.score,
+				maxScore: 1.0,
+				details: evalResult.details,
+			});
+		}
+
+		// Show evaluator summary
+		const avgScore = Object.values(scoreCard).reduce((sum, score) => sum + (score as number), 0) / Object.keys(scoreCard).length;
+		if (!quiet) logger.execution.raw(chalk.gray(`  ✓ Average score: ${(avgScore * 100).toFixed(1)}%`));
 	} catch (e) {
 		// Evaluator run failed
 	}
@@ -485,7 +636,7 @@ export async function executeBenchmark(
 
 	// Use new signature to avoid race conditions in parallel execution
 	// Pass all data directly instead of relying on this.currentRun
-	logger.completeRun({
+	benchmarkLogger.completeRun({
 		runId: runData.runId,
 		batchId: runData.batchId,
 		suite: runData.suite,
@@ -526,7 +677,7 @@ export async function executeBenchmark(
 		const status = isSuccessful ? chalk.green('✓') : chalk.red('✗');
 		const modelStr = model ? ` [${model}]` : '';
 		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
-		console.log(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
+		logger.execution.raw(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
 		
 		// Still show LLM Judge table even in quiet mode (it's important information)
 		if (result.scores) {
@@ -535,13 +686,13 @@ export async function executeBenchmark(
 		return;
 	}
 
-	console.log(`\n${chalk.bold.underline('Benchmark Results')}`);
-	console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-	console.log(`│ ${chalk.bold('Agent:')} ${chalk.cyan(agentDisplay.padEnd(15))} ${chalk.bold('Tier:')} ${chalk.cyan(tier.padEnd(8))} ${chalk.bold('Duration:')} ${chalk.blue(duration.toFixed(2) + 's')} │`);
-	console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-	console.log(`│ ${chalk.bold('Score (mean ± σ):')} ${chalk.green(weightedScore.toFixed(4))} ± ${chalk.green('0.0000')} ${chalk.gray('(out of 10.0)')} │`);
-	console.log(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
-	console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+	logger.execution.raw(`\n${chalk.bold.underline('Benchmark Results')}`);
+	logger.execution.raw(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+	logger.execution.raw(`│ ${chalk.bold('Agent:')} ${chalk.cyan(agentDisplay.padEnd(15))} ${chalk.bold('Tier:')} ${chalk.cyan(tier.padEnd(8))} ${chalk.bold('Duration:')} ${chalk.blue(duration.toFixed(2) + 's')} │`);
+	logger.execution.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+	logger.execution.raw(`│ ${chalk.bold('Score (mean ± σ):')} ${chalk.green(weightedScore.toFixed(4))} ± ${chalk.green('0.0000')} ${chalk.gray('(out of 10.0)')} │`);
+	logger.execution.raw(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
+	logger.execution.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
 	// Show detailed LLM Judge scores if available
 	if (result.scores) {
@@ -550,61 +701,62 @@ export async function executeBenchmark(
 
 	// Print telemetry in table format
 	if (result.telemetry) {
-		console.log(`\n${chalk.bold.underline('Telemetry')}`);
-		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-		console.log(`│ ${chalk.bold('Metric'.padEnd(20))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Unit'.padEnd(15))} │`);
-		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-		console.log(`│ ${chalk.cyan('Tool Calls'.padEnd(20))} ${chalk.green((result.telemetry.toolCalls || 0).toString().padEnd(20))} ${chalk.gray('calls'.padEnd(15))} │`);
-		console.log(`│ ${chalk.cyan('Tokens In'.padEnd(20))} ${chalk.green((result.telemetry.tokens?.in || 0).toString().padEnd(20))} ${chalk.gray('tokens'.padEnd(15))} │`);
-		console.log(`│ ${chalk.cyan('Tokens Out'.padEnd(20))} ${chalk.green((result.telemetry.tokens?.out || 0).toString().padEnd(20))} ${chalk.gray('tokens'.padEnd(15))} │`);
-		console.log(`│ ${chalk.cyan('Cost'.padEnd(20))} ${chalk.green(`$${(result.telemetry.cost_usd || 0).toFixed(6)}`.padEnd(20))} ${chalk.gray('USD'.padEnd(15))} │`);
-		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+		logger.execution.raw(`\n${chalk.bold.underline('Telemetry')}`);
+		logger.execution.raw(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+		logger.execution.raw(`│ ${chalk.bold('Metric'.padEnd(20))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Unit'.padEnd(15))} │`);
+		logger.execution.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+		logger.execution.raw(`│ ${chalk.cyan('Tool Calls'.padEnd(20))} ${chalk.green((result.telemetry.toolCalls || 0).toString().padEnd(20))} ${chalk.gray('calls'.padEnd(15))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('Tokens In'.padEnd(20))} ${chalk.green((result.telemetry.tokens?.in || 0).toString().padEnd(20))} ${chalk.gray('tokens'.padEnd(15))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('Tokens Out'.padEnd(20))} ${chalk.green((result.telemetry.tokens?.out || 0).toString().padEnd(20))} ${chalk.gray('tokens'.padEnd(15))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('Cost'.padEnd(20))} ${chalk.green(`$${(result.telemetry.cost_usd || 0).toFixed(6)}`.padEnd(20))} ${chalk.gray('USD'.padEnd(15))} │`);
+		logger.execution.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 	}
 
 	// Show database summary in table format
 	try {
-		const stats = await logger.getStats();
-		console.log(`\n${chalk.bold.underline('Database Summary')}`);
-		console.log(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
-		console.log(`│ ${chalk.bold('Metric'.padEnd(25))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Status'.padEnd(10))} │`);
-		console.log(`├${'─'.repeat(TABLE_WIDTH)}┤`);
-		console.log(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue((stats.totalRuns || 0).toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${((stats.successRate || 0) * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green((stats.averageWeightedScore || 0).toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`│ ${chalk.cyan('API'.padEnd(25))} ${chalk.blue('Cloudflare Worker'.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
-		console.log(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+		const stats = await benchmarkLogger.getStats();
+		logger.execution.raw(`\n${chalk.bold.underline('Database Summary')}`);
+		logger.execution.raw(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+		logger.execution.raw(`│ ${chalk.bold('Metric'.padEnd(25))} ${chalk.bold('Value'.padEnd(20))} ${chalk.bold('Status'.padEnd(10))} │`);
+		logger.execution.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+		logger.execution.raw(`│ ${chalk.cyan('Total Runs'.padEnd(25))} ${chalk.blue((stats.totalRuns || 0).toString().padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('Success Rate'.padEnd(25))} ${chalk.green(`${((stats.successRate || 0) * 100).toFixed(1)}%`.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('Average Score'.padEnd(25))} ${chalk.green((stats.averageWeightedScore || 0).toFixed(4).padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		logger.execution.raw(`│ ${chalk.cyan('API'.padEnd(25))} ${chalk.blue('Cloudflare Worker'.padEnd(20))} ${chalk.green('✓'.padEnd(10))} │`);
+		logger.execution.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
 	} catch (dbError) {
-		console.log(chalk.yellow('Database query failed:'));
-		console.error(chalk.dim(dbError instanceof Error ? dbError.message : String(dbError)));
+		logger.execution.warn('Database query failed:');
+		logger.execution.debug(dbError instanceof Error ? dbError.message : String(dbError));
 	}
 
 	// Results are saved to database only (benchmarks.db is the single source of truth)
-	console.log(`\n${chalk.green('✓')} Results saved to database`);
+	logger.execution.raw(`\n${chalk.green('✓')} Results saved to database`);
 
 	// Note: Database is now created directly in public/ directory
 
 	// Show completion outro
-	console.log(`\n${chalk.green('✓')} Benchmark completed successfully`);
+	logger.execution.raw(`\n${chalk.green('✓')} Benchmark completed successfully`);
 
 	} catch (error) {
 		// Catch-all for unexpected errors
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		const errorStack = error instanceof Error ? error.stack : undefined;
 
-		logger.failRun(errorMessage, 'unknown');
+		benchmarkLogger.failRun(errorMessage, 'unknown');
+		console.log('---------------------- error: ', error);
 
 		if (!quiet) {
-			console.log(chalk.red('✗ Unexpected error'));
-			console.error(chalk.red('\nError details:'));
-			console.error(chalk.red(errorMessage));
+			logger.execution.error('✗ Unexpected error');
+			logger.execution.error('\nError details:');
+			logger.execution.error(errorMessage);
 			if (errorStack) {
-				console.error(chalk.dim('\nStack trace:'));
-				console.error(chalk.dim(errorStack));
+				logger.execution.debug('\nStack trace:');
+				logger.execution.debug(errorStack);
 			}
 		}
 		if (quiet) {
-			console.log(chalk.red(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`));
+			logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${errorMessage}`);
 		}
 	} finally {
 		if (progress) completeProgress(progress);
@@ -612,6 +764,16 @@ export async function executeBenchmark(
 		if (timeoutId) {
 			clearTimeout(timeoutId);
 			timeoutId = null;
+		}
+
+		// Cleanup MCP clients if they were initialized
+		if ((globalThis as any).__mcpCleanup) {
+			try {
+				await (globalThis as any).__mcpCleanup();
+				delete (globalThis as any).__mcpCleanup;
+			} catch (error) {
+				logger.execution.error(chalk.yellow(`[Benchmark] Error cleaning up MCP clients: ${error instanceof Error ? error.message : String(error)}`));
+			}
 		}
 	}
 }

@@ -115,7 +115,7 @@ function Dashboard() {
             config={{
               count: {
                 label: "Number of Runs",
-                color: "hsl(var(--chart-1))",
+                color: "rgb(var(--chart-1))",
               },
             }}
             className="h-[300px] w-full"
@@ -133,11 +133,11 @@ function Dashboard() {
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   return (
-                    <div className="rounded-lg border bg-background p-2 shadow-sm">
+                    <div className="rounded-lg border-2 border-border bg-white dark:bg-black p-3 shadow-xl">
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">{payload[0].payload.range}</span>
-                          <span className="text-sm font-bold">{payload[0].value} runs</span>
+                          <span className="text-sm font-medium text-foreground">{payload[0].payload.range}</span>
+                          <span className="text-sm font-bold text-foreground">{payload[0].value} runs</span>
                         </div>
                       </div>
                     </div>

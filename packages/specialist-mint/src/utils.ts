@@ -66,7 +66,7 @@ addFormats(ajv);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.json5');
+const templateSchemaPath = join(__dirname, 'schemas', 'template.schema.jsonc');
 const snapshotSchemaPath = join(__dirname, 'schemas', 'snapshot.schema.json5');
 
 const templateSchemaContent = readFileSync(templateSchemaPath, 'utf-8');

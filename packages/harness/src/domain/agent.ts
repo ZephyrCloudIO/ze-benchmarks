@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { EchoAgent, ClaudeCodeAdapter, OpenRouterAdapter, AnthropicAdapter, type AgentAdapter } from '../../../agent-adapters/src/index.ts';
 // Import types from agency-prompt-creator (using relative path since it's a workspace package)
 import type { SpecialistTemplate, PreferredModel } from '../../../agency-prompt-creator/src/types.ts';
+import { logger } from '@ze/logger';
 import type { OpenRouterModel } from '../lib/openrouter-api.js';
 
 // ============================================================================
@@ -146,32 +147,35 @@ export function resolveSpecialistTemplatePath(specialistName: string, workspaceR
 	// Strip namespace prefix if present (e.g., @zephyr-cloud/)
 	const templateName = specialistName.replace(/^@[^/]+\//, '');
 
-	// Construct template path relative to workspace root
-	const templatePath = `templates/${templateName}-template.json5`;
-	const absolutePath = resolve(workspaceRoot, templatePath);
-
-	// Verify template exists
-	if (!existsSync(absolutePath)) {
-		throw new Error(
-			`Specialist template not found: ${templatePath}\n` +
-			`  Specialist: ${specialistName}\n` +
-			`  Expected path: ${absolutePath}\n` +
-			`  Tip: Ensure the template file exists in starting_from_outcome/`
-		);
+	// Try both .jsonc and .json5 extensions (prefer .jsonc)
+	const extensions = ['.jsonc', '.json5'];
+	for (const ext of extensions) {
+		const templatePath = `templates/${templateName}-template${ext}`;
+		const absolutePath = resolve(workspaceRoot, templatePath);
+		
+		if (existsSync(absolutePath)) {
+			return absolutePath;
+		}
 	}
 
-	// Return absolute path to avoid cwd-related issues when harness is spawned
-	// from different directories (similar to mint:snapshot fix)
-	return absolutePath;
+	// If neither exists, throw error with both paths
+	const jsoncPath = resolve(workspaceRoot, `templates/${templateName}-template.jsonc`);
+	const json5Path = resolve(workspaceRoot, `templates/${templateName}-template.json5`);
+	throw new Error(
+		`Specialist template not found: ${specialistName}\n` +
+		`  Tried: ${jsoncPath}\n` +
+		`  Tried: ${json5Path}\n` +
+		`  Tip: Ensure the template file exists in templates/`
+	);
 }
 
 export async function createAgentAdapter(agentName?: string, model?: string, specialistName?: string, workspaceRoot?: string): Promise<AgentAdapter> {
 	// Log agent creation attempt
-	console.log(chalk.gray('[DEBUG] createAgentAdapter()'));
-	console.log(chalk.gray(`  Agent: ${agentName || 'auto-detect'}`));
-	console.log(chalk.gray(`  Model: ${model || 'auto-detect'}`));
-	console.log(chalk.gray(`  Specialist: ${specialistName || 'none'}`));
-	console.log(chalk.gray(`  Workspace root: ${workspaceRoot || 'none'}`));
+	logger.agent.debug('[DEBUG] createAgentAdapter()');
+	logger.agent.debug(`  Agent: ${agentName || 'auto-detect'}`);
+	logger.agent.debug(`  Model: ${model || 'auto-detect'}`);
+	logger.agent.debug(`  Specialist: ${specialistName || 'none'}`);
+	logger.agent.debug(`  Workspace root: ${workspaceRoot || 'none'}`);
 
 	// If specialist is provided but model/agent not specified, try to auto-detect from template
 	let finalAgentName = agentName;
@@ -179,7 +183,7 @@ export async function createAgentAdapter(agentName?: string, model?: string, spe
 
 	if (specialistName && workspaceRoot && (!model || !agentName)) {
 		try {
-			console.log(chalk.gray(`  Auto-detecting model and agent from specialist template...`));
+			logger.agent.debug(`  Auto-detecting model and agent from specialist template...`);
 			const templatePath = resolveSpecialistTemplatePath(specialistName, workspaceRoot);
 			
 			// Load template to get preferred models
@@ -193,16 +197,16 @@ export async function createAgentAdapter(agentName?: string, model?: string, spe
 				const preferredModel = selectPreferredModel(template);
 				if (preferredModel) {
 					finalModel = preferredModel.model;
-					console.log(chalk.blue(`  ℹ️  Using preferred model from template: ${chalk.cyan(finalModel)}`));
+					logger.agent.info(`  ℹ️  Using preferred model from template: ${chalk.cyan(finalModel)}`);
 				} else {
-					console.log(chalk.yellow(`  ⚠️  No preferred models found in template, using default agent`));
+					logger.agent.warn(`  ⚠️  No preferred models found in template, using default agent`);
 				}
 			}
 
 			// If agent not provided, default to openrouter (we'll find the model in OpenRouter's catalog)
 			if (!agentName) {
 				finalAgentName = 'openrouter';
-				console.log(chalk.blue(`  ℹ️  Auto-detected agent: ${chalk.cyan('openrouter')} (will find model in OpenRouter catalog)`));
+				logger.agent.info(`  ℹ️  Auto-detected agent: ${chalk.cyan('openrouter')} (will find model in OpenRouter catalog)`);
 			}
 
 			// Find the OpenRouter model by name using the same search logic as the interactive CLI
@@ -222,41 +226,41 @@ export async function createAgentAdapter(agentName?: string, model?: string, spe
 							
 							if (closestModel !== finalModel) {
 								const matchedModel = availableModels.find(m => m.id === closestModel);
-								console.log(chalk.blue(`  ℹ️  Found closest OpenRouter model: ${chalk.cyan(closestModel)}`));
+								logger.agent.info(`  ℹ️  Found closest OpenRouter model: ${chalk.cyan(closestModel)}`);
 								if (matchedModel?.name) {
-									console.log(chalk.gray(`     Model name: ${matchedModel.name}`));
+									logger.agent.debug(`     Model name: ${matchedModel.name}`);
 								}
 								if (searchResults.length > 1) {
-									console.log(chalk.gray(`     (${searchResults.length} matches found, selected best match)`));
+									logger.agent.debug(`     (${searchResults.length} matches found, selected best match)`);
 								}
 								finalModel = closestModel;
 							} else {
 								// Use first search result if scoring didn't find a better match
 								finalModel = searchResults[0].id;
-								console.log(chalk.blue(`  ℹ️  Using OpenRouter model: ${chalk.cyan(finalModel)}`));
+								logger.agent.info(`  ℹ️  Using OpenRouter model: ${chalk.cyan(finalModel)}`);
 								if (searchResults.length > 1) {
-									console.log(chalk.gray(`     (${searchResults.length} matches found)`));
+									logger.agent.debug(`     (${searchResults.length} matches found)`);
 								}
 							}
 						} else {
-							console.log(chalk.yellow(`  ⚠️  No OpenRouter models found matching "${finalModel}"`));
-							console.log(chalk.gray(`     Using model as-is: ${finalModel}`));
+							logger.agent.warn(`  ⚠️  No OpenRouter models found matching "${finalModel}"`);
+							logger.agent.debug(`     Using model as-is: ${finalModel}`);
 						}
 					}
 				} catch (error) {
-					console.log(chalk.yellow(`  ⚠️  Could not fetch OpenRouter models for matching: ${error instanceof Error ? error.message : String(error)}`));
-					console.log(chalk.gray(`  Continuing with model: ${finalModel}`));
+					logger.agent.warn(`  ⚠️  Could not fetch OpenRouter models for matching: ${error instanceof Error ? error.message : String(error)}`);
+					logger.agent.debug(`  Continuing with model: ${finalModel}`);
 				}
 			}
 
 			// If still no agent determined, default to openrouter
 			if (!finalAgentName) {
-				console.log(chalk.yellow(`  ⚠️  Could not determine agent, defaulting to openrouter`));
+				logger.agent.warn(`  ⚠️  Could not determine agent, defaulting to openrouter`);
 				finalAgentName = 'openrouter';
 			}
 		} catch (error) {
-			console.error(chalk.yellow(`  ⚠️  Failed to auto-detect from template: ${error instanceof Error ? error.message : String(error)}`));
-			console.log(chalk.gray(`  Continuing with provided or default values...`));
+			logger.agent.error(chalk.yellow(`  ⚠️  Failed to auto-detect from template: ${error instanceof Error ? error.message : String(error)}`));
+			logger.agent.debug(`  Continuing with provided or default values...`);
 			// Continue with provided values or defaults
 			if (!finalAgentName) {
 				finalAgentName = 'openrouter';
@@ -275,57 +279,57 @@ export async function createAgentAdapter(agentName?: string, model?: string, spe
 	try {
 		switch (finalAgentName) {
 			case 'openrouter':
-				console.log(chalk.gray(`  Creating OpenRouterAdapter...`));
+				logger.agent.debug(`  Creating OpenRouterAdapter...`);
 				// Pass model directly to constructor instead of using environment variable
 				baseAdapter = new OpenRouterAdapter(process.env.OPENROUTER_API_KEY, finalModel);
-				console.log(chalk.gray(`  ✓ OpenRouterAdapter created`));
+				logger.agent.debug(`  ✓ OpenRouterAdapter created`);
 				break;
 			case 'anthropic':
-				console.log(chalk.gray(`  Creating AnthropicAdapter...`));
+				logger.agent.debug(`  Creating AnthropicAdapter...`);
 				if (finalModel) {
 					process.env.CLAUDE_MODEL = finalModel;
 				}
 				baseAdapter = new AnthropicAdapter();
-				console.log(chalk.gray(`  ✓ AnthropicAdapter created`));
+				logger.agent.debug(`  ✓ AnthropicAdapter created`);
 				break;
 			case 'claude-code':
-				console.log(chalk.gray(`  Creating ClaudeCodeAdapter...`));
+				logger.agent.debug(`  Creating ClaudeCodeAdapter...`);
 				baseAdapter = new ClaudeCodeAdapter(finalModel);
-				console.log(chalk.gray(`  ✓ ClaudeCodeAdapter created`));
+				logger.agent.debug(`  ✓ ClaudeCodeAdapter created`);
 				break;
 			case 'echo':
 			default:
-				console.log(chalk.gray(`  Creating EchoAgent...`));
+				logger.agent.debug(`  Creating EchoAgent...`);
 				baseAdapter = new EchoAgent();
-				console.log(chalk.gray(`  ✓ EchoAgent created`));
+				logger.agent.debug(`  ✓ EchoAgent created`);
 				break;
 		}
 	} catch (error) {
-		console.error(chalk.red(`[DEBUG] Failed to create base adapter: ${error instanceof Error ? error.message : String(error)}`));
+		logger.agent.error(chalk.red(`[DEBUG] Failed to create base adapter: ${error instanceof Error ? error.message : String(error)}`));
 		throw error;
 	}
 
 	// Wrap with SpecialistAdapter if specialist name provided
 	if (specialistName && workspaceRoot) {
 		try {
-			console.log(chalk.gray(`  Resolving specialist template path...`));
+			logger.agent.debug(`  Resolving specialist template path...`);
 			const templatePath = resolveSpecialistTemplatePath(specialistName, workspaceRoot);
-			console.log(chalk.blue(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`));
-			console.log(chalk.gray(`     Template: ${templatePath}`));
+			logger.agent.info(`  ℹ️  Using specialist: ${chalk.cyan(specialistName)}`);
+			logger.agent.debug(`     Template: ${templatePath}`);
 
 			// Lazy load SpecialistAdapter to avoid loading agency-prompt-creator unless needed
-			console.log(chalk.gray(`  Loading SpecialistAdapter...`));
+			logger.agent.debug(`  Loading SpecialistAdapter...`);
 			const { SpecialistAdapter } = await import('../../../agent-adapters/src/specialist.ts');
 			// Use static factory method for async template loading with inheritance support
 			const specialistAdapter = await SpecialistAdapter.create(baseAdapter, templatePath);
-			console.log(chalk.gray(`  ✓ SpecialistAdapter created and wrapped base adapter`));
+			logger.agent.debug(`  ✓ SpecialistAdapter created and wrapped base adapter`);
 			return specialistAdapter;
 		} catch (error) {
-			console.error(chalk.red(`[DEBUG] Failed to create specialist adapter: ${error instanceof Error ? error.message : String(error)}`));
+			logger.agent.error(chalk.red(`[DEBUG] Failed to create specialist adapter: ${error instanceof Error ? error.message : String(error)}`));
 			throw error;
 		}
 	}
 
-	console.log(chalk.gray(`  ✓ Agent adapter creation complete (base adapter only)`));
+	logger.agent.debug(`  ✓ Agent adapter creation complete (base adapter only)`);
 	return baseAdapter;
 }

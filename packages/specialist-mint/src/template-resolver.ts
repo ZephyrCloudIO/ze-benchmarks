@@ -8,6 +8,9 @@ import { resolve, dirname, basename } from 'path';
 import { existsSync } from 'fs';
 import type { SpecialistTemplate } from './types.js';
 import { loadJSON5 } from './utils.js';
+import { logger } from '@ze/logger';
+
+const log = logger.templateResolver;
 
 /**
  * Resolve template path, automatically using enriched version if available
@@ -38,7 +41,7 @@ export function resolveTemplatePath(
 
   // Enriched version doesn't exist
   if (autoEnrich) {
-    console.warn('[Template Resolver] Enriched template not found. Auto-enrichment not yet implemented.');
+    log.warn('[Template Resolver] Enriched template not found. Auto-enrichment not yet implemented.');
     // TODO: Trigger enrichment here
     // await enrichTemplate(absolutePath);
     // return { path: enrichedPath, isEnriched: true };
@@ -53,13 +56,17 @@ export function resolveTemplatePath(
  */
 export function getEnrichedTemplatePath(templatePath: string, version: string): string {
   const dir = dirname(templatePath);
-  const base = basename(templatePath, '.json5');
+  // Support both .json5 and .jsonc extensions
+  const base = templatePath.endsWith('.jsonc')
+    ? basename(templatePath, '.jsonc')
+    : basename(templatePath, '.json5');
 
   // Remove '-template' suffix if present
   const nameWithoutTemplate = base.endsWith('-template')
     ? base.slice(0, -'-template'.length)
     : base;
 
+  // Use .json5 extension for enriched templates (maintains consistency)
   return resolve(dir, `${nameWithoutTemplate}-template.enriched-${version}.json5`);
 }
 
@@ -67,7 +74,7 @@ export function getEnrichedTemplatePath(templatePath: string, version: string): 
  * Check if a path is an enriched template
  */
 export function isEnrichedTemplatePath(path: string): boolean {
-  return path.includes('.enriched-') && path.endsWith('.json5');
+  return path.includes('.enriched-') && (path.endsWith('.json5') || path.endsWith('.jsonc'));
 }
 
 /**

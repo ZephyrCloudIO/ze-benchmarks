@@ -4,6 +4,10 @@ import type { MessageCreateParams, ContentBlock, TextBlock, ToolUseBlock } from 
 import type { AgentAdapter, AgentRequest, AgentResponse } from "./index.ts";
 import { resolve, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import chalk from 'chalk';
+import { logger } from '@ze/logger';
+
+const log = logger.anthropic;
 
 // Load environment variables from .env file in project root
 // Find workspace root by looking for pnpm-workspace.yaml (topmost one)
@@ -47,8 +51,8 @@ export class AnthropicAdapter implements AgentAdapter {
   
   constructor(apiKey = process.env.ANTHROPIC_API_KEY!) {
     // Debug: Log relevant environment variables
-    console.log('[env] Anthropic Adapter - Environment variables:');
-    console.log(`  ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? '***set***' : '(not set)'}`);
+    log.debug('[env] Anthropic Adapter - Environment variables:');
+    log.debug(`  ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? '***set***' : '(not set)'}`);
     
     if (!apiKey) {
       throw new Error(
@@ -171,12 +175,17 @@ export class AnthropicAdapter implements AgentAdapter {
       let resultContent: string;
 
       if (handler) {
+        log.debug(chalk.blue(`[AnthropicAdapter] Executing tool: ${toolUse.name}`));
         try {
+          log.debug(chalk.cyan(`[AnthropicAdapter] Tool arguments: ${JSON.stringify(toolUse.input, null, 2)}`));
           resultContent = await handler(toolUse.input);
+          log.debug(chalk.green(`[AnthropicAdapter] ✓ ${toolUse.name} completed`));
         } catch (error) {
+          log.error(chalk.red(`[AnthropicAdapter] ❌ Error in ${toolUse.name}:`), error);
           resultContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
         }
       } else {
+        log.warn(chalk.yellow(`[AnthropicAdapter] ⚠️  No handler found for tool: ${toolUse.name}`));
         resultContent = `Tool '${toolUse.name}' is not available`;
       }
 

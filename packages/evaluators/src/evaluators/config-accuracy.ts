@@ -3,6 +3,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { findProjectDir } from '../utils/workspace.ts';
+import { logger } from '@ze/logger';
+
+const log = logger.configAccuracy;
 
 export class ConfigAccuracyEvaluator implements Evaluator {
 	meta = { name: 'ConfigAccuracyEvaluator' } as const;
@@ -10,13 +13,13 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 	async evaluate(ctx: EvaluationContext): Promise<EvaluatorResult> {
 		try {
 			// Log the paths received from context
-			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Suites dir from context: ${ctx.suitesDir || 'not provided'}`));
-			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Reference path from context: ${ctx.referencePath || 'not provided'}`));
-			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Workspace dir: ${ctx.workspaceDir}`));
+			log.debug(chalk.blue(`[ConfigAccuracyEvaluator] Suites dir from context: ${ctx.suitesDir || 'not provided'}`));
+			log.debug(chalk.blue(`[ConfigAccuracyEvaluator] Reference path from context: ${ctx.referencePath || 'not provided'}`));
+			log.debug(chalk.blue(`[ConfigAccuracyEvaluator] Workspace dir: ${ctx.workspaceDir}`));
 
 			// Use reference path from context (no filesystem traversal needed)
 			if (!ctx.referencePath || !fs.existsSync(ctx.referencePath)) {
-				console.error(chalk.red(`[ConfigAccuracyEvaluator] ❌ Reference not found: ${ctx.referencePath || 'undefined'}`));
+				log.error(chalk.red(`[ConfigAccuracyEvaluator] ❌ Reference not found: ${ctx.referencePath || 'undefined'}`));
 				return {
 					name: this.meta.name,
 					score: 0,
@@ -25,8 +28,8 @@ export class ConfigAccuracyEvaluator implements Evaluator {
 			}
 
 			const contents = fs.readdirSync(ctx.referencePath);
-			console.log(chalk.green(`[ConfigAccuracyEvaluator] ✓ Reference found`));
-			console.log(chalk.blue(`[ConfigAccuracyEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
+			log.debug(chalk.green(`[ConfigAccuracyEvaluator] ✓ Reference found`));
+			log.debug(chalk.blue(`[ConfigAccuracyEvaluator] Contents (${contents.length} items): [${contents.slice(0, 5).join(', ')}${contents.length > 5 ? '...' : ''}]`));
 
 			// Find the generated project directory (not 'control')
 			const projectDir = findProjectDir(ctx.workspaceDir);

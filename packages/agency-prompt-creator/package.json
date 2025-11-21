@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "json5": "^2.2.3",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@ze/logger": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "^0.17.1",

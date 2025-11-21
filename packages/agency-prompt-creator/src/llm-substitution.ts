@@ -4,6 +4,9 @@
  */
 
 import type { ExtractedIntent } from './intent-extraction.js';
+import { logger } from '@ze/logger';
+
+const log = logger.llmSubstitution;
 
 /**
  * OpenAI tool schema for template variable substitution
@@ -144,8 +147,8 @@ export async function substituteWithLLM(
     // If LLM substitution fails, fall back to returning template as-is
     // (or could fall back to regex substitution)
     if (error instanceof Error) {
-      console.warn('[LLM Substitution] Failed:', error.message);
-      console.warn('[LLM Substitution] Returning template as-is');
+      log.warn('[LLM Substitution] Failed:', error.message);
+      log.warn('[LLM Substitution] Returning template as-is');
     }
     return template;
   }

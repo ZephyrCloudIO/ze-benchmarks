@@ -1,6 +1,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { findZeBenchmarksRoot } from './project-root.js';
+import { logger } from '@ze/logger';
+
+const log = logger.config;
 
 export interface BenchmarkConfig {
   suitesDir: string;
@@ -45,8 +48,8 @@ export function loadBenchmarkConfig(projectRoot?: string): BenchmarkConfig {
       const configContent = readFileSync(configPath, 'utf-8');
       config = JSON.parse(configContent);
     } catch (error) {
-      console.warn(`Failed to parse benchmark.config.json: ${error instanceof Error ? error.message : String(error)}`);
-      console.warn('Using default configuration');
+      log.warn(`Failed to parse benchmark.config.json: ${error instanceof Error ? error.message : String(error)}`);
+      log.warn('Using default configuration');
     }
   }
 

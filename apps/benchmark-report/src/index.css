@@ -30,11 +30,11 @@
     --border: 228 228 235;
     --input: 228 228 235;
     --ring: 163 215 224;
-    --chart-1: 163 215 224;
-    --chart-2: 178 230 215;
-    --chart-3: 244 195 180;
-    --chart-4: 245 162 127;
-    --chart-5: 251 175 60;
+    --chart-1: 40 40 60;
+    --chart-2: 70 70 90;
+    --chart-3: 100 100 120;
+    --chart-4: 130 130 150;
+    --chart-5: 160 160 180;
     --radius: 0.625rem;
     --sidebar: 255 255 255;
     --sidebar-foreground: 10 10 15;
@@ -72,11 +72,11 @@
     --border: 40 40 60;
     --input: 40 40 60;
     --ring: 163 215 224;
-    --chart-1: 163 215 224;
-    --chart-2: 178 230 215;
-    --chart-3: 244 195 180;
-    --chart-4: 245 162 127;
-    --chart-5: 251 175 60;
+    --chart-1: 200 200 220;
+    --chart-2: 210 210 230;
+    --chart-3: 220 220 235;
+    --chart-4: 230 230 240;
+    --chart-5: 240 240 250;
     --sidebar: 0 0 0;
     --sidebar-foreground: 255 255 255;
     --sidebar-primary: 163 215 224;
@@ -166,19 +166,57 @@
         color: rgb(var(--foreground)) !important;
     }
     
-    /* Chart tooltip background and text */
+    /* Chart tooltip background and text - ensure good contrast */
     .recharts-default-tooltip {
-        background-color: rgb(var(--background)) !important;
+        background-color: rgb(var(--card)) !important;
         border-color: rgb(var(--border)) !important;
-        color: rgb(var(--foreground)) !important;
+        color: rgb(var(--card-foreground)) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
     }
     
     .recharts-default-tooltip .recharts-tooltip-label {
-        color: rgb(var(--foreground)) !important;
+        color: rgb(var(--card-foreground)) !important;
     }
     
     .recharts-default-tooltip .recharts-tooltip-item-name,
     .recharts-default-tooltip .recharts-tooltip-item-value {
-        color: rgb(var(--foreground)) !important;
+        color: rgb(var(--card-foreground)) !important;
+    }
+    
+    /* Ensure custom tooltip content has proper styling */
+    [data-chart] .recharts-tooltip-wrapper {
+        z-index: 1000;
+    }
+    
+    /* Chart bars - ensure they're visible with full opacity */
+    .recharts-bar-rectangle {
+        opacity: 1 !important;
+    }
+    
+    /* Chart bar hover states - maintain consistent gray colors */
+    .recharts-bar-rectangle:hover {
+        opacity: 0.8 !important;
+    }
+    
+    /* Ensure hover states use the same color, just with opacity */
+    [data-chart] .recharts-bar-rectangle:hover {
+        opacity: 0.8 !important;
+    }
+    
+    /* Prevent recharts from changing fill color on hover */
+    .recharts-bar-rectangle:hover,
+    .recharts-bar-rectangle:active {
+        fill: inherit !important;
+    }
+    
+    /* Fix tooltip cursor background - use light color in light mode */
+    .recharts-rectangle.recharts-tooltip-cursor {
+        fill: rgb(240 240 245) !important;
+        opacity: 0.2 !important;
+    }
+    
+    .dark .recharts-rectangle.recharts-tooltip-cursor {
+        fill: rgb(var(--muted)) !important;
+        opacity: 0.4 !important;
     }
 }
