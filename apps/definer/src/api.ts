@@ -19,7 +19,7 @@ export async function createRoleDef(data: any): Promise<RoleDef> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('apiKey') || ''}`,
+      'Authorization': `Bearer ${localStorage.getItem('apiKey') || 'dev-local-key'}`,
     },
     body: JSON.stringify(data),
   });
@@ -32,7 +32,7 @@ export async function updateRoleDef(id: string, data: any): Promise<RoleDef> {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('apiKey') || ''}`,
+      'Authorization': `Bearer ${localStorage.getItem('apiKey') || 'dev-local-key'}`,
     },
     body: JSON.stringify(data),
   });
@@ -44,7 +44,7 @@ export async function deleteRoleDef(id: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/roledefs/${id}`, {
     method: 'DELETE',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('apiKey') || ''}`,
+      'Authorization': `Bearer ${localStorage.getItem('apiKey') || 'dev-local-key'}`,
     },
   });
   if (!response.ok) throw new Error('Failed to delete RoleDef');
