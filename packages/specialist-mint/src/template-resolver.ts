@@ -10,7 +10,7 @@ import type { SpecialistTemplate } from './types.js';
 import { loadJSON5 } from './utils.js';
 import { logger } from '@ze/logger';
 
-const log = logger.create('template-resolver');
+const log = logger.templateResolver;
 
 /**
  * Resolve template path, automatically using enriched version if available

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { findZeBenchmarksRoot } from './project-root.js';
 import { logger } from '@ze/logger';
 
-const log = logger.create('config');
+const log = logger.config;
 
 export interface BenchmarkConfig {
   suitesDir: string;

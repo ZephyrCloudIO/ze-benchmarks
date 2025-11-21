@@ -7,7 +7,7 @@
 import { OpenAI } from 'openai';
 import { logger } from '@ze/logger';
 
-const log = logger.create('llm-client');
+const log = logger.llmClient;
 
 export type LLMProvider = 'openrouter' | 'anthropic';
 

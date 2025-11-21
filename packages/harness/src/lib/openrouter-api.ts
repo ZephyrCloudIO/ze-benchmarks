@@ -1,7 +1,7 @@
 import { OpenAI } from 'openai';
 import { logger } from '@ze/logger';
 
-const log = logger.create('openrouter-api');
+const log = logger.openrouterApi;
 
 export interface OpenRouterModel {
   id: string;

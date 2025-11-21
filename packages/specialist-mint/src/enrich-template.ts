@@ -15,7 +15,7 @@ import type { SpecialistTemplate, DocumentationEnrichment } from './types.js';
 import { loadJSON5, writeJSON5 } from './utils.js';
 import { logger } from '@ze/logger';
 
-const log = logger.create('enrich-template');
+const log = logger.enrichTemplate;
 import { createLLMClient, type LLMProvider } from './llm-client.js';
 import { fetchDocumentation } from './doc-fetcher.js';
 import { resolve, dirname, basename, join } from 'path';

@@ -221,6 +221,15 @@ export const logger = {
   /** Specialist mint logging */
   specialistMint: createLogger('specialist-mint'),
 
+  /** LLM client logging */
+  llmClient: createLogger('llm-client'),
+
+  /** Template enrichment logging */
+  enrichTemplate: createLogger('enrich-template'),
+
+  /** Template resolver logging */
+  templateResolver: createLogger('template-resolver'),
+
   // Harness Runtime
   /** Figma tools logging */
   figmaTools: createLogger('figma-tools'),
@@ -235,7 +244,11 @@ export const logger = {
   askUserTool: createLogger('ask-user-tool'),
 
   /** Validation logging */
-  validation: createLogger('validation')
+  validation: createLogger('validation'),
+
+  // Harness Lib
+  /** OpenRouter API logging */
+  openrouterApi: createLogger('openrouter-api')
 };
 
 /**
