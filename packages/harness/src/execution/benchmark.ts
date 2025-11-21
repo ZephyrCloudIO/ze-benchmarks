@@ -195,17 +195,17 @@ export async function executeBenchmark(
 		workspaceDir = workspacePrep.workspaceDir;
 		fixtureDir = workspacePrep.fixtureDir;
 
-		logger.execution.raw(chalk.magenta('🔍 DEBUG: Workspace prepared successfully'));
-		logger.execution.raw(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
-		logger.execution.raw(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
+		logger.execution.debug(chalk.magenta('🔍 DEBUG: Workspace prepared successfully``'));
+		logger.execution.debug(chalk.magenta(`🔍 DEBUG: workspaceDir = ${workspaceDir}`));
+		logger.execution.debug(chalk.magenta(`🔍 DEBUG: fixtureDir = ${fixtureDir}`));
 	} else if (isArtifactScenario) {
 		if (!quiet) {
-			logger.execution.raw(chalk.blue('[Benchmark] Artifact-based scenario detected - skipping workspace preparation'));
-			logger.execution.raw(chalk.gray(`  Artifact type: ${scenarioCfg.artifact.type}`));
+			logger.execution.debug(chalk.blue('[Benchmark] Artifact-based scenario detected - skipping workspace preparation'));
+			logger.execution.debug(chalk.gray(`  Artifact type: ${scenarioCfg.artifact.type}`));
 		}
 	} else {
 		if (!quiet) {
-			logger.execution.raw(chalk.yellow('[Benchmark] Workspace not required for this scenario - skipping workspace preparation'));
+			logger.execution.debug(chalk.yellow('[Benchmark] Workspace not required for this scenario - skipping workspace preparation'));
 		}
 	}
 
@@ -235,16 +235,16 @@ export async function executeBenchmark(
 
 
 	// Stage 3: Agent Execution
-	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
+	logger.execution.debug(chalk.magenta('🔍 DEBUG: Stage 3 check - promptContent exists:', !!promptContent, 'agent:', agentDisplay));
 	// Allow agent execution if:
 	// 1. We have prompt content
 	// 2. Agent is not 'echo'
 	// 3. Either agent is defined OR specialist is provided (specialist will auto-detect agent via createAgentAdapter)
 	if (promptContent && agent !== 'echo' && (agent !== undefined || specialist)) {
-		logger.execution.raw(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
+		logger.execution.debug(chalk.magenta('🔍 DEBUG: Entering Stage 3 - Agent Execution'));
 		if (progress) updateProgress(progress, 3, 'Agent working...');
 		try {
-			logger.execution.raw(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
+			logger.execution.debug(chalk.magenta('🔍 DEBUG: About to create agent adapter'));
 			// Create agent adapter (agent can be undefined if specialist will auto-detect)
 		const agentAdapter = await createAgentAdapter(agent, model, specialist, workspaceRoot);
 
@@ -465,23 +465,23 @@ export async function executeBenchmark(
 			const promptSent = JSON.stringify(messagesForLogging);
 
 			// Debug: Log promptSent details
-			logger.execution.raw(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
-			logger.execution.raw(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
-			logger.execution.raw(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
+			logger.execution.debug(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
+			logger.execution.debug(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
+			logger.execution.debug(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
 			if (messagesForLogging.length > 0) {
 				messagesForLogging.forEach((msg, idx) => {
-					logger.execution.raw(chalk.magenta(`  Message ${idx + 1}: role=${msg.role}, content_length=${msg.content?.length || 0} chars`));
+					logger.execution.debug(chalk.magenta(`  Message ${idx + 1}: role=${msg.role}, content_length=${msg.content?.length || 0} chars`));
 					if (msg.role === 'system' && msg.content) {
-						logger.execution.raw(chalk.magenta(`    System prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+						logger.execution.debug(chalk.magenta(`    System prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
 					}
 					if (msg.role === 'user' && msg.content) {
-						logger.execution.raw(chalk.magenta(`    User prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
+						logger.execution.debug(chalk.magenta(`    User prompt preview (first 200 chars): ${msg.content.substring(0, 200)}...`));
 					}
 				});
 			}
-			logger.execution.raw(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
-			logger.execution.raw(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
-			logger.execution.raw(chalk.magenta('🔍 END DEBUG: promptSent\n'));
+			logger.execution.debug(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
+			logger.execution.debug(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
+			logger.execution.debug(chalk.magenta('🔍 END DEBUG: promptSent\n'));
 
 			// Show summary after agent completes
 			logger.execution.debug(`  ✓ Tokens: ${response.tokensIn || 0} in, ${response.tokensOut || 0} out | Cost: $${(response.costUsd || 0).toFixed(4)}`);
@@ -515,22 +515,22 @@ export async function executeBenchmark(
 			// Telemetry is shown in final results
 
 		} catch (error) {
-			logger.execution.raw(chalk.magenta('🔍 DEBUG: Agent execution threw error:', JSON.stringify(error, null, 2)));
+			logger.execution.debug(chalk.magenta('🔍 DEBUG: Agent execution threw error:', JSON.stringify(error, null, 2)));
 			benchmarkLogger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) logger.execution.error('✗ Agent execution failed');
 			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`);
 			return; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
-		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
+		logger.execution.debug(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
 	} else if (agent === 'echo' || (agent === undefined && !specialist)) {
-		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or no specialist provided'));
+		logger.execution.debug(chalk.magenta('🔍 DEBUG: Skipping agent execution - using echo agent or no specialist provided'));
 	} else {
-		logger.execution.raw(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
+		logger.execution.debug(chalk.magenta('🔍 DEBUG: Skipping agent execution - unknown condition'));
 	}
 
 	// Stage 4: Validation (skip for artifact scenarios or if validation not required)
-	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
+	logger.execution.debug(chalk.magenta('🔍 DEBUG: Stage 4 - Validation starting'));
 	const validationRequired = scenarioCfg.validation?.required !== false; // Default to true for backward compatibility
 	const shouldRunValidation = !isArtifactScenario && workspaceDir && validationRequired;
 	
@@ -550,7 +550,7 @@ export async function executeBenchmark(
 	if (!quiet) logger.execution.debug(`  ✓ ${passedCommands}/${commandLog.length} commands passed`);
 
 	// Stage 5: Evaluation
-	logger.execution.raw(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
+	logger.execution.debug(chalk.magenta('🔍 DEBUG: Stage 5 - Evaluation starting'));
 	if (llmJudgeOnly) {
 		if (!quiet) logger.execution.info('[Benchmark] Running LLM judge only (other evaluators skipped)');
 	}
@@ -744,7 +744,6 @@ export async function executeBenchmark(
 		const errorStack = error instanceof Error ? error.stack : undefined;
 
 		benchmarkLogger.failRun(errorMessage, 'unknown');
-		console.log('---------------------- error: ', error);
 
 		if (!quiet) {
 			logger.execution.error('✗ Unexpected error');

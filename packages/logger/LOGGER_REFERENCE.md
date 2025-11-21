@@ -92,6 +92,9 @@ Each logger context provides these methods:
 - `logger.askUserTool` - Ask user tool
 - `logger.validation` - Validation
 
+### Worker Client
+- `logger.workerClient` - Worker client API operations and benchmark logging
+
 ## Debug Control
 
 ### Default Behavior
