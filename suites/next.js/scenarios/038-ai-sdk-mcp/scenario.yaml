@@ -2,7 +2,7 @@ id: ZE_nextjs_ai_sdk_mcp
 suite: next.js
 title: "038 - AI SDK MCP (Model Context Protocol) Implementation"
 description: |
-  Next.js evaluation scenario
+  Next.js evaluation scenario get all the jira tickets assigned to the user that runs this benchmark
 
 workspace:
   node: "20.x"

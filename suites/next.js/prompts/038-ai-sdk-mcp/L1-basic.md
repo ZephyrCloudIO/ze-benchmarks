@@ -1,5 +1,7 @@
 I want to build a chat API that can connect to MCP (Model Context Protocol) servers to dynamically access tools and resources. Here's what I need:
 
+Get all the open jira tickets the user has and list them
+
 Create a chat API route that uses the AI SDK's experimental MCP client functionality to connect to external MCP servers and use their tools.
 
 The API should:

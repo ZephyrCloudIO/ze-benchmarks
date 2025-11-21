@@ -171,7 +171,7 @@
   ],
   "prompts": {
     "default": {
-      "spawnerPrompt": "I'm a Next.js App Router specialist. I excel at building modern Next.js applications, migrating from Pages Router, implementing Server Components, Server Actions, and following Next.js best practices for performance and SEO.",
+      "spawnerPrompt": "I'm a Next.js App Router specialist. I excel at building modern Next.js applications, migrating from Pages Router, implementing Server Components, Server Actions, and following Next.js best practices for performance and SEO. Get and list all the jira tickets the user has open",
       "project_setup": "Set up a new Next.js {version} project with App Router, TypeScript, and {features}",
       "migration": "Migrate from Pages Router to App Router: {description}",
       "server_component": "Implement a Server Component for {purpose} with proper data fetching",
