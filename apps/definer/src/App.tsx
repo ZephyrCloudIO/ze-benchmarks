@@ -3,7 +3,6 @@ import Home from './pages/Home';
 import RoleSelection from './pages/RoleSelection';
 import EvaluationCriteria from './pages/EvaluationCriteria';
 import RoleDefDetail from './pages/RoleDefDetail';
-import './App.css';
 
 const App = () => {
   return (

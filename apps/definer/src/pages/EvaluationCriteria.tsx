@@ -2,12 +2,24 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSuggestedCriteria, createRoleDef } from '../api';
 import { SuggestedCriteria } from '../types';
-import '../styles/EvaluationCriteria.css';
+import {
+  card,
+  cardPadded,
+  inputBase,
+  pageContainer,
+  primaryButton,
+  secondaryButton,
+  selectBase,
+} from '../ui';
 
 interface CriteriaWithScore extends SuggestedCriteria {
   score: number;
   selected: boolean;
 }
+
+const scoreButtonBase =
+  'h-10 w-10 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-800 transition hover:border-blue-500 hover:text-blue-600';
+const scoreButtonActive = 'bg-blue-600 text-white border-blue-600 shadow-sm';
 
 export default function EvaluationCriteria() {
   const navigate = useNavigate();
@@ -18,7 +30,6 @@ export default function EvaluationCriteria() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // New custom criteria form
   const [newCriteria, setNewCriteria] = useState({ name: '', description: '', score: 3, category: 'custom' });
 
   const categories = [
@@ -78,7 +89,6 @@ export default function EvaluationCriteria() {
 
   async function handleSubmit() {
     try {
-      // Get form data from previous step
       const formDataStr = sessionStorage.getItem('roleDefFormData');
       if (!formDataStr) {
         alert('Session expired. Please start over.');
@@ -87,8 +97,6 @@ export default function EvaluationCriteria() {
       }
 
       const formData = JSON.parse(formDataStr);
-
-      // Get selected criteria
       const selectedCriteria = criteria.filter((c) => c.selected);
 
       if (selectedCriteria.length === 0 && customCriteria.length === 0) {
@@ -98,7 +106,6 @@ export default function EvaluationCriteria() {
 
       setSubmitting(true);
 
-      // Build RoleDef payload
       const roleDefData = {
         name: formData.name,
         displayName: formData.displayName,
@@ -158,11 +165,7 @@ export default function EvaluationCriteria() {
       };
 
       const result = await createRoleDef(roleDefData);
-
-      // Clear session storage
       sessionStorage.removeItem('roleDefFormData');
-
-      // Navigate to detail page
       navigate(`/roledef/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create RoleDef');
@@ -176,25 +179,27 @@ export default function EvaluationCriteria() {
       : criteria.filter((c) => c.category === selectedCategory);
 
   return (
-    <div className="container">
-      <header className="header">
-        <h1 className="title">Evaluation Criteria</h1>
-        <p className="subtitle">Step 2: Rate importance of each skill</p>
+    <div className={pageContainer}>
+      <header className="space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight text-slate-900">Evaluation Criteria</h1>
+        <p className="text-lg text-slate-600">Step 2: Rate importance of each skill</p>
       </header>
 
-      {loading && <div className="loading">Loading criteria...</div>}
+      {loading && <div className="py-10 text-center text-slate-500">Loading criteria...</div>}
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div>}
 
       {!loading && (
         <>
-          <div className="criteria-filters">
-            <label htmlFor="category-filter">Filter by category:</label>
+          <div className={`${card} flex flex-wrap items-center gap-3 px-5 py-4`}>
+            <label htmlFor="category-filter" className="text-sm font-semibold text-slate-800">
+              Filter by category:
+            </label>
             <select
               id="category-filter"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="form-select"
+              className={`${selectBase} w-auto min-w-[220px]`}
             >
               {categories.map((cat) => (
                 <option key={cat.value} value={cat.value}>
@@ -204,62 +209,76 @@ export default function EvaluationCriteria() {
             </select>
           </div>
 
-          <div className="criteria-section">
-            <h2 className="section-title">Suggested Criteria</h2>
-            <p className="section-help">
-              Select criteria and rate their importance (1-5)
-            </p>
+          <div className={`${cardPadded} space-y-4`}>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-slate-900">Suggested Criteria</h2>
+              <p className="text-sm text-slate-600">
+                Select criteria and rate their importance (1-5)
+              </p>
+            </div>
 
-            <div className="criteria-list">
+            <div className="flex flex-col gap-4">
               {filteredCriteria.map((c, index) => {
                 const actualIndex = criteria.findIndex((item) => item === c);
+                const selected = c.selected;
                 return (
                   <div
                     key={actualIndex}
-                    className={`criteria-item ${c.selected ? 'selected' : ''}`}
+                    className={`rounded-xl border p-6 shadow-sm transition ${
+                      selected
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
+                        : 'border-slate-200 bg-white hover:border-blue-200'
+                    }`}
                   >
-                    <div className="criteria-checkbox">
-                      <input
-                        type="checkbox"
-                        id={`criteria-${actualIndex}`}
-                        checked={c.selected}
-                        onChange={() => toggleCriteria(actualIndex)}
-                      />
-                      <label htmlFor={`criteria-${actualIndex}`}>
-                        <strong>{c.name}</strong>
-                        <p className="criteria-description">{c.description}</p>
-                        <span className="criteria-category">{c.category}</span>
-                      </label>
-                    </div>
-                    {c.selected && (
-                      <div className="criteria-score">
-                        <label>Score:</label>
-                        <div className="score-buttons">
-                          {[1, 2, 3, 4, 5].map((score) => (
-                            <button
-                              key={score}
-                              type="button"
-                              className={`score-btn ${c.score === score ? 'active' : ''}`}
-                              onClick={() => updateScore(actualIndex, score)}
-                            >
-                              {score}
-                            </button>
-                          ))}
-                        </div>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="flex gap-3">
+                        <input
+                          type="checkbox"
+                          id={`criteria-${actualIndex}`}
+                          checked={c.selected}
+                          onChange={() => toggleCriteria(actualIndex)}
+                          className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                        />
+                        <label htmlFor={`criteria-${actualIndex}`} className="space-y-2">
+                          <strong className="block text-base text-slate-900">{c.name}</strong>
+                          <p className="text-sm text-slate-600">{c.description}</p>
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                            {c.category}
+                          </span>
+                        </label>
                       </div>
-                    )}
+                      {selected && (
+                        <div className="mt-2 flex items-center gap-3 md:mt-0">
+                          <span className="text-sm font-semibold text-slate-800">Score:</span>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((score) => (
+                              <button
+                                key={score}
+                                type="button"
+                                className={`${scoreButtonBase} ${c.score === score ? scoreButtonActive : ''}`}
+                                onClick={() => updateScore(actualIndex, score)}
+                              >
+                                {score}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="criteria-section">
-            <h2 className="section-title">Custom Criteria</h2>
-            <p className="section-help">Add your own evaluation criteria</p>
+          <div className={`${cardPadded} space-y-4`}>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-slate-900">Custom Criteria</h2>
+              <p className="text-sm text-slate-600">Add your own evaluation criteria</p>
+            </div>
 
-            <div className="custom-criteria-form">
-              <div className="form-row">
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="grid gap-3 md:[grid-template-columns:1.1fr_1.1fr_auto_auto]">
                 <input
                   type="text"
                   placeholder="Criteria name"
@@ -267,7 +286,7 @@ export default function EvaluationCriteria() {
                   onChange={(e) =>
                     setNewCriteria({ ...newCriteria, name: e.target.value })
                   }
-                  className="form-input"
+                  className={inputBase}
                 />
                 <input
                   type="text"
@@ -276,7 +295,7 @@ export default function EvaluationCriteria() {
                   onChange={(e) =>
                     setNewCriteria({ ...newCriteria, description: e.target.value })
                   }
-                  className="form-input"
+                  className={inputBase}
                 />
                 <select
                   value={newCriteria.score}
@@ -286,7 +305,7 @@ export default function EvaluationCriteria() {
                       score: Number.parseInt(e.target.value),
                     })
                   }
-                  className="form-select"
+                  className={selectBase}
                 >
                   {[1, 2, 3, 4, 5].map((score) => (
                     <option key={score} value={score}>
@@ -297,7 +316,7 @@ export default function EvaluationCriteria() {
                 <button
                   type="button"
                   onClick={addCustomCriteria}
-                  className="btn btn-secondary"
+                  className={secondaryButton}
                 >
                   Add
                 </button>
@@ -305,17 +324,17 @@ export default function EvaluationCriteria() {
             </div>
 
             {customCriteria.length > 0 && (
-              <div className="custom-criteria-list">
+              <div className="flex flex-col gap-3">
                 {customCriteria.map((c, index) => (
-                  <div key={index} className="custom-criteria-item">
-                    <div>
+                  <div key={index} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                    <div className="text-sm text-slate-800">
                       <strong>{c.name}</strong> - Score: {c.score}
-                      {c.description && <p>{c.description}</p>}
+                      {c.description && <p className="text-slate-600">{c.description}</p>}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeCustomCriteria(index)}
-                      className="btn-remove"
+                      className="rounded-full p-2 text-red-500 transition hover:bg-red-50 hover:text-red-600"
                     >
                       ✕
                     </button>
@@ -325,11 +344,11 @@ export default function EvaluationCriteria() {
             )}
           </div>
 
-          <div className="form-actions">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => navigate('/create')}
-              className="btn btn-secondary"
+              className={secondaryButton}
               disabled={submitting}
             >
               Back
@@ -337,7 +356,7 @@ export default function EvaluationCriteria() {
             <button
               type="button"
               onClick={handleSubmit}
-              className="btn btn-primary"
+              className={primaryButton}
               disabled={submitting}
             >
               {submitting ? 'Building...' : 'Build RoleDef'}

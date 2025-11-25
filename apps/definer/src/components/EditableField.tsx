@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import '../styles/EditableField.css';
+import { iconButton, inputBase, primaryButton, secondaryButton, textareaBase } from '../ui';
 
 interface EditableFieldProps {
   value: string;
@@ -24,13 +24,13 @@ export default function EditableField({ value, onSave, multiline = false, label 
 
   if (isEditing) {
     return (
-      <div className="editable-field editing">
-        {label && <label className="field-label">{label}</label>}
+      <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4 shadow-sm">
+        {label && <label className="text-sm font-semibold text-slate-800">{label}</label>}
         {multiline ? (
           <textarea
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="field-input"
+            className={textareaBase}
             rows={4}
             autoFocus
           />
@@ -39,15 +39,15 @@ export default function EditableField({ value, onSave, multiline = false, label 
             type="text"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="field-input"
+            className={inputBase}
             autoFocus
           />
         )}
-        <div className="field-actions">
-          <button onClick={handleSave} className="btn-save">
+        <div className="flex justify-end gap-2">
+          <button onClick={handleSave} className={primaryButton}>
             Save
           </button>
-          <button onClick={handleCancel} className="btn-cancel">
+          <button onClick={handleCancel} className={secondaryButton}>
             Cancel
           </button>
         </div>
@@ -56,13 +56,15 @@ export default function EditableField({ value, onSave, multiline = false, label 
   }
 
   return (
-    <div className="editable-field">
-      {label && <label className="field-label">{label}</label>}
-      <div className="field-display">
-        <span className="field-value">{value || '(empty)'}</span>
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {label && <label className="text-sm font-semibold text-slate-800">{label}</label>}
+      <div className="flex items-start gap-3">
+        <span className="flex-1 text-sm text-slate-800">
+          {value ? value : <span className="italic text-slate-400">(empty)</span>}
+        </span>
         <button
           onClick={() => setIsEditing(true)}
-          className="btn-edit"
+          className={iconButton}
           title="Edit"
         >
           ✏️
