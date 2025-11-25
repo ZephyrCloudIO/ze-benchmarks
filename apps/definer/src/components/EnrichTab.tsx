@@ -39,7 +39,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/document`, {
         method: 'POST',
@@ -76,7 +76,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
     setSuccess(null);
 
     try {
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/url`, {
         method: 'POST',
@@ -116,7 +116,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
     try {
       const config = JSON.parse(mcpConfig);
 
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/mcp`, {
         method: 'POST',

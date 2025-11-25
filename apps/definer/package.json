@@ -6,8 +6,6 @@
   "scripts": {
     "build": "rsbuild build",
     "dev": "rsbuild dev",
-    "check": "biome check --write",
-    "format": "biome format --write",
     "preview": "rsbuild preview"
   },
   "dependencies": {
