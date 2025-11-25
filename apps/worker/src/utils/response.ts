@@ -9,3 +9,7 @@ export function jsonResponse(data: any, status: number = 200): Response {
     }
   });
 }
+
+export function errorResponse(message: string, status: number = 500): Response {
+  return jsonResponse({ error: message }, status);
+}

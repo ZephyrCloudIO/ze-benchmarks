@@ -6,6 +6,7 @@ import * as runsApi from './api/runs';
 import * as batchesApi from './api/batches';
 import * as statsApi from './api/stats';
 import * as submitApi from './api/submit';
+import * as roledefsApi from './api/roledefs';
 
 type CF = [env: Env, ctx: ExecutionContext];
 
@@ -25,6 +26,19 @@ router.get('/api/batches/:batchId', batchesApi.getBatchDetails);
 
 router.get('/api/stats', statsApi.getGlobalStats);
 router.get('/api/stats/agents', statsApi.getAgentStats);
+
+// RoleDef endpoints
+router.get('/api/roledefs', roledefsApi.listRoleDefs);
+router.get('/api/roledefs/criteria/suggestions', roledefsApi.getSuggestedCriteria);
+router.get('/api/roledefs/:roleDefId', roledefsApi.getRoleDefDetails);
+router.post('/api/roledefs', authenticate, roledefsApi.createRoleDef);
+router.put('/api/roledefs/:roleDefId', authenticate, roledefsApi.updateRoleDef);
+router.delete('/api/roledefs/:roleDefId', authenticate, roledefsApi.deleteRoleDef);
+
+// RoleDef enrichment endpoints
+router.post('/api/roledefs/enrich/document', authenticate, roledefsApi.enrichFromDocument);
+router.post('/api/roledefs/enrich/url', authenticate, roledefsApi.enrichFromUrl);
+router.post('/api/roledefs/enrich/mcp', authenticate, roledefsApi.enrichFromMcp);
 
 // Protected write endpoints (requires authentication)
 router.post('/api/results', authenticate, submitApi.submitResults);

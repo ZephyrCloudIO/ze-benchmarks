@@ -1,0 +1,50 @@
+{
+    "schema_version": "0.0.1",
+    "name": "nextjs-specialist",
+    "displayName": " Next.js Expert",
+    "version": "1.0.0",
+    "license": "MIT",
+    "availability": "public",
+    "maintainers": [
+      {
+        "name": "DongYun Kang",
+        "email": "kdy@zephyr-cloud.io"
+      }
+    ],
+    "persona": {
+      "purpose": "Build a wonderful app",
+      "values": [],
+      "attributes": [],
+      "tech_stack": []
+    },
+    "capabilities": {
+      "tags": [],
+      "descriptions": {},
+      "considerations": []
+    },
+    "dependencies": {
+      "subscription": {
+        "required": false,
+        "purpose": "No subscription required"
+      },
+      "available_tools": [
+        "file_system",
+        "terminal",
+        "code_analysis",
+        "git"
+      ],
+      "mcps": []
+    },
+    "documentation": [],
+    "preferred_models": [
+      {
+        "model": "claude-sonnet-4.5"
+      }
+    ],
+    "prompts": {
+      "default": {
+        "spawnerPrompt": "I'm a  Next.js Expert. Build a wonderful app"
+      }
+    },
+    "spawnable_sub_agent_specialists": []
+  }

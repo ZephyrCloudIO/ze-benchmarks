@@ -88,7 +88,10 @@ ALLOWED_ORIGINS = "https://bench-dev.zephyr-cloud.io,http://localhost:3000"
 # For production secrets (use wrangler secret put):
 # Production:
 #   wrangler secret put API_SECRET_KEY --env production
+#   wrangler secret put OPENROUTER_API_KEY --env production
 # Staging:
 #   wrangler secret put API_SECRET_KEY --env staging
+#   wrangler secret put OPENROUTER_API_KEY --env staging
 # Dev:
 #   wrangler secret put API_SECRET_KEY --env dev
+#   wrangler secret put OPENROUTER_API_KEY --env dev
