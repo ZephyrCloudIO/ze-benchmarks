@@ -19,8 +19,9 @@ CREATE TABLE IF NOT EXISTS role_defs (
   updated_at INTEGER NOT NULL
 );
 
-CREATE INDEX idx_roledefs_name ON role_defs(name);
-CREATE INDEX idx_roledefs_created_at ON role_defs(created_at);
+-- Use IF NOT EXISTS to avoid re-creating indexes already defined in prior migrations
+CREATE INDEX IF NOT EXISTS idx_roledefs_name ON role_defs(name);
+CREATE INDEX IF NOT EXISTS idx_roledefs_created_at ON role_defs(created_at);
 
 -- Create evaluation_criteria table
 CREATE TABLE IF NOT EXISTS evaluation_criteria (
@@ -35,4 +36,4 @@ CREATE TABLE IF NOT EXISTS evaluation_criteria (
   FOREIGN KEY (role_def_id) REFERENCES role_defs(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_criteria_roledef_id ON evaluation_criteria(role_def_id);
+CREATE INDEX IF NOT EXISTS idx_criteria_roledef_id ON evaluation_criteria(role_def_id);
