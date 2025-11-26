@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../styles/RoleSelection.css';
+import {
+  cardPadded,
+  inputBase,
+  pageContainer,
+  primaryButton,
+  secondaryButton,
+  textareaBase,
+} from '../ui';
 
 export default function RoleSelection() {
   const navigate = useNavigate();
@@ -14,7 +21,6 @@ export default function RoleSelection() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Store form data in sessionStorage to use in next step
     sessionStorage.setItem('roleDefFormData', JSON.stringify(formData));
     navigate('/create/criteria');
   };
@@ -30,113 +36,117 @@ export default function RoleSelection() {
     formData.maintainerName && formData.maintainerEmail;
 
   return (
-    <div className="container">
-      <header className="header">
-        <h1 className="title">Define Your Role</h1>
-        <p className="subtitle">Step 1: Basic Information</p>
+    <div className={pageContainer}>
+      <header className="space-y-2">
+        <h1 className="text-4xl font-bold tracking-tight text-slate-900">Define Your Role</h1>
+        <p className="text-lg text-slate-600">Step 1: Basic Information</p>
       </header>
 
-      <form onSubmit={handleSubmit} className="form">
-        <div className="form-section">
-          <h2 className="form-section-title">Role Identity</h2>
+      <form onSubmit={handleSubmit} className={`${cardPadded} mx-auto max-w-3xl space-y-10`}>
+        <div className="space-y-8">
+          <h2 className="text-2xl font-semibold text-slate-900">Role Identity</h2>
 
-          <div className="form-group">
-            <label htmlFor="name" className="form-label">
-              Role Name <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="e.g., nextjs-specialist"
-              className="form-input"
-              required
-            />
-            <p className="form-help">Unique identifier (lowercase, hyphen-separated)</p>
-          </div>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-semibold text-slate-800">
+                Role Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="e.g., nextjs-specialist"
+                className={inputBase}
+                required
+              />
+              <p className="text-xs text-slate-500">Unique identifier (lowercase, hyphen-separated)</p>
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="displayName" className="form-label">
-              Display Name <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              id="displayName"
-              name="displayName"
-              value={formData.displayName}
-              onChange={handleChange}
-              placeholder="e.g., Next.js Expert"
-              className="form-input"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <label htmlFor="displayName" className="text-sm font-semibold text-slate-800">
+                Display Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="displayName"
+                name="displayName"
+                value={formData.displayName}
+                onChange={handleChange}
+                placeholder="e.g., Next.js Expert"
+                className={inputBase}
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="purpose" className="form-label">
-              Purpose <span className="required">*</span>
-            </label>
-            <textarea
-              id="purpose"
-              name="purpose"
-              value={formData.purpose}
-              onChange={handleChange}
-              placeholder="Describe the main purpose and expertise of this role..."
-              className="form-textarea"
-              rows={4}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h2 className="form-section-title">Maintainer Information</h2>
-
-          <div className="form-group">
-            <label htmlFor="maintainerName" className="form-label">
-              Maintainer Name <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              id="maintainerName"
-              name="maintainerName"
-              value={formData.maintainerName}
-              onChange={handleChange}
-              placeholder="Your name or team name"
-              className="form-input"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="maintainerEmail" className="form-label">
-              Maintainer Email <span className="required">*</span>
-            </label>
-            <input
-              type="email"
-              id="maintainerEmail"
-              name="maintainerEmail"
-              value={formData.maintainerEmail}
-              onChange={handleChange}
-              placeholder="contact@example.com"
-              className="form-input"
-              required
-            />
+            <div className="space-y-2">
+              <label htmlFor="purpose" className="text-sm font-semibold text-slate-800">
+                Purpose <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="purpose"
+                name="purpose"
+                value={formData.purpose}
+                onChange={handleChange}
+                placeholder="Describe the main purpose and expertise of this role..."
+                className={textareaBase}
+                rows={4}
+                required
+              />
+            </div>
           </div>
         </div>
 
-        <div className="form-actions">
+        <div className="space-y-8">
+          <h2 className="text-2xl font-semibold text-slate-900">Maintainer Information</h2>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="maintainerName" className="text-sm font-semibold text-slate-800">
+                Maintainer Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="maintainerName"
+                name="maintainerName"
+                value={formData.maintainerName}
+                onChange={handleChange}
+                placeholder="Your name or team name"
+                className={inputBase}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="maintainerEmail" className="text-sm font-semibold text-slate-800">
+                Maintainer Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                id="maintainerEmail"
+                name="maintainerEmail"
+                value={formData.maintainerEmail}
+                onChange={handleChange}
+                placeholder="contact@example.com"
+                className={inputBase}
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="btn btn-secondary"
+            className={secondaryButton}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="btn btn-primary"
+            className={primaryButton}
             disabled={!isValid}
           >
             Next: Evaluation Criteria

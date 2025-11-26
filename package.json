@@ -22,6 +22,8 @@
     "worker:deploy-staging": "pnpm --filter ze-benchmarks-worker run deploy:staging",
     "worker:deploy-production": "pnpm --filter ze-benchmarks-worker run deploy:production",
     "start:report": "pnpm --filter benchmark-report run dev",
+    "definer:dev": "pnpm --filter definer run dev",
+    "definer:build": "pnpm --filter definer run build",
     "bench:run": "tsx scripts/run-all-models.ts",
     "bench:compare": "tsx scripts/compare-batches.ts",
     "export:prompts": "tsx scripts/export-batch-prompts.ts",

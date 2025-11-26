@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import '../styles/EditableList.css';
+import { iconButton, inputBase, primaryButton, secondaryButton, successButton } from '../ui';
 
 interface EditableListProps {
   items: string[];
@@ -40,35 +40,40 @@ export default function EditableList({ items, onUpdate, label }: EditableListPro
   };
 
   return (
-    <div className="editable-list">
-      <div className="list-header">
-        <h4>{label}</h4>
-        <button onClick={() => setIsAdding(true)} className="btn-add">
+    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-slate-900">{label}</h4>
+        <button onClick={() => setIsAdding(true)} className={successButton}>
           + Add
         </button>
       </div>
-      <ul className="list-items">
+      <ul className="space-y-3">
         {items.map((item, index) => (
-          <li key={index} className="list-item">
+          <li key={index} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm transition hover:border-blue-200">
             {editingIndex === index ? (
-              <div className="list-item-edit">
+              <div className="flex w-full items-center gap-3">
                 <input
                   type="text"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
+                  className={inputBase}
                   autoFocus
                 />
-                <button onClick={handleSaveEdit} className="btn-save">Save</button>
-                <button onClick={() => setEditingIndex(null)} className="btn-cancel">Cancel</button>
+                <button onClick={handleSaveEdit} className={primaryButton}>Save</button>
+                <button onClick={() => setEditingIndex(null)} className={secondaryButton}>Cancel</button>
               </div>
             ) : (
               <>
-                <span>{item}</span>
-                <div className="list-item-actions">
-                  <button onClick={() => handleEdit(index)} className="btn-edit" title="Edit">
+                <span className="text-sm text-slate-800">{item}</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleEdit(index)} className={iconButton} title="Edit">
                     ✏️
                   </button>
-                  <button onClick={() => handleRemove(index)} className="btn-remove" title="Remove">
+                  <button
+                    onClick={() => handleRemove(index)}
+                    className={`${iconButton} text-red-500 hover:bg-red-50 hover:text-red-600`}
+                    title="Remove"
+                  >
                     🗑️
                   </button>
                 </div>
@@ -78,16 +83,19 @@ export default function EditableList({ items, onUpdate, label }: EditableListPro
         ))}
       </ul>
       {isAdding && (
-        <div className="list-add-form">
+        <div className="flex flex-col gap-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 md:flex-row md:items-center">
           <input
             type="text"
             value={newItem}
             onChange={(e) => setNewItem(e.target.value)}
             placeholder={`New ${label.toLowerCase().replace(/s$/, '')}`}
+            className={inputBase}
             autoFocus
           />
-          <button onClick={handleAdd} className="btn-save">Add</button>
-          <button onClick={() => setIsAdding(false)} className="btn-cancel">Cancel</button>
+          <div className="flex gap-2">
+            <button onClick={handleAdd} className={primaryButton}>Add</button>
+            <button onClick={() => setIsAdding(false)} className={secondaryButton}>Cancel</button>
+          </div>
         </div>
       )}
     </div>

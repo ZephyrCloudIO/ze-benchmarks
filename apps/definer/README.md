@@ -29,7 +29,7 @@ Configure environment:
 
 ```bash
 cp .env.example .env
-# Edit .env to set PUBLIC_VITE_API_URL if needed
+# Edit .env to set ZE_PUBLIC_WORKER_URL if needed
 ```
 
 ## Development

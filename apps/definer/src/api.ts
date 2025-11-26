@@ -1,6 +1,6 @@
-import { RoleDef, EvaluationCriteria, SuggestedCriteria } from './types';
+import type { RoleDef, SuggestedCriteria } from './types';
 
-const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
 export async function fetchRoleDefs(): Promise<RoleDef[]> {
   const response = await fetch(`${API_BASE_URL}/roledefs`);

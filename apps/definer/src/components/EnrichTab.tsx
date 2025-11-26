@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import '../styles/EnrichTab.css';
+import { cardPadded, inputBase, primaryButton, textareaBase } from '../ui';
 
 interface EnrichTabProps {
   onEnrich: (data: any) => Promise<void>;
 }
+
+const tabButtonBase =
+  'inline-flex items-center gap-2 rounded-t-lg border-b-2 border-transparent px-4 py-2 text-sm font-semibold transition hover:bg-slate-50';
 
 export default function EnrichTab({ onEnrich }: EnrichTabProps) {
   const [activeUploadTab, setActiveUploadTab] = useState<'document' | 'url' | 'mcp'>('document');
@@ -11,13 +14,8 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Document upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  // URL state
   const [url, setUrl] = useState('');
-
-  // MCP state
   const [mcpConfig, setMcpConfig] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,7 +39,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/document`, {
         method: 'POST',
@@ -78,7 +76,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
     setSuccess(null);
 
     try {
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/url`, {
         method: 'POST',
@@ -118,7 +116,7 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
     try {
       const config = JSON.parse(mcpConfig);
 
-      const API_BASE_URL = import.meta.env.PUBLIC_VITE_API_URL || 'http://localhost:8787/api';
+      const API_BASE_URL = import.meta.env.ZE_PUBLIC_WORKER_URL || 'http://localhost:8787/api';
 
       const response = await fetch(`${API_BASE_URL}/roledefs/enrich/mcp`, {
         method: 'POST',
@@ -150,56 +148,62 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
   };
 
   return (
-    <div className="enrich-tab">
-      <div className="enrich-header">
-        <h3>Enrich RoleDef</h3>
-        <p>Upload documents, URLs, or MCP configurations to automatically enhance your RoleDef</p>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <h3 className="text-xl font-semibold text-slate-900">Enrich RoleDef</h3>
+        <p className="text-sm text-slate-600">Upload documents, URLs, or MCP configurations to automatically enhance your RoleDef</p>
       </div>
 
-      <div className="enrich-tabs">
+      <div className="flex gap-2 border-b border-slate-200">
         <button
-          className={`enrich-tab-btn ${activeUploadTab === 'document' ? 'active' : ''}`}
+          className={`${tabButtonBase} ${activeUploadTab === 'document' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'text-slate-600'}`}
           onClick={() => setActiveUploadTab('document')}
         >
           📄 Document
         </button>
         <button
-          className={`enrich-tab-btn ${activeUploadTab === 'url' ? 'active' : ''}`}
+          className={`${tabButtonBase} ${activeUploadTab === 'url' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'text-slate-600'}`}
           onClick={() => setActiveUploadTab('url')}
         >
           🔗 URL
         </button>
         <button
-          className={`enrich-tab-btn ${activeUploadTab === 'mcp' ? 'active' : ''}`}
+          className={`${tabButtonBase} ${activeUploadTab === 'mcp' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'text-slate-600'}`}
           onClick={() => setActiveUploadTab('mcp')}
         >
           ⚙️ MCP Config
         </button>
       </div>
 
-      {error && <div className="enrich-error">{error}</div>}
-      {success && <div className="enrich-success">{success}</div>}
+      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {success && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>}
 
-      <div className="enrich-content">
+      <div className={`${cardPadded} space-y-6`}>
         {activeUploadTab === 'document' && (
-          <div className="enrich-section">
-            <h4>Upload Document</h4>
-            <p>Upload resumes, job descriptions, or other documents to extract relevant information</p>
-            <div className="file-upload">
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-lg font-semibold text-slate-900">Upload Document</h4>
+              <p className="text-sm text-slate-600">Upload resumes, job descriptions, or other documents to extract relevant information</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 type="file"
                 onChange={handleFileChange}
                 accept=".pdf,.doc,.docx,.txt"
                 id="file-input"
+                className="sr-only"
               />
-              <label htmlFor="file-input" className="file-label">
+              <label
+                htmlFor="file-input"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-600 transition hover:border-blue-500 hover:text-blue-600"
+              >
                 {selectedFile ? selectedFile.name : 'Choose a file...'}
               </label>
             </div>
             <button
               onClick={handleDocumentUpload}
               disabled={!selectedFile || isProcessing}
-              className="btn-primary"
+              className={primaryButton}
             >
               {isProcessing ? 'Processing...' : 'Upload and Process'}
             </button>
@@ -207,20 +211,22 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
         )}
 
         {activeUploadTab === 'url' && (
-          <div className="enrich-section">
-            <h4>Add from URL</h4>
-            <p>Provide a URL to documentation or resources to extract information</p>
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-lg font-semibold text-slate-900">Add from URL</h4>
+              <p className="text-sm text-slate-600">Provide a URL to documentation or resources to extract information</p>
+            </div>
             <input
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/documentation"
-              className="url-input"
+              className={inputBase}
             />
             <button
               onClick={handleUrlSubmit}
               disabled={!url.trim() || isProcessing}
-              className="btn-primary"
+              className={primaryButton}
             >
               {isProcessing ? 'Processing...' : 'Fetch and Process'}
             </button>
@@ -228,20 +234,22 @@ export default function EnrichTab({ onEnrich }: EnrichTabProps) {
         )}
 
         {activeUploadTab === 'mcp' && (
-          <div className="enrich-section">
-            <h4>MCP Configuration</h4>
-            <p>Paste MCP (Model Context Protocol) configuration to add tools and capabilities</p>
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-lg font-semibold text-slate-900">MCP Configuration</h4>
+              <p className="text-sm text-slate-600">Paste MCP (Model Context Protocol) configuration to add tools and capabilities</p>
+            </div>
             <textarea
               value={mcpConfig}
               onChange={(e) => setMcpConfig(e.target.value)}
               placeholder='{\n  "name": "my-mcp-server",\n  "tools": [...]\n}'
-              className="mcp-textarea"
+              className={`${textareaBase} font-mono`}
               rows={10}
             />
             <button
               onClick={handleMcpSubmit}
               disabled={!mcpConfig.trim() || isProcessing}
-              className="btn-primary"
+              className={primaryButton}
             >
               {isProcessing ? 'Processing...' : 'Process Configuration'}
             </button>

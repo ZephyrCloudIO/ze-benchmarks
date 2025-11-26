@@ -1,0 +1,53 @@
+name: Build Definer - Zephyr
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/definer/**"
+      - ".github/workflows/deploy-definer-zephyr.yml"
+  release:
+    types: [prereleased, released]
+
+concurrency:
+  group: definer-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Definer for Zephyr
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build definer bundle
+        run: pnpm definer:build
+        env:
+          ZE_SECRET_TOKEN: ${{ secrets.ZE_SECRET_TOKEN }}
+          ZE_PUBLIC_APP_HOST: https://bench-api-dev.zephyr-cloud.io
+
+      - name: Build summary
+        run: |
+          echo "### ✅ Definer build complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
