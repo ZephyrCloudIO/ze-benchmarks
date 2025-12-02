@@ -62,6 +62,22 @@ export const runTelemetry = sqliteTable('run_telemetry', {
   promptSent: text('prompt_sent'),
 });
 
+export const humanScores = sqliteTable('human_scores', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  runId: text('run_id').notNull().references(() => benchmarkRuns.runId),
+  scorerName: text('scorer_name').notNull(),
+  scorerEmail: text('scorer_email'),
+  scores: text('scores').notNull(), // JSON: Array<{category, score, reasoning, confidence}>
+  overallScore: real('overall_score').notNull(), // 0-1.0 normalized
+  timeSpentSeconds: integer('time_spent_seconds'),
+  notes: text('notes'),
+  metadata: text('metadata'), // JSON: Additional context
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => ({
+  runIdIdx: index('idx_human_scores_run_id').on(table.runId),
+  createdAtIdx: index('idx_human_scores_created_at').on(table.createdAt),
+}));
+
 // Relationships
 export const batchRunsRelations = relations(batchRuns, ({ many }) => ({
   benchmarkRuns: many(benchmarkRuns),
@@ -77,6 +93,7 @@ export const benchmarkRunsRelations = relations(benchmarkRuns, ({ one, many }) =
     fields: [benchmarkRuns.runId],
     references: [runTelemetry.runId],
   }),
+  humanScores: many(humanScores),
 }));
 
 export const evaluationResultsRelations = relations(evaluationResults, ({ one }) => ({
@@ -93,6 +110,13 @@ export const runTelemetryRelations = relations(runTelemetry, ({ one }) => ({
   }),
 }));
 
+export const humanScoresRelations = relations(humanScores, ({ one }) => ({
+  benchmarkRun: one(benchmarkRuns, {
+    fields: [humanScores.runId],
+    references: [benchmarkRuns.runId],
+  }),
+}));
+
 // Export types
 export type BatchRun = typeof batchRuns.$inferSelect;
 export type NewBatchRun = typeof batchRuns.$inferInsert;
@@ -105,6 +129,9 @@ export type NewEvaluationResult = typeof evaluationResults.$inferInsert;
 
 export type RunTelemetry = typeof runTelemetry.$inferSelect;
 export type NewRunTelemetry = typeof runTelemetry.$inferInsert;
+
+export type HumanScore = typeof humanScores.$inferSelect;
+export type NewHumanScore = typeof humanScores.$inferInsert;
 
 // RoleDef tables
 export const roleDefs = sqliteTable('role_defs', {

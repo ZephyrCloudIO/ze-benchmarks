@@ -441,7 +441,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, humanScoring, enrichTemplate, iterations } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -551,7 +551,7 @@ async function run() {
 			logger.cli.info(chalk.cyan(`\n--- Iteration ${i + 1}/${iterations} ---`));
 		}
 
-		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly, humanScoring);
 	}
 
 	// Complete batch with statistics

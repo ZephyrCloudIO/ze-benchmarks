@@ -90,9 +90,15 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	const useParallel = combinations.length >= 3;
 	let concurrency = combinations.length <= 5 ? 2 : combinations.length <= 15 ? 3 : 5;
 
+	// Enable human scoring for single benchmark runs (default behavior)
+	const enableHumanScoring = combinations.length === 1;
+
 	logger.interactive.raw(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s) with specialists:`));
 	if (useParallel) {
 		logger.interactive.debug(`Parallel execution with concurrency: ${concurrency}`);
+	}
+	if (enableHumanScoring) {
+		logger.interactive.info(chalk.blue('📋 Human scoring enabled - browser will open after benchmark completes'));
 	}
 
 	// Execute warmup once per unique suite/scenario
@@ -136,7 +142,9 @@ export async function executeMultipleBenchmarksWithSpecialists(
 					batchId,
 					true,       // quiet mode
 					specialist, // specialist parameter
-					true        // skip warmup (already done)
+					true,       // skip warmup (already done)
+					true,       // llmJudgeOnly
+					enableHumanScoring // humanScoring (enabled for single runs, disabled for batch)
 				);
 			}
 		);
@@ -153,7 +161,9 @@ export async function executeMultipleBenchmarksWithSpecialists(
 				batchId,
 				true,       // quiet mode
 				specialist, // specialist parameter
-				true        // skip warmup (already done)
+				true,       // skip warmup (already done)
+				true,       // llmJudgeOnly
+				enableHumanScoring // humanScoring (enabled for single runs, disabled for batch)
 			);
 		}
 	}
@@ -350,10 +360,16 @@ export async function executeMultipleBenchmarks(
 		}
 	}
 
+	// Enable human scoring for single benchmark runs (default behavior)
+	const enableHumanScoring = combinations.length === 1;
+
 	// Show summary
 	logger.interactive.raw(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s):`));
 	if (useParallel) {
 		logger.interactive.debug(`Parallel execution with concurrency: ${concurrency}`);
+	}
+	if (enableHumanScoring) {
+		logger.interactive.info(chalk.blue('📋 Human scoring enabled - browser will open after benchmark completes'));
 	}
 
 	// Execute warmup once per unique suite/scenario before running benchmarks
@@ -391,7 +407,7 @@ export async function executeMultipleBenchmarks(
 			async (combo, i) => {
 				const { suite, scenario, tier, agent, model } = combo;
 				logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true); // quiet mode, skip warmup
+				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true, enableHumanScoring); // quiet mode, skip warmup, llmJudgeOnly, humanScoring (enabled for single runs)
 			}
 		);
 	} else {
@@ -401,7 +417,7 @@ export async function executeMultipleBenchmarks(
 
 			logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
 
-			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true); // quiet mode, skip warmup
+			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true, enableHumanScoring); // quiet mode, skip warmup, llmJudgeOnly, humanScoring (enabled for single runs)
 		}
 	}
 

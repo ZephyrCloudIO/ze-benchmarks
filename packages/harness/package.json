@@ -14,17 +14,18 @@
     "dev:tsx": "tsx src/cli.ts"
   },
   "dependencies": {
-    "yaml": "^2.5.0",
-    "zod": "^3.23.8",
-    "globby": "^14.0.2",
-    "openai": "^4.0.0",
-    "ze-evaluator": "workspace:*",
-    "@ze/worker-client": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.17.0",
     "@ze/logger": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.17.0"
+    "@ze/worker-client": "workspace:*",
+    "globby": "^14.0.2",
+    "open": "^11.0.0",
+    "openai": "^4.0.0",
+    "yaml": "^2.5.0",
+    "ze-evaluator": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
-    "@types/node": "^20.14.10"
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.4"
   }
 }

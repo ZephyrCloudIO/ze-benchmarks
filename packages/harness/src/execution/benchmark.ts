@@ -8,6 +8,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
+import open from 'open';
 import type { AgentRequest } from '../../../agent-adapters/src/index.ts';
 import { BenchmarkLogger } from '@ze/worker-client';
 import { runEvaluators } from '../../../evaluators/src/index.ts';
@@ -27,6 +28,7 @@ import { computeWeightedTotals, calculateSuccess } from '../domain/scoring.ts';
 import { displayLLMJudgeScores, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
 import { TABLE_WIDTH, SCORE_THRESHOLDS } from '../lib/constants.ts';
 import { logger } from '@ze/logger';
+import { ensureHumanScorerServer } from '../lib/human-scorer-server.ts';
 
 // Get workspace root for specialist template resolution
 const workspaceRoot = findWorkspaceRoot(process.cwd());
@@ -62,7 +64,8 @@ export async function executeBenchmark(
 	quiet?: boolean,
 	specialist?: string,
 	skipWarmup?: boolean,
-	llmJudgeOnly: boolean = true
+	llmJudgeOnly: boolean = true,
+	humanScoring: boolean = false
 ) {
 	// Initialize logger
 	const benchmarkLogger = BenchmarkLogger.getInstance();
@@ -662,6 +665,31 @@ export async function executeBenchmark(
 		evaluations: evaluationsData,
 		telemetry: telemetryData,
 	});
+
+	// Open browser for human scoring if requested
+	if (humanScoring || process.env.HUMAN_SCORING_ENABLED === 'true') {
+		const scoringUrl = `http://localhost:5173/score/${runId}`;
+
+		// Ensure the server is running before opening browser
+		const serverReady = await ensureHumanScorerServer(quiet);
+
+		if (serverReady) {
+			if (!quiet) {
+				logger.execution.info(chalk.blue(`\n📋 Opening human scoring interface...`));
+				logger.execution.info(chalk.gray(`   URL: ${scoringUrl}`));
+			}
+			try {
+				await open(scoringUrl);
+			} catch (error) {
+				logger.execution.warn(chalk.yellow(`⚠️  Could not open browser automatically: ${error instanceof Error ? error.message : String(error)}`));
+				logger.execution.info(chalk.gray(`   Please open manually: ${scoringUrl}`));
+			}
+		} else {
+			logger.execution.warn(chalk.yellow(`⚠️  Could not start human-scorer server`));
+			logger.execution.info(chalk.gray(`   Start manually: cd apps/human-scorer && pnpm dev`));
+			logger.execution.info(chalk.gray(`   Then open: ${scoringUrl}`));
+		}
+	}
 
 	// Stage 6: Results
 	if (progress) updateProgress(progress, 6, 'Preparing results');
