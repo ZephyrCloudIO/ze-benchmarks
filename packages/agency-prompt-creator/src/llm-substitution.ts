@@ -3,7 +3,7 @@
  * Step 3c: Replace mustache variables using LLM understanding
  */
 
-import type { ExtractedIntent } from './intent-extraction.js';
+import type { ExtractedIntent } from './intent-extraction';
 import { logger } from '@ze/logger';
 
 const log = logger.llmSubstitution;

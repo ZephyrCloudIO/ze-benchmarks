@@ -3,8 +3,8 @@
  * Step 3b: Select spawner prompt, task prompt, and documentation
  */
 
-import type { SpecialistTemplate, Prompts, DocumentationEntry } from './types.js';
-import type { ExtractedIntent } from './intent-extraction.js';
+import type { SpecialistTemplate, Prompts, DocumentationEntry } from './types';
+import type { ExtractedIntent } from './intent-extraction';
 
 /**
  * Documentation reference with enrichment details

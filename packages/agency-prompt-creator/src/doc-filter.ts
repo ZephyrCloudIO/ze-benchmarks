@@ -9,8 +9,8 @@
  * - User prompt keyword matching (frameworks, components, tech stack)
  */
 
-import type { SpecialistTemplate, TaskType, TemplateContext } from './types.js';
-import { extractKeywords, containsKeyword, countKeywordMatches, type ExtractedKeywords } from './keyword-extraction.js';
+import type { SpecialistTemplate, TaskType, TemplateContext } from './types';
+import { extractKeywords, containsKeyword, countKeywordMatches, type ExtractedKeywords } from './keyword-extraction';
 import { logger } from '@ze/logger';
 
 const log = logger.docFilter;
