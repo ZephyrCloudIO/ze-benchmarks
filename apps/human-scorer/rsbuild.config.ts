@@ -17,6 +17,9 @@ export default defineConfig({
   },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+    publicDir: {
+      name: 'public',
+    },
   },
   tools: {
     rspack: {

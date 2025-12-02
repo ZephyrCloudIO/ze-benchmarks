@@ -89,10 +89,16 @@ export class ApiClient {
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+    console.debug(`[HumanScorer:API] ApiClient initialized with baseUrl: ${baseUrl}`);
   }
 
   private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const method = options?.method || 'GET';
+    const startTime = Date.now();
+
+    console.debug(`[HumanScorer:API] ${method} ${endpoint}`);
+    console.debug(`[HumanScorer:API] Request URL: ${url}`);
 
     try {
       const response = await fetch(url, {
@@ -103,13 +109,22 @@ export class ApiClient {
         },
       });
 
+      const duration = Date.now() - startTime;
+      console.debug(`[HumanScorer:API] Response status: ${response.status} (${duration}ms)`);
+
       if (!response.ok) {
         const error = await response.text();
+        console.debug(`[HumanScorer:API] API error response: ${error}`);
         throw new Error(`API Error (${response.status}): ${error}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      const dataSize = JSON.stringify(data).length;
+      console.debug(`[HumanScorer:API] Response data size: ${dataSize} bytes`);
+      return data;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      console.debug(`[HumanScorer:API] Request failed after ${duration}ms:`, error);
       if (error instanceof Error) {
         throw error;
       }
@@ -119,27 +134,57 @@ export class ApiClient {
 
   // Runs API
   async getRunDetails(runId: string): Promise<RunDetails> {
-    return this.fetch<RunDetails>(`/api/runs/${runId}`);
+    console.debug(`[HumanScorer:API] Fetching run details for runId: ${runId}`);
+    const result = await this.fetch<RunDetails>(`/api/runs/${runId}`);
+    console.debug(`[HumanScorer:API] Run details loaded:`, {
+      suite: result.run.suite,
+      scenario: result.run.scenario,
+      agent: result.run.agent,
+      evaluationsCount: result.evaluations?.length || 0,
+      hasTelemetry: !!result.telemetry
+    });
+    return result;
   }
 
   async getRunEvaluations(runId: string): Promise<EvaluationResult[]> {
-    return this.fetch<EvaluationResult[]>(`/api/runs/${runId}/evaluations`);
+    console.debug(`[HumanScorer:API] Fetching evaluations for runId: ${runId}`);
+    const result = await this.fetch<EvaluationResult[]>(`/api/runs/${runId}/evaluations`);
+    console.debug(`[HumanScorer:API] Evaluations loaded: ${result.length} evaluation(s)`);
+    return result;
   }
 
   async getRunTelemetry(runId: string): Promise<RunTelemetry | null> {
-    return this.fetch<RunTelemetry | null>(`/api/runs/${runId}/telemetry`);
+    console.debug(`[HumanScorer:API] Fetching telemetry for runId: ${runId}`);
+    const result = await this.fetch<RunTelemetry | null>(`/api/runs/${runId}/telemetry`);
+    console.debug(`[HumanScorer:API] Telemetry loaded:`, result ? {
+      toolCalls: result.toolCalls,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      costUsd: result.costUsd
+    } : 'null');
+    return result;
   }
 
   // Human Scores API
   async submitHumanScore(runId: string, score: HumanScoreSubmission): Promise<HumanScore> {
-    return this.fetch<HumanScore>(`/api/runs/${runId}/human-scores`, {
+    console.debug(`[HumanScorer:API] Submitting human score for runId: ${runId}`, {
+      scorerName: score.scorerName,
+      categoriesCount: score.scores?.length || 0,
+      overallScore: score.overallScore
+    });
+    const result = await this.fetch<HumanScore>(`/api/runs/${runId}/human-scores`, {
       method: 'POST',
       body: JSON.stringify(score),
     });
+    console.debug(`[HumanScorer:API] Human score submitted successfully, id: ${result.id}`);
+    return result;
   }
 
   async getHumanScores(runId: string): Promise<HumanScore[]> {
-    return this.fetch<HumanScore[]>(`/api/runs/${runId}/human-scores`);
+    console.debug(`[HumanScorer:API] Fetching human scores for runId: ${runId}`);
+    const result = await this.fetch<HumanScore[]>(`/api/runs/${runId}/human-scores`);
+    console.debug(`[HumanScorer:API] Human scores loaded: ${result.length} score(s)`);
+    return result;
   }
 
   async getHumanScoreStats(): Promise<HumanScoreStats> {

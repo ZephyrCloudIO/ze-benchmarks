@@ -92,6 +92,7 @@ export async function executeMultipleBenchmarksWithSpecialists(
 
 	// Enable human scoring for single benchmark runs (default behavior)
 	const enableHumanScoring = combinations.length === 1;
+	logger.interactive.debug(`[HumanScorer] enableHumanScoring decision: ${enableHumanScoring} (combinations: ${combinations.length})`);
 
 	logger.interactive.raw(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s) with specialists:`));
 	if (useParallel) {
@@ -362,6 +363,7 @@ export async function executeMultipleBenchmarks(
 
 	// Enable human scoring for single benchmark runs (default behavior)
 	const enableHumanScoring = combinations.length === 1;
+	logger.interactive.debug(`[HumanScorer] enableHumanScoring decision: ${enableHumanScoring} (combinations: ${combinations.length})`);
 
 	// Show summary
 	logger.interactive.raw(chalk.bold.underline(`\nRunning ${combinations.length} benchmark(s):`));

@@ -19,6 +19,12 @@ interface ScoreFormProps {
 export function ScoreForm({ runId, categories, evaluations, onSubmitSuccess }: ScoreFormProps) {
   const queryClient = useQueryClient();
 
+  console.debug(`[HumanScorer:Form] ScoreForm initialized for runId: ${runId}`, {
+    categoriesCount: categories.length,
+    categories: categories,
+    hasEvaluations: !!evaluations
+  });
+
   // Form state
   const [scorerName, setScorerName] = useState("");
   const [scorerEmail, setScorerEmail] = useState("");
@@ -106,20 +112,39 @@ export function ScoreForm({ runId, categories, evaluations, onSubmitSuccess }: S
           timestamp: new Date().toISOString(),
         },
       };
+      console.debug(`[HumanScorer:Form] Submitting scores:`, {
+        categories: Object.keys(categoryScores),
+        overallScore,
+        timeSpentSeconds: timeSpent,
+        scorerName: submission.scorerName
+      });
       return apiClient.submitHumanScore(runId, submission);
     },
     onSuccess: () => {
+      console.debug(`[HumanScorer:Form] Score submission successful`);
       queryClient.invalidateQueries({ queryKey: ["humanScores", runId] });
       queryClient.invalidateQueries({ queryKey: ["humanScoreStats"] });
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
     },
+    onError: (error) => {
+      console.debug(`[HumanScorer:Form] Score submission failed:`, error);
+    },
   });
 
   // Form validation
   const isValid = scorerName.trim().length > 0;
   const allScored = Object.values(categoryScores).every((cs) => cs.score >= 1 && cs.score <= 5);
+
+  // Log validation state changes
+  useEffect(() => {
+    console.debug(`[HumanScorer:Form] Validation state:`, {
+      isValid,
+      allScored,
+      categoriesScored: Object.values(categoryScores).filter(cs => cs.score >= 1 && cs.score <= 5).length
+    });
+  }, [isValid, allScored, categoryScores]);
 
   return (
     <div className="space-y-4">

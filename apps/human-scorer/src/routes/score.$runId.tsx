@@ -9,40 +9,84 @@ import { CheckCircle2 } from 'lucide-react';
 
 export const Route = createFileRoute('/score/$runId')({
   component: ScoreRunPage,
+  errorComponent: ({ error }) => (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center space-y-4">
+        <h2 className="text-2xl font-bold text-destructive">Error Loading Run</h2>
+        <p className="text-muted-foreground">
+          {error instanceof Error ? error.message : "Failed to load benchmark run data"}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ),
+  pendingComponent: () => (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading benchmark run...</p>
+      </div>
+    </div>
+  ),
 });
 
 function ScoreRunPage() {
   const { runId } = Route.useParams();
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  console.debug(`[HumanScorer:Route] ScoreRunPage mounted with runId: ${runId}`);
+
   // Fetch run details
   const { data: runDetails, isLoading: isLoadingRun } = useQuery({
     queryKey: ['run', runId],
-    queryFn: () => apiClient.getRunDetails(runId),
+    queryFn: () => {
+      console.debug(`[HumanScorer:Route] Fetching run details...`);
+      return apiClient.getRunDetails(runId);
+    },
   });
 
   // Fetch evaluations
   const { data: evaluations, isLoading: isLoadingEvals } = useQuery({
     queryKey: ['evaluations', runId],
-    queryFn: () => apiClient.getRunEvaluations(runId),
+    queryFn: () => {
+      console.debug(`[HumanScorer:Route] Fetching evaluations...`);
+      return apiClient.getRunEvaluations(runId);
+    },
     enabled: !!runDetails,
   });
 
   // Fetch telemetry
   const { data: telemetry, isLoading: isLoadingTelemetry } = useQuery({
     queryKey: ['telemetry', runId],
-    queryFn: () => apiClient.getRunTelemetry(runId),
+    queryFn: () => {
+      console.debug(`[HumanScorer:Route] Fetching telemetry...`);
+      return apiClient.getRunTelemetry(runId);
+    },
     enabled: !!runDetails,
   });
 
   // Fetch existing human scores
   const { data: humanScores } = useQuery({
     queryKey: ['humanScores', runId],
-    queryFn: () => apiClient.getHumanScores(runId),
+    queryFn: () => {
+      console.debug(`[HumanScorer:Route] Fetching existing human scores...`);
+      return apiClient.getHumanScores(runId);
+    },
     enabled: !!runDetails,
   });
 
+  // Log loading states
   if (isLoadingRun || isLoadingEvals || isLoadingTelemetry) {
+    console.debug(`[HumanScorer:Route] Loading state:`, {
+      isLoadingRun,
+      isLoadingEvals,
+      isLoadingTelemetry
+    });
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
@@ -54,6 +98,7 @@ function ScoreRunPage() {
   }
 
   if (!runDetails) {
+    console.debug(`[HumanScorer:Route] Run details not found for runId: ${runId}`);
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
@@ -70,6 +115,17 @@ function ScoreRunPage() {
   const categories = evaluations && evaluations.length > 0
     ? evaluations.map((e) => e.evaluatorName)
     : ['Correctness', 'Code Quality', 'Best Practices'];
+
+  console.debug(`[HumanScorer:Route] Run details loaded:`, {
+    suite: runDetails.run.suite,
+    scenario: runDetails.run.scenario,
+    agent: runDetails.run.agent,
+    model: runDetails.run.model,
+    evaluationsCount: evaluations?.length || 0,
+    categoriesCount: categories.length,
+    hasTelemetry: !!telemetry,
+    humanScoresCount: humanScores?.length || 0
+  });
 
   return (
     <div className="space-y-6">

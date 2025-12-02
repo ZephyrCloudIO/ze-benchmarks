@@ -668,27 +668,40 @@ export async function executeBenchmark(
 
 	// Open browser for human scoring if requested
 	if (humanScoring || process.env.HUMAN_SCORING_ENABLED === 'true') {
+		logger.execution.debug(`[HumanScorer] Checking if human scoring should be enabled...`);
+		logger.execution.debug(`[HumanScorer] humanScoring flag: ${humanScoring}, env var: ${process.env.HUMAN_SCORING_ENABLED}`);
+		logger.execution.debug(`[HumanScorer] Constructing scoring URL with runId: ${runId}`);
+		
 		const scoringUrl = `http://localhost:5173/score/${runId}`;
+		logger.execution.debug(`[HumanScorer] Scoring URL: ${scoringUrl}`);
 
 		// Ensure the server is running before opening browser
+		logger.execution.debug(`[HumanScorer] Ensuring human-scorer server is ready...`);
 		const serverReady = await ensureHumanScorerServer(quiet);
+		logger.execution.debug(`[HumanScorer] Server readiness check result: ${serverReady}`);
 
 		if (serverReady) {
 			if (!quiet) {
 				logger.execution.info(chalk.blue(`\n📋 Opening human scoring interface...`));
 				logger.execution.info(chalk.gray(`   URL: ${scoringUrl}`));
 			}
+			logger.execution.debug(`[HumanScorer] Attempting to open browser with URL: ${scoringUrl}`);
 			try {
 				await open(scoringUrl);
+				logger.execution.debug(`[HumanScorer] Browser opened successfully`);
 			} catch (error) {
+				logger.execution.debug(`[HumanScorer] Browser open failed: ${error instanceof Error ? error.message : String(error)}`);
 				logger.execution.warn(chalk.yellow(`⚠️  Could not open browser automatically: ${error instanceof Error ? error.message : String(error)}`));
 				logger.execution.info(chalk.gray(`   Please open manually: ${scoringUrl}`));
 			}
 		} else {
+			logger.execution.debug(`[HumanScorer] Server not ready, skipping browser open`);
 			logger.execution.warn(chalk.yellow(`⚠️  Could not start human-scorer server`));
 			logger.execution.info(chalk.gray(`   Start manually: cd apps/human-scorer && pnpm dev`));
 			logger.execution.info(chalk.gray(`   Then open: ${scoringUrl}`));
 		}
+	} else {
+		logger.execution.debug(`[HumanScorer] Human scoring not enabled (humanScoring=${humanScoring}, env=${process.env.HUMAN_SCORING_ENABLED})`);
 	}
 
 	// Stage 6: Results

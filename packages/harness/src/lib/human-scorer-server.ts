@@ -131,11 +131,13 @@ function findRepoRoot(): string {
  */
 export async function ensureHumanScorerServer(quiet: boolean = false): Promise<boolean> {
 	const port = 5173;
+	logger.execution.debug(`[HumanScorer] ensureHumanScorerServer called with quiet=${quiet}, port=${port}`);
 
 	logger.execution.info(chalk.blue('\n[HumanScorer] Ensuring server is running...'));
 
 	// Check if already running
 	if (await isServerRunning(port)) {
+		logger.execution.debug(`[HumanScorer] Server is already running on port ${port}`);
 		logger.execution.success(chalk.green('[HumanScorer] ✓ Server is already running'));
 		return true;
 	}
@@ -163,9 +165,11 @@ export async function ensureHumanScorerServer(quiet: boolean = false): Promise<b
 	const isReady = await waitForServer(port, 45000);
 
 	if (isReady) {
+		logger.execution.debug(`[HumanScorer] Server is ready, returning success`);
 		logger.execution.success(chalk.green(`[HumanScorer] ✓ Server is ready at http://localhost:${port}`));
 		return true;
 	} else {
+		logger.execution.debug(`[HumanScorer] Server did not become ready in time, returning failure`);
 		logger.execution.warn(chalk.yellow('[HumanScorer] ⚠️  Server did not become ready in time'));
 		logger.execution.info(chalk.gray('[HumanScorer] Start manually: cd apps/human-scorer && pnpm dev'));
 		return false;
