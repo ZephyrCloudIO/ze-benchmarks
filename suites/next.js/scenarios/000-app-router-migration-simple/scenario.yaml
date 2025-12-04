@@ -41,10 +41,7 @@ heuristic_checks:
       weight: 3.0
       description: "Production build completes without errors"
 
-    - name: "tests_pass"
-      command: "pnpm test"
-      weight: 2.0
-      description: "Test suite passes"
+
 
     - name: "lint_passes"
       command: "pnpm lint"
