@@ -38,28 +38,3 @@ export interface SubmitResultsPayload {
     promptSent?: string;
   };
 }
-
-// Human scoring types
-export interface CategoryScore {
-  category: string;         // e.g., "Correctness", "Code Quality"
-  score: number;            // 1-5 scale
-  reasoning?: string;       // Optional human explanation
-  confidence?: number;      // 0-1.0: How confident in this score
-}
-
-export interface HumanScoreSubmission {
-  scorerName: string;
-  scorerEmail?: string;
-  scores: CategoryScore[];
-  overallScore?: number;    // Optional, will be calculated if not provided
-  timeSpentSeconds?: number;
-  notes?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface HumanScore extends HumanScoreSubmission {
-  id: number;
-  runId: string;
-  overallScore: number;     // 0-1.0 normalized
-  createdAt: string;
-}

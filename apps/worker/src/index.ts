@@ -7,7 +7,6 @@ import * as batchesApi from './api/batches';
 import * as statsApi from './api/stats';
 import * as submitApi from './api/submit';
 import * as roledefsApi from './api/roledefs';
-import * as humanScoresApi from './api/human-scores';
 
 type CF = [env: Env, ctx: ExecutionContext];
 
@@ -27,11 +26,6 @@ router.get('/api/batches/:batchId', batchesApi.getBatchDetails);
 
 router.get('/api/stats', statsApi.getGlobalStats);
 router.get('/api/stats/agents', statsApi.getAgentStats);
-
-// Human scoring endpoints (public read, no auth for submit to keep it simple)
-router.get('/api/runs/:runId/human-scores', humanScoresApi.getHumanScores);
-router.post('/api/runs/:runId/human-scores', humanScoresApi.submitHumanScore);
-router.get('/api/human-scores/stats', humanScoresApi.getHumanScoreStats);
 
 // RoleDef endpoints
 router.get('/api/roledefs', roledefsApi.listRoleDefs);

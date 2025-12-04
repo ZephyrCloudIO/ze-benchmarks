@@ -94,9 +94,8 @@ export function parseArgs(argv: string[]) {
 	const warmupOnly = rest.includes('--warmup-only');
 	const quiet = rest.includes('--quiet');
 	const llmJudgeOnly = rest.includes('--llm-judge-only');
-	const humanScoring = rest.includes('--human-scoring');
 
-	return { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, humanScoring, enrichTemplate, iterations } as const;
+	return { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } as const;
 }
 
 export function showHelp() {
@@ -130,7 +129,6 @@ export function showHelp() {
 	logger.cli.raw(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
 	logger.cli.raw(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);
 	logger.cli.raw(`  ${chalk.cyan('--llm-judge-only')}               Only run LLM judge evaluator (skip other evaluators)`);
-	logger.cli.raw(`  ${chalk.cyan('--human-scoring')}                Open browser for human scoring after benchmark`);
 
 	logger.cli.raw('\n' + chalk.bold('Model Selection:'));
 	logger.cli.raw(`  ${chalk.cyan('OpenRouter Models:')} Search-based selection from 200+ models`);

@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useQuery } from '@tanstack/react-query'
-import { HumanScoreDisplay } from '@/components/HumanScoreDisplay'
-import { HumanVsLLMComparison } from '@/components/HumanVsLLMComparison'
 
 export const Route = createFileRoute('/runs/$runId')({
   component: RunDetailsPage,
@@ -18,12 +16,6 @@ function RunDetailsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['runDetails', runId],
     queryFn: () => apiClient.getRunDetails(runId),
-  });
-
-  const { data: humanScores } = useQuery({
-    queryKey: ['humanScores', runId],
-    queryFn: () => apiClient.getHumanScores(runId),
-    enabled: !!data?.run,
   });
 
   if (isLoading) {
@@ -259,19 +251,6 @@ function RunDetailsPage() {
             ))}
           </Accordion>
         </div>
-      )}
-
-      {/* Human vs LLM Comparison */}
-      {humanScores && humanScores.length > 0 && evaluations.length > 0 && (
-        <HumanVsLLMComparison
-          humanScores={humanScores}
-          evaluations={evaluations}
-        />
-      )}
-
-      {/* Human Scores */}
-      {humanScores && humanScores.length > 0 && (
-        <HumanScoreDisplay humanScores={humanScores} />
       )}
     </div>
   );

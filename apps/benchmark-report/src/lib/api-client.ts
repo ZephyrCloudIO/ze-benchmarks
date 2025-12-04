@@ -751,44 +751,6 @@ export class ApiClient {
       .sort((a, b) => b.totalTokens - a.totalTokens)
       .slice(0, 10);
   }
-
-  // Human Scores API
-  async getHumanScores(runId: string): Promise<HumanScore[]> {
-    return this.fetch<HumanScore[]>(`/api/runs/${runId}/human-scores`);
-  }
-
-  async getHumanScoreStats(): Promise<HumanScoreStats> {
-    return this.fetch<HumanScoreStats>('/api/human-scores/stats');
-  }
-}
-
-// Human scoring types
-export interface CategoryScore {
-  category: string;
-  score: number;
-  reasoning?: string;
-  confidence?: number;
-}
-
-export interface HumanScore {
-  id: number;
-  runId: string;
-  scorerName: string;
-  scorerEmail?: string;
-  scores: CategoryScore[];
-  overallScore: number;
-  timeSpentSeconds?: number;
-  notes?: string;
-  metadata?: string;
-  createdAt: string;
-}
-
-export interface HumanScoreStats {
-  totalScores: number;
-  uniqueRuns: number;
-  uniqueScorers: number;
-  avgOverallScore: number;
-  avgTimeSpent: number;
 }
 
 // Export a singleton instance
