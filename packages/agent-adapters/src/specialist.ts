@@ -255,8 +255,14 @@ export class SpecialistAdapter implements AgentAdapter {
       log.warn('[SpecialistAdapter] Using synchronous template loading (deprecated). Use SpecialistAdapter.create() for async loading with inheritance support.');
       this.template = this.loadTemplateSync(templatePath);
     }
-    
+
     this.name = `specialist:${this.template.name}:${underlyingAdapter.name}`;
+
+    // Validate template version and log warnings
+    if (this.template.version_metadata) {
+      const warnings = this.validateVersion();
+      warnings.forEach(w => log.warn(`[SpecialistAdapter] ${w}`));
+    }
 
     // Initialize LLM configuration
     this.llmConfig = this.loadLLMConfig();
@@ -1103,6 +1109,35 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     return section;
+  }
+
+  /**
+   * Validate template version and return warnings
+   */
+  private validateVersion(): string[] {
+    const warnings: string[] = [];
+    const metadata = this.template.version_metadata;
+
+    if (!metadata) return warnings;
+
+    if (metadata.deprecated) {
+      warnings.push(
+        `Template ${this.template.name} v${this.template.version} is deprecated`
+      );
+      if (metadata.replacement) {
+        warnings.push(`Consider migrating to: ${metadata.replacement}`);
+      }
+    }
+
+    if (metadata.breaking_changes && metadata.breaking_changes.length > 0) {
+      const recent = metadata.breaking_changes.slice(0, 3);
+      warnings.push(
+        `Breaking changes detected:\n` +
+        recent.map((bc: any) => `   - ${bc.description}`).join('\n')
+      );
+    }
+
+    return warnings;
   }
 
   // =========================================================================

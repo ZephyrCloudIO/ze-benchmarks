@@ -374,6 +374,9 @@ importers:
       openai:
         specifier: ^6.8.1
         version: 6.9.1(ws@8.18.3)(zod@4.1.12)
+      semver:
+        specifier: ^7.6.0
+        version: 7.7.3
     devDependencies:
       '@rslib/core':
         specifier: ^0.17.2
@@ -384,6 +387,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
+      '@types/semver':
+        specifier: ^7.5.0
+        version: 7.7.1
       tsx:
         specifier: ^4.20.6
         version: 4.20.6
@@ -2760,6 +2766,9 @@ packages:
 
   '@types/react@19.2.5':
     resolution: {integrity: sha512-keKxkZMqnDicuvFoJbzrhbtdLSPhj/rZThDlKWCDbgXmUg0rEUFtRssDXKYmtXluZlIqiC5VqkCgRwzuyLHKHw==}
+
+  '@types/semver@7.7.1':
+    resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
 
   '@types/statuses@2.0.6':
     resolution: {integrity: sha512-xMAgYwceFhRA2zY+XbEA7mxYbA093wdiW8Vu6gZPGWy9cmOyU9XesH1tNcEWsKFd5Vzrqx5T3D38PWx1FIIXkA==}
@@ -7429,6 +7438,8 @@ snapshots:
   '@types/react@19.2.5':
     dependencies:
       csstype: 3.2.3
+
+  '@types/semver@7.7.1': {}
 
   '@types/statuses@2.0.6':
     optional: true

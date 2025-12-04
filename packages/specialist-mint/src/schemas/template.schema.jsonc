@@ -41,6 +41,147 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
 
+    "version_metadata": {
+      "type": "object",
+      "description": "Version tracking, changelog, and compatibility information",
+      "properties": {
+        "changelog": {
+          "type": "array",
+          "description": "Complete version history with changes",
+          "items": {
+            "type": "object",
+            "required": ["version", "date", "type", "changes"],
+            "properties": {
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                "description": "Version number"
+              },
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this version was created"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["major", "minor", "patch"],
+                "description": "Type of version bump"
+              },
+              "changes": {
+                "type": "array",
+                "description": "List of changes in this version",
+                "items": {
+                  "type": "object",
+                  "required": ["category", "description"],
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": ["enrichment", "prompt", "documentation", "persona", "capabilities", "fix", "other"],
+                      "description": "Category of change"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Description of the change"
+                    },
+                    "breaking": {
+                      "type": "boolean",
+                      "description": "Whether this is a breaking change"
+                    },
+                    "migration_notes": {
+                      "type": "string",
+                      "description": "Notes for migrating to this version"
+                    }
+                  }
+                }
+              },
+              "author": {
+                "type": "string",
+                "description": "Who made these changes"
+              }
+            }
+          }
+        },
+        "breaking_changes": {
+          "type": "array",
+          "description": "Detailed breaking changes history",
+          "items": {
+            "type": "object",
+            "required": ["version", "date", "description", "affected_areas", "migration_guide"],
+            "properties": {
+              "version": {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                "description": "Version with breaking change"
+              },
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the breaking change was introduced"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of the breaking change"
+              },
+              "affected_areas": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Areas of the template affected"
+              },
+              "migration_guide": {
+                "type": "string",
+                "description": "How to migrate from previous version"
+              },
+              "deprecated_features": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Features that were deprecated"
+              }
+            }
+          }
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "Whether this template version is deprecated"
+        },
+        "deprecated_in": {
+          "type": "string",
+          "description": "Version when this template was deprecated"
+        },
+        "deprecated_reason": {
+          "type": "string",
+          "description": "Reason for deprecation"
+        },
+        "replacement": {
+          "type": "string",
+          "description": "Recommended replacement template"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this template was first created"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this template was last updated"
+        },
+        "last_enriched_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When documentation was last enriched"
+        },
+        "min_schema_version": {
+          "type": "string",
+          "description": "Minimum schema version required"
+        },
+        "compatible_with": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Compatible template versions"
+        }
+      }
+    },
+
     "from": {
       "type": "string",
       "description": "Optional parent template for inheritance. Can be a scoped package reference (e.g., '@zephyr-cloud/base'), relative path (e.g., './base.json5'), or absolute path. See INHERITANCE.md for merge rules."
