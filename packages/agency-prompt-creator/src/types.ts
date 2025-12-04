@@ -5,7 +5,7 @@
 
 /**
  * Task types that can be detected from user prompts
- * Built-in types are always available, but templates can define custom types
+ * Built-in types are always available, and custom types are supported via string
  */
 export type TaskType =
   | 'project_setup'
@@ -16,7 +16,7 @@ export type TaskType =
   | 'testing'
   | 'documentation'
   | 'default'
-  | string; // Allow custom task types from templates
+  | (string & {}); // Allow custom task types while preserving autocomplete
 
 /**
  * Persona definition for a specialist
@@ -26,6 +26,7 @@ export interface Persona {
   values?: string[];
   attributes?: string[];
   tech_stack?: string[];
+  // Allow additional persona properties
   [key: string]: any;
 }
 
@@ -35,6 +36,7 @@ export interface Persona {
 export interface Capabilities {
   tags: string[];
   descriptions?: Record<string, string>;
+  // Allow additional capability properties
   [key: string]: any;
 }
 
@@ -45,15 +47,18 @@ export interface PromptConfig {
   spawnerPrompt?: string;
   systemPrompt?: string;
   contextPrompt?: string;
+  // Allow additional prompt properties
   [key: string]: any;
 }
 
 /**
  * Prompts structure with default and model-specific overrides
+ * Task-specific prompts use Record<TaskType, ...> to maintain type safety
  */
 export interface Prompts {
   default?: PromptConfig;
   model_specific?: Record<string, PromptConfig>;
+  // Task-specific prompts can be added using Record<string, PromptConfig> for tasks
   [taskType: string]: PromptConfig | Record<string, PromptConfig> | undefined;
 }
 
@@ -117,10 +122,10 @@ export interface SpecialistTemplate {
   dependencies?: {
     available_tools?: string[]; // Tools available to specialist (file_system, terminal, etc.)
     subscription?: string[]; // Required subscriptions or services
-    [key: string]: any;
+    mcps?: any[]; // MCP server configurations
   };
 
-  // Metadata
+  // Allow additional metadata fields
   [key: string]: any;
 }
 
@@ -145,6 +150,7 @@ export interface TemplateContext {
   task_type?: TaskType;
   user_prompt?: string;
   documentation?: FilteredDocumentation[];
+  // Allow additional template variables
   [key: string]: any;
 }
 

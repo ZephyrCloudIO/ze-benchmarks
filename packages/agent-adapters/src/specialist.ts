@@ -786,10 +786,10 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const cacheKey = createCacheKey(userPrompt + ':intent');
-    const cached = this.llmCache.get(cacheKey);
+    const cached = this.llmCache.getIntent(cacheKey);
     if (cached) {
       log.debug('[SpecialistAdapter] Using cached intent extraction');
-      return cached as ExtractedIntent;
+      return cached;
     }
 
     const prompt = buildIntentExtractionPrompt(userPrompt);
@@ -814,7 +814,7 @@ export class SpecialistAdapter implements AgentAdapter {
       }
 
       const intent = parseIntentResponse(toolCall.function.arguments);
-      this.llmCache.set(cacheKey, intent);
+      this.llmCache.setIntent(cacheKey, intent);
       return intent;
     } catch (error) {
       if (error instanceof Error) {
@@ -836,10 +836,10 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const cacheKey = createCacheKey(userPrompt + ':selection');
-    const cached = this.llmCache.get(cacheKey);
+    const cached = this.llmCache.getComponentSelection(cacheKey);
     if (cached) {
       log.debug('[SpecialistAdapter] Using cached component selection');
-      return cached as SpecialistSelection;
+      return cached;
     }
 
     const prompt = buildComponentSelectionPrompt(userPrompt, intent, this.template);
@@ -904,14 +904,14 @@ export class SpecialistAdapter implements AgentAdapter {
       log.debug('[SpecialistAdapter] =======================================================');
       
       const selection = parseComponentSelectionResponse(toolCall.function.arguments, this.template);
-      
+
       // Debug: Log parsed selection
       log.debug('[SpecialistAdapter] ========== PARSED SELECTION ==========');
       log.debug('[SpecialistAdapter] Selection taskPromptId:', selection.taskPromptId);
       log.debug('[SpecialistAdapter] Selection spawnerPromptId:', selection.spawnerPromptId);
       log.debug('[SpecialistAdapter] ====================================');
-      
-      this.llmCache.set(cacheKey, selection);
+
+      this.llmCache.setComponentSelection(cacheKey, selection);
       return selection;
     } catch (error) {
       if (error instanceof Error) {

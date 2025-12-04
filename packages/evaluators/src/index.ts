@@ -52,29 +52,11 @@ export async function runEvaluators(
 export * from './types.ts';
 export type { EvaluatorResult as Result } from './types.ts';
 
-// Export factory function, main evaluation function, and all helper functions
+// Export factory function, main evaluation function, and should-enable check
 export {
 	createLLMJudgeEvaluator,
 	evaluateLLMJudge,
-	shouldEnableLLMJudge,
-	// Prompt building functions
-	buildEvaluationPrompt,
-	buildTaskDescription,
-	buildArtifactSection,
-	buildAgentResponseSection,
-	buildChangesSection,
-	buildCommandResultsSection,
-	buildCategoriesSection,
-	buildJsonFormatExample,
-	// Utility functions
-	countTokens,
-	slugifyCategory,
-	countPromptTokens,
-	// API interaction
-	callOpenAI,
-	// Result processing
-	normalizeScore,
-	formatEvaluationDetails
+	shouldEnableLLMJudge
 } from './evaluators/llm-judge.ts';
 
 export {
