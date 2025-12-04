@@ -74,9 +74,15 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
       metadata: payload.metadata ? JSON.stringify(payload.metadata) : undefined
     };
     
-    // Try to insert with specialistEnabled, but fallback if column doesn't exist
+    // Try to insert with specialist fields, but fallback if columns don't exist
     if (payload.specialistEnabled !== undefined) {
       runValues.specialistEnabled = payload.specialistEnabled;
+    }
+    if (payload.specialistName !== undefined) {
+      runValues.specialistName = payload.specialistName;
+    }
+    if (payload.specialistVersion !== undefined) {
+      runValues.specialistVersion = payload.specialistVersion;
     }
     
     console.debug(`[Worker:Submit] Inserting benchmark run: ${payload.runId}`);

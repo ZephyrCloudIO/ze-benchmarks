@@ -8,7 +8,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import open from 'open';
 import type { AgentRequest } from '../../../agent-adapters/src/index.ts';
 import { BenchmarkLogger } from '@ze/worker-client';
 import { runEvaluators } from '../../../evaluators/src/index.ts';
@@ -72,6 +71,11 @@ export async function executeBenchmark(
 	// Use 'auto-detect' as placeholder if agent is undefined and specialist is provided
 	let agentName = agent || (specialist ? 'auto-detect' : 'echo');
 	const agentDisplay = agent || 'auto-detect'; // For display purposes throughout the function
+
+	// Variables to capture specialist info
+	let specialistName: string | undefined;
+	let specialistVersion: string | undefined;
+
 	const runId = await benchmarkLogger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
 	
@@ -254,6 +258,12 @@ export async function executeBenchmark(
 			agentName = agentAdapter.name; // Update local runData too
 			runData.agent = agentName; // Update for completeRun
 			benchmarkLogger.updateAgent(agentAdapter.name, runId);
+
+			// Extract specialist name and version if available
+			if ('template' in agentAdapter && (agentAdapter as any).template) {
+				specialistName = (agentAdapter as any).template.name;
+				specialistVersion = (agentAdapter as any).template.version;
+			}
 
 			// Show selected model info - ALWAYS for OpenRouter
 			if ((agent === 'openrouter' || (!agent && specialist)) && 'getModel' in agentAdapter) {
@@ -653,6 +663,8 @@ export async function executeBenchmark(
 		isSuccessful,
 		successMetric,
 		specialistEnabled: !!specialist,
+		specialistName,
+		specialistVersion,
 		metadata: {
 			diffSummary: diffArtifacts.diffSummary,
 			depsDelta: diffArtifacts.depsDelta,
