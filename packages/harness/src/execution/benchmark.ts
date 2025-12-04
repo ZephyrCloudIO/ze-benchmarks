@@ -24,7 +24,7 @@ import { executeWarmup } from '../domain/warmup.ts';
 import { prepareWorkspaceFromFixture, findWorkspaceRoot } from '../lib/workspace-utils.ts';
 import { createAgentAdapter } from '../domain/agent.ts';
 import { computeWeightedTotals, calculateSuccess } from '../domain/scoring.ts';
-import { displayLLMJudgeScores, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
+import { displayLLMJudgeScores, displayHeuristicChecks, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
 import { TABLE_WIDTH, SCORE_THRESHOLDS } from '../lib/constants.ts';
 import { logger } from '@ze/logger';
 
@@ -692,8 +692,9 @@ export async function executeBenchmark(
 		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
 		logger.execution.raw(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
 		
-		// Still show LLM Judge table even in quiet mode (it's important information)
+		// Still show Heuristic Checks and LLM Judge tables even in quiet mode (important information)
 		if (result.scores) {
+			displayHeuristicChecks(result);
 			displayLLMJudgeScores(result, scenarioCfg);
 		}
 		return;
@@ -706,6 +707,11 @@ export async function executeBenchmark(
 	logger.execution.raw(`│ ${chalk.bold('Score (mean ± σ):')} ${chalk.green(weightedScore.toFixed(4))} ± ${chalk.green('0.0000')} ${chalk.gray('(out of 10.0)')} │`);
 	logger.execution.raw(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
 	logger.execution.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+
+	// Show detailed Heuristic Checks if available
+	if (result.scores) {
+		displayHeuristicChecks(result);
+	}
 
 	// Show detailed LLM Judge scores if available
 	if (result.scores) {

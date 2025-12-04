@@ -26,6 +26,69 @@ validation:
 oracle:
   answers_file: "./oracle-answers.json"
 
+heuristic_checks:
+  enabled: true
+
+  # Critical validation commands
+  commands:
+    - name: "install_succeeds"
+      command: "pnpm install"
+      weight: 2.0
+      description: "Dependencies install successfully"
+
+    - name: "build_succeeds"
+      command: "pnpm build"
+      weight: 3.0
+      description: "Production build completes without errors"
+
+    - name: "tests_pass"
+      command: "pnpm test"
+      weight: 2.0
+      description: "Test suite passes"
+
+    - name: "lint_passes"
+      command: "pnpm lint"
+      weight: 1.0
+      description: "Code meets linting standards"
+
+  # Verify App Router structure
+  files:
+    - name: "app_directory_exists"
+      path: "app"
+      weight: 2.0
+      description: "App Router directory exists"
+
+    - name: "next_config_exists"
+      path: "next.config.js"
+      weight: 0.5
+      description: "Next.js configuration file exists"
+
+  # Check for App Router patterns
+  patterns:
+    - name: "has_page_files"
+      file: "app/**/*.tsx"
+      pattern: "export default|export async function"
+      weight: 2.0
+      description: "App Router page components exist"
+
+    - name: "has_layout_file"
+      file: "app/**/layout.tsx"
+      pattern: "export default.*RootLayout|export default function.*Layout"
+      weight: 1.5
+      description: "Layout component exists in App Router"
+
+    - name: "uses_metadata_api"
+      file: "app/**/*.tsx"
+      pattern: "export const metadata|export async function generateMetadata"
+      weight: 1.0
+      description: "Uses App Router metadata API"
+
+    - name: "no_pages_router_patterns"
+      file: "app/**/*.tsx"
+      pattern: "getServerSideProps|getStaticProps|getInitialProps"
+      weight: 1.5
+      description: "No legacy Pages Router data fetching patterns"
+
 llm_judge:
   enabled: true
   model: "anthropic/claude-3.5-sonnet"

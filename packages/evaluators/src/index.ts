@@ -5,12 +5,26 @@ import { logger } from '@ze/logger';
 const log = logger.evaluators;
 
 import { createLLMJudgeEvaluator, shouldEnableLLMJudge } from './evaluators/llm-judge.ts';
+import { createHeuristicChecksEvaluator, shouldEnableHeuristicChecks } from './evaluators/heuristic-checks.ts';
 
 export async function runEvaluators(
 	ctx: EvaluationContext,
 	llmJudgeOnly?: boolean
 ): Promise<{ results: EvaluatorResult[]; scoreCard: ScoreCard }> {
 	const results: EvaluatorResult[] = [];
+
+	// Check if heuristic checks are enabled
+	if (shouldEnableHeuristicChecks(ctx.scenario)) {
+		const evaluator = createHeuristicChecksEvaluator();
+		try {
+			results.push(await evaluator.evaluate(ctx));
+		} catch (error) {
+			results.push({ name: evaluator.meta.name, score: 0, details: `error: ${String(error)}` });
+		}
+	} else {
+		log.debug(chalk.yellow('[Evaluators] ⚠️  Heuristic checks not enabled in scenario'));
+		log.debug(chalk.gray('[Evaluators]   Enable them by setting heuristic_checks.enabled: true in scenario.yaml'));
+	}
 
 	// Check if LLM judge is enabled
 	if (shouldEnableLLMJudge(ctx.scenario)) {
@@ -25,8 +39,9 @@ export async function runEvaluators(
 		log.debug(chalk.gray('[Evaluators]   Enable it by setting llm_judge.enabled: true in scenario.yaml'));
 	}
 
-	// Build scoreCard with only LLM judge score
+	// Build scoreCard with both heuristic checks and LLM judge scores
 	const scoreCard: ScoreCard = {
+		heuristic_checks: results.find((result) => result.name === 'HeuristicChecksEvaluator')?.score ?? 0,
 		llm_judge: results.find((result) => result.name === 'LLMJudgeEvaluator')?.score ?? 0,
 	};
 
@@ -61,4 +76,10 @@ export {
 	normalizeScore,
 	formatEvaluationDetails
 } from './evaluators/llm-judge.ts';
+
+export {
+	createHeuristicChecksEvaluator,
+	evaluateHeuristicChecks,
+	shouldEnableHeuristicChecks
+} from './evaluators/heuristic-checks.ts';
 

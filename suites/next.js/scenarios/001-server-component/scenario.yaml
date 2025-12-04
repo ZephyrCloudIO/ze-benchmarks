@@ -26,6 +26,63 @@ validation:
 oracle:
   answers_file: "./oracle-answers.json"
 
+heuristic_checks:
+  enabled: true
+
+  # Critical validation commands
+  commands:
+    - name: "install_succeeds"
+      command: "pnpm install"
+      weight: 2.0
+      description: "Dependencies install successfully"
+
+    - name: "build_succeeds"
+      command: "pnpm build"
+      weight: 3.0
+      description: "Production build completes without errors"
+
+    - name: "tests_pass"
+      command: "pnpm test"
+      weight: 2.0
+      description: "Test suite passes"
+
+    - name: "lint_passes"
+      command: "pnpm lint"
+      weight: 1.0
+      description: "Code meets linting standards"
+
+  # Check for Server Component patterns
+  patterns:
+    - name: "has_async_component"
+      file: "app/**/*.tsx"
+      pattern: "export default async function|async function.*Component"
+      weight: 2.5
+      description: "Server component uses async pattern"
+
+    - name: "has_server_data_fetch"
+      file: "app/**/*.tsx"
+      pattern: "await fetch|await.*\\(\\)"
+      weight: 2.0
+      description: "Server-side data fetching implemented"
+
+    - name: "no_client_hooks_in_server"
+      file: "app/**/page.tsx"
+      pattern: "useState|useEffect|useContext|useReducer"
+      weight: 2.0
+      description: "No client-side hooks in server components"
+
+    - name: "proper_component_structure"
+      file: "app/**/*.tsx"
+      pattern: "export default|function.*\\(.*props"
+      weight: 1.0
+      description: "Components follow proper structure"
+
+    - name: "has_typescript_types"
+      file: "app/**/*.tsx"
+      pattern: "interface|type\\s+\\w+.*="
+      weight: 0.5
+      description: "TypeScript types defined"
+
 llm_judge:
   enabled: true
   model: "anthropic/claude-3.5-sonnet"
