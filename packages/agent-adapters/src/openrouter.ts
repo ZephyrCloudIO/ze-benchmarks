@@ -402,16 +402,12 @@ export class OpenRouterAdapter implements AgentAdapter {
           log.warn(chalk.yellow(`[OpenRouterAdapter] ⚠️  Request is large (${(requestSizeAfter / 1024).toFixed(2)} KB), this might cause issues`));
         }
 
-        // Include tool definitions only on the first turn to reduce payload size
+        // Always include tool definitions in every request
+        // Some models (especially Claude) need tools present in all requests for multi-turn tool calling
         if (transformedTools && transformedTools.length > 0) {
-          if (turn === 0) {
-            apiRequest.tools = transformedTools;
-            apiRequest.tool_choice = "auto";
-          } else if (turn === 1) {
-            delete apiRequest.tools;
-            delete apiRequest.tool_choice;
-            log.debug(chalk.gray(`[OpenRouterAdapter] Tools removed from subsequent requests to avoid repeated payload`));
-          }
+          apiRequest.tools = transformedTools;
+          apiRequest.tool_choice = "auto";
+          log.debug(chalk.gray(`[OpenRouterAdapter] Including ${transformedTools.length} tool(s) in request (turn ${turn + 1})`));
         }
         
       } catch (error: any) {

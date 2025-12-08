@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { mintSnapshot } from './mint.js';
 import { enrichTemplate } from './enrich-template.js';
+import { createVersionCommand, createChangelogCommand } from './cli-version.js';
 import chalk from 'chalk';
 import { logger } from '@ze/logger';
 
@@ -85,5 +86,9 @@ program
       process.exit(1);
     }
   });
+
+// Version management commands
+program.addCommand(createVersionCommand());
+program.addCommand(createChangelogCommand());
 
 program.parse();

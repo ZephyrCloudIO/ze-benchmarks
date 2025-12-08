@@ -24,7 +24,7 @@ import { executeWarmup } from '../domain/warmup.ts';
 import { prepareWorkspaceFromFixture, findWorkspaceRoot } from '../lib/workspace-utils.ts';
 import { createAgentAdapter } from '../domain/agent.ts';
 import { computeWeightedTotals, calculateSuccess } from '../domain/scoring.ts';
-import { displayLLMJudgeScores, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
+import { displayLLMJudgeScores, displayHeuristicChecks, createProgress, updateProgress, completeProgress } from '../lib/display.ts';
 import { TABLE_WIDTH, SCORE_THRESHOLDS } from '../lib/constants.ts';
 import { logger } from '@ze/logger';
 
@@ -71,6 +71,11 @@ export async function executeBenchmark(
 	// Use 'auto-detect' as placeholder if agent is undefined and specialist is provided
 	let agentName = agent || (specialist ? 'auto-detect' : 'echo');
 	const agentDisplay = agent || 'auto-detect'; // For display purposes throughout the function
+
+	// Variables to capture specialist info
+	let specialistName: string | undefined;
+	let specialistVersion: string | undefined;
+
 	const runId = await benchmarkLogger.startRun(suite, scenario, tier, agentName, model, batchId);
 	const startTime = Date.now();
 	
@@ -253,6 +258,12 @@ export async function executeBenchmark(
 			agentName = agentAdapter.name; // Update local runData too
 			runData.agent = agentName; // Update for completeRun
 			benchmarkLogger.updateAgent(agentAdapter.name, runId);
+
+			// Extract specialist name and version if available
+			if ('template' in agentAdapter && (agentAdapter as any).template) {
+				specialistName = (agentAdapter as any).template.name;
+				specialistVersion = (agentAdapter as any).template.version;
+			}
 
 			// Show selected model info - ALWAYS for OpenRouter
 			if ((agent === 'openrouter' || (!agent && specialist)) && 'getModel' in agentAdapter) {
@@ -652,6 +663,8 @@ export async function executeBenchmark(
 		isSuccessful,
 		successMetric,
 		specialistEnabled: !!specialist,
+		specialistName,
+		specialistVersion,
 		metadata: {
 			diffSummary: diffArtifacts.diffSummary,
 			depsDelta: diffArtifacts.depsDelta,
@@ -679,8 +692,9 @@ export async function executeBenchmark(
 		const successStr = isSuccessful ? 'SUCCESS' : 'FAILED';
 		logger.execution.raw(`${status} ${suite}/${scenario} (${tier}) ${agentDisplay}${modelStr} - ${weightedScore.toFixed(2)}/10 [${successStr}]`);
 		
-		// Still show LLM Judge table even in quiet mode (it's important information)
+		// Still show Heuristic Checks and LLM Judge tables even in quiet mode (important information)
 		if (result.scores) {
+			displayHeuristicChecks(result);
 			displayLLMJudgeScores(result, scenarioCfg);
 		}
 		return;
@@ -693,6 +707,11 @@ export async function executeBenchmark(
 	logger.execution.raw(`│ ${chalk.bold('Score (mean ± σ):')} ${chalk.green(weightedScore.toFixed(4))} ± ${chalk.green('0.0000')} ${chalk.gray('(out of 10.0)')} │`);
 	logger.execution.raw(`│ ${chalk.bold('Range (min ... max):')} ${chalk.green(weightedScore.toFixed(4))} ${chalk.white('...')} ${chalk.red(weightedScore.toFixed(4))} ${chalk.gray('(1 run)')} │`);
 	logger.execution.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+
+	// Show detailed Heuristic Checks if available
+	if (result.scores) {
+		displayHeuristicChecks(result);
+	}
 
 	// Show detailed LLM Judge scores if available
 	if (result.scores) {

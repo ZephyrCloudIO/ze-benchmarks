@@ -14,6 +14,7 @@ import chalk from 'chalk';
 import type { SpecialistTemplate, DocumentationEnrichment } from './types.js';
 import { loadJSON5, writeJSON5 } from './utils.js';
 import { logger } from '@ze/logger';
+import { bumpVersion, updateVersionMetadata } from './version-manager.js';
 
 const log = logger.enrichTemplate;
 import { createLLMClient, type LLMProvider } from './llm-client.js';
@@ -66,6 +67,68 @@ export interface EnrichmentResult {
 }
 
 /**
+ * Find the latest enriched template for a given base template
+ * Returns the path to the latest enriched version, or null if none exists
+ */
+function findLatestEnrichedTemplate(baseTemplatePath: string, specialistName: string): string | null {
+  const dir = dirname(baseTemplatePath);
+  const enrichedBaseDir = join(dir, 'enriched');
+
+  // Check if enriched directory exists
+  if (!existsSync(enrichedBaseDir)) {
+    return null;
+  }
+
+  // Find all version directories (e.g., 0.0.1, 0.0.2, 0.0.3)
+  const versionDirs = readdirSync(enrichedBaseDir)
+    .filter(entry => {
+      const fullPath = join(enrichedBaseDir, entry);
+      return existsSync(fullPath) && readdirSync(fullPath).length > 0;
+    })
+    .filter(entry => /^\d+\.\d+\.\d+$/.test(entry)) // Match semantic version pattern
+    .sort((a, b) => {
+      // Sort versions semantically
+      const aParts = a.split('.').map(Number);
+      const bParts = b.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        if (aParts[i] !== bParts[i]) {
+          return aParts[i] - bParts[i];
+        }
+      }
+      return 0;
+    });
+
+  if (versionDirs.length === 0) {
+    return null;
+  }
+
+  // Get the highest version
+  const latestVersion = versionDirs[versionDirs.length - 1];
+  const latestVersionDir = join(enrichedBaseDir, latestVersion);
+
+  // Find the latest enriched file in that version directory
+  const escapedName = specialistName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const filePattern = new RegExp(`^${escapedName}\\.enriched\\.(\\d+)\\.json5$`);
+
+  const files = readdirSync(latestVersionDir);
+  const enrichedFiles = files
+    .filter(f => filePattern.test(f))
+    .map(f => {
+      const match = f.match(filePattern);
+      return { file: f, number: match ? parseInt(match[1], 10) : 0 };
+    })
+    .filter(f => f.number > 0)
+    .sort((a, b) => b.number - a.number); // Sort descending
+
+  if (enrichedFiles.length === 0) {
+    return null;
+  }
+
+  // Return the latest enriched file path
+  return join(latestVersionDir, enrichedFiles[0].file);
+}
+
+/**
  * Main enrichment function
  *
  * Analyzes documentation resources in a template and creates an enriched version
@@ -87,21 +150,45 @@ export async function enrichTemplate(
   log.debug(chalk.gray(`   Provider: ${provider}`));
   log.debug(chalk.gray(`   Model: ${model}`));
 
-  // Load template
+  // Resolve base template path
   const resolvedTemplatePath = resolve(process.cwd(), templatePath);
-  const template: SpecialistTemplate = loadJSON5(resolvedTemplatePath);
 
-  log.debug(chalk.gray(`   Template: ${template.name} v${template.version}`));
-
-  // Extract specialist name from template path or use template name
+  // Extract specialist name from template path
   // e.g., templates/nextjs-specialist-template.json5 or .jsonc -> nextjs-specialist
   const templateBasename = resolvedTemplatePath.endsWith('.jsonc')
     ? basename(resolvedTemplatePath, '.jsonc')
     : basename(resolvedTemplatePath, '.json5');
-  const specialistName = templateBasename.replace(/-template$/, '') || template.name;
+  const specialistName = templateBasename.replace(/-template$/, '');
+
+  // Try to find the latest enriched template
+  const latestEnrichedPath = findLatestEnrichedTemplate(resolvedTemplatePath, specialistName);
+
+  // Load from latest enriched version if it exists, otherwise use base template
+  let templateSourcePath: string;
+  let isFirstEnrichment: boolean;
+
+  if (latestEnrichedPath) {
+    templateSourcePath = latestEnrichedPath;
+    isFirstEnrichment = false;
+    log.info(chalk.cyan(`📂 Using latest enriched template: ${basename(dirname(latestEnrichedPath))}/${basename(latestEnrichedPath)}`));
+  } else {
+    templateSourcePath = resolvedTemplatePath;
+    isFirstEnrichment = true;
+    log.info(chalk.cyan(`📂 Using base template (first enrichment)`));
+  }
+
+  // Load template
+  const template: SpecialistTemplate = loadJSON5(templateSourcePath);
+
+  // Auto-bump version for enrichment
+  const oldVersion = template.version;
+  const newVersion = bumpVersion(oldVersion, 'patch');
+
+  log.debug(chalk.gray(`   Template: ${template.name} v${oldVersion}`));
+  log.info(chalk.blue(`📦 Bumping version: ${oldVersion} → ${newVersion}`));
 
   // Always generate new enriched template with incremented number
-  const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, template.version, specialistName);
+  const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, newVersion, specialistName);
   log.debug(chalk.gray(`   Output: ${enrichedPath}`));
 
   // Initialize LLM client
@@ -170,10 +257,21 @@ export async function enrichTemplate(
     });
   }
 
-  // Create enriched template
+  // Create enriched template with updated version and metadata
   const enrichedTemplate: SpecialistTemplate = {
     ...template,
-    documentation
+    version: newVersion,
+    documentation,
+    version_metadata: updateVersionMetadata(template.version_metadata, {
+      oldVersion,
+      newVersion,
+      type: 'patch',
+      changes: [{
+        category: 'enrichment',
+        description: `Enriched ${enriched} documentation resource${enriched !== 1 ? 's' : ''}`,
+        breaking: false
+      }]
+    })
   };
 
   // Write enriched template

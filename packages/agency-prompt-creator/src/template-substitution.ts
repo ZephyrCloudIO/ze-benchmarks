@@ -3,8 +3,8 @@
  * Replaces {{variable}} placeholders with actual values
  */
 
-import type { TemplateContext, TaskType } from './types.js';
-import { filterDocumentation } from './doc-filter.js';
+import type { TemplateContext, TaskType } from './types';
+import { filterDocumentation } from './doc-filter';
 
 /**
  * Perform mustache-style template substitution

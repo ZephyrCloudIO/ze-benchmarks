@@ -3,7 +3,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { ToolDefinition, ToolHandler } from './workspace-tools.ts';
 import { z } from 'zod';
-import { createFigmaResponseSummary } from './figma-tools.js';
 import { logger } from '@ze/logger';
 
 const log = logger.mcpTools;
@@ -210,65 +209,19 @@ function createMCPToolHandler(
 				return 'Tool executed successfully (no output)';
 			}
 
-			// Always create summaries for Figma file responses to reduce token usage and prevent API errors
-			// OpenRouter and most APIs have limits on message size
+			// For large responses, check size and summarize/truncate if needed
 			const MAX_RESPONSE_SIZE = 500000; // ~500KB to leave room for conversation context
-			
-			// For figma_get_file, always create a summary (even if response is small)
-			if (toolName === 'figma_get_file') {
-				try {
-					const jsonData = JSON.parse(contentString);
-					if (jsonData.document) {
-						log.debug(chalk.blue(`[MCP] Creating summary for figma_get_file response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
-						const summary = createFigmaResponseSummary(jsonData);
-						log.debug(chalk.green(`[MCP] ✓ Created summary (${summary.length} chars, ${(summary.length / 1024).toFixed(2)} KB)`));
-						return summary;
-					}
-				} catch (e) {
-					log.debug(chalk.yellow(`[MCP] ⚠️  Could not parse figma_get_file response as JSON, returning as-is`));
-				}
-			}
-			
+
 			// For other large responses, check size and summarize/truncate if needed
 			if (contentString.length > MAX_RESPONSE_SIZE) {
 				log.debug(chalk.yellow(`[MCP] ⚠️  Tool ${toolName} returned very large response (${contentString.length} chars, ${(contentString.length / 1024).toFixed(2)} KB)`));
 				log.debug(chalk.yellow(`[MCP] ⚠️  Truncating to prevent API errors...`));
 				
-				// Try to parse as JSON and create a summary if possible
+				// Try to parse as JSON and truncate
 				try {
-					const jsonData = JSON.parse(contentString);
-					
-					// For other Figma-related tools, try to create a summary
-					if (toolName.startsWith('figma_') && jsonData) {
-						// Create a simple summary structure
-						const summary = {
-							_summary: true,
-							_originalSize: contentString.length,
-							_data: Object.keys(jsonData).reduce((acc: any, key: string) => {
-								const value = jsonData[key];
-								if (Array.isArray(value)) {
-									acc[key] = {
-										_count: value.length,
-										_samples: value.slice(0, 10)
-									};
-								} else if (typeof value === 'object' && value !== null) {
-									acc[key] = {
-										_keys: Object.keys(value).slice(0, 20),
-										_count: Object.keys(value).length
-									};
-								} else {
-									acc[key] = value;
-								}
-								return acc;
-							}, {}),
-							_note: `Response summarized: original size was ${contentString.length} characters. Showing summary structure.`
-						};
-						const summaryString = JSON.stringify(summary, null, 2);
-						log.debug(chalk.green(`[MCP] ✓ Created summary (${summaryString.length} chars, ${(summaryString.length / 1024).toFixed(2)} KB)`));
-						return summaryString;
-					}
-					
-					// For other large JSON responses, truncate and add note
+					JSON.parse(contentString);
+
+					// For large JSON responses, truncate and add note
 					const truncated = contentString.substring(0, MAX_RESPONSE_SIZE - 500);
 					return truncated + `\n\n... [Response truncated: original size was ${contentString.length} characters. Showing first ${MAX_RESPONSE_SIZE - 500} characters.]`;
 				} catch (e) {
@@ -326,20 +279,6 @@ export function resolveMCPConfig(mcpDef: {
 		'@modelcontextprotocol/server-github': {
 			command: 'npx',
 			args: ['-y', '@modelcontextprotocol/server-github'],
-		},
-		'figma': {
-			command: 'npx',
-			args: ['-y', '@thirdstrandstudio/mcp-figma'],
-			env: {
-				FIGMA_API_KEY: process.env.FIGMA_API_KEY || '',
-			},
-		},
-		'@thirdstrandstudio/mcp-figma': {
-			command: 'npx',
-			args: ['-y', '@thirdstrandstudio/mcp-figma'],
-			env: {
-				FIGMA_API_KEY: process.env.FIGMA_API_KEY || '',
-			},
 		},
 	};
 

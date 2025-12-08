@@ -44,12 +44,16 @@ export async function getRunDetails(request: Request, env: Env): Promise<Respons
     const url = new URL(request.url);
     const runId = url.pathname.split('/').pop();
 
+    console.debug(`[Worker:Runs] getRunDetails request for runId: ${runId}`);
+
     if (!runId) {
+      console.debug(`[Worker:Runs] getRunDetails: Run ID missing`);
       return jsonResponse({ error: 'Run ID required' }, 400);
     }
 
     const db = drizzle(env.DB);
 
+    console.debug(`[Worker:Runs] Fetching run from database: ${runId}`);
     const run = await db
       .select()
       .from(schema.benchmarkRuns)
@@ -57,9 +61,11 @@ export async function getRunDetails(request: Request, env: Env): Promise<Respons
       .get();
 
     if (!run) {
+      console.debug(`[Worker:Runs] Run not found: ${runId}`);
       return jsonResponse({ error: 'Run not found' }, 404);
     }
 
+    console.debug(`[Worker:Runs] Run found, fetching evaluations and telemetry`);
     const evaluations = await db
       .select()
       .from(schema.evaluationResults)
@@ -70,6 +76,11 @@ export async function getRunDetails(request: Request, env: Env): Promise<Respons
       .from(schema.runTelemetry)
       .where(eq(schema.runTelemetry.runId, runId))
       .get();
+
+    console.debug(`[Worker:Runs] Returning run details:`, {
+      evaluationsCount: evaluations.length,
+      hasTelemetry: !!telemetry
+    });
 
     return jsonResponse({
       run: convertBenchmarkRunFields(run),
@@ -87,6 +98,8 @@ export async function getRunEvaluations(request: Request, env: Env): Promise<Res
     const url = new URL(request.url);
     const runId = url.pathname.split('/')[3]; // /api/runs/:runId/evaluations
 
+    console.debug(`[Worker:Runs] getRunEvaluations request for runId: ${runId}`);
+
     const db = drizzle(env.DB);
 
     const evaluations = await db
@@ -97,6 +110,8 @@ export async function getRunEvaluations(request: Request, env: Env): Promise<Res
 
     // Convert field names from snake_case to camelCase
     const convertedEvaluations = evaluations.map(convertEvaluationFields);
+
+    console.debug(`[Worker:Runs] Returning ${convertedEvaluations.length} evaluation(s) for runId: ${runId}`);
 
     return jsonResponse(convertedEvaluations);
   } catch (err: any) {
@@ -110,6 +125,8 @@ export async function getRunTelemetry(request: Request, env: Env): Promise<Respo
     const url = new URL(request.url);
     const runId = url.pathname.split('/')[3]; // /api/runs/:runId/telemetry
 
+    console.debug(`[Worker:Runs] getRunTelemetry request for runId: ${runId}`);
+
     const db = drizzle(env.DB);
 
     const telemetry = await db
@@ -117,6 +134,12 @@ export async function getRunTelemetry(request: Request, env: Env): Promise<Respo
       .from(schema.runTelemetry)
       .where(eq(schema.runTelemetry.runId, runId))
       .get();
+
+    console.debug(`[Worker:Runs] Returning telemetry for runId: ${runId}`, telemetry ? {
+      toolCalls: telemetry.toolCalls,
+      tokensIn: telemetry.tokensIn,
+      tokensOut: telemetry.tokensOut
+    } : 'null');
 
     // Convert field names from snake_case to camelCase
     return jsonResponse(convertTelemetryFields(telemetry));

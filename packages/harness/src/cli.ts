@@ -88,9 +88,6 @@ function checkScenarioExists(suiteName: string, scenarioName: string): boolean {
   return existsSync(join(root, 'suites', suiteName, 'scenarios', scenarioName));
 }
 
-// Export for use by other modules
-export { findRepoRoot, validateName, checkSuiteExists, checkScenarioExists };
-
 // ============================================================================
 // MAIN ENTRY POINT
 // ============================================================================

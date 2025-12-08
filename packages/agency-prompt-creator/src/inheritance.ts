@@ -2,7 +2,7 @@
  * Template inheritance resolver following INHERITANCE.md TSConfig-style merge rules
  */
 
-import type { SpecialistTemplate } from './types.js';
+import type { SpecialistTemplate } from './types';
 
 /**
  * Merge two templates following TSConfig-style rules:

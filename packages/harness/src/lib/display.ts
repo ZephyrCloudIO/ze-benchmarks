@@ -50,6 +50,97 @@ export function createTitle() {
   });
 }
 
+// Heuristic Checks display function
+export function displayHeuristicChecks(
+  result: { scores?: Record<string, any>; evaluator_results?: Array<{ name: string; details?: string }> }
+) {
+  const heuristicScore = (result.scores as any)['heuristic_checks'];
+  const evaluatorResults = (result as any).evaluator_results;
+
+  let heuristicResult = null;
+  if (evaluatorResults && Array.isArray(evaluatorResults)) {
+    heuristicResult = evaluatorResults.find((r: any) => r.name === 'HeuristicChecksEvaluator');
+  }
+
+  if (!heuristicResult && !heuristicScore) return;
+
+  const details = heuristicResult?.details || heuristicScore?.details;
+  const score = heuristicResult?.score ?? heuristicScore ?? 0;
+
+  if (!details) return;
+
+  // Parse the details to extract check information
+  const lines = details.split('\n');
+  const checks: Array<{ status: string; name: string; weight: string; description?: string; error?: string }> = [];
+  let passedCount = 0;
+  let totalCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match lines like: ✓ build_succeeds (weight: 2.0) - Description
+    // or: ✗ lint_passes (weight: 1.0) - Description
+    const match = line.match(/^([✓✗])\s+(\S+)\s+\(weight:\s+([\d.]+)\)(?:\s+-\s+(.+))?$/);
+    if (match) {
+      const [, status, name, weight, description] = match;
+      totalCount++;
+      if (status === '✓') passedCount++;
+
+      // Check if next line is an error
+      let error = undefined;
+      if (status === '✗' && i + 1 < lines.length && lines[i + 1].trim().startsWith('Error:')) {
+        error = lines[i + 1].trim().replace(/^Error:\s*/, '');
+      }
+
+      checks.push({ status, name, weight, description, error });
+    }
+  }
+
+  if (checks.length === 0) return;
+
+  logger.display.raw(`\n${chalk.bold.underline('Heuristic Checks')}`);
+  logger.display.raw(`┌${'─'.repeat(TABLE_WIDTH)}┐`);
+  logger.display.raw(`│ ${chalk.bold('Check Name'.padEnd(35))} ${chalk.bold('Weight'.padEnd(8))} ${chalk.bold('Status'.padEnd(12))} │`);
+  logger.display.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+
+  // Display each check
+  checks.forEach((check) => {
+    const displayName = check.name.length > 35 ? check.name.substring(0, 32) + '...' : check.name;
+    const isPassed = check.status === '✓';
+    const statusText = isPassed ? 'Passed' : 'Failed';
+    const statusColor = isPassed ? 'green' : 'red';
+    const weightColor = isPassed ? 'blue' : 'gray';
+
+    logger.display.raw(
+      `│ ${chalk.cyan(displayName.padEnd(35))} ${chalk[weightColor](check.weight.padEnd(8))} ${chalk[statusColor](statusText.padEnd(12))} │`
+    );
+
+    // If there's a description, show it on the next line (indented)
+    if (check.description && !check.error) {
+      const desc = check.description.length > 54 ? check.description.substring(0, 51) + '...' : check.description;
+      logger.display.raw(`│   ${chalk.gray(desc.padEnd(TABLE_WIDTH - 4))} │`);
+    }
+
+    // If there's an error, show it (indented)
+    if (check.error) {
+      const errorText = check.error.length > 54 ? check.error.substring(0, 51) + '...' : check.error;
+      logger.display.raw(`│   ${chalk.red('Error: ' + errorText).padEnd(TABLE_WIDTH - 4 + 9)} │`);
+    }
+  });
+
+  logger.display.raw(`├${'─'.repeat(TABLE_WIDTH)}┤`);
+
+  // Summary line
+  const scorePercent = (score * 100).toFixed(1);
+  const scoreColor = score >= 0.9 ? 'green' : score >= 0.7 ? 'yellow' : 'red';
+  const summaryText = `${passedCount}/${totalCount} checks passed`;
+  const scoreText = `Score: ${scorePercent}%`;
+
+  logger.display.raw(
+    `│ ${chalk.bold(summaryText.padEnd(35))} ${chalk[scoreColor](scoreText.padEnd(20))} │`
+  );
+  logger.display.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
+}
+
 // LLM Judge display function
 export function displayLLMJudgeScores(
   result: { scores?: Record<string, any>; evaluator_results?: Array<{ name: string; details?: string }> },

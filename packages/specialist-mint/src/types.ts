@@ -11,11 +11,50 @@ export interface DocumentationEnrichment {
   enrichment_model: string;
 }
 
+export interface ChangeEntry {
+  category: 'enrichment' | 'prompt' | 'documentation' | 'persona' | 'capabilities' | 'fix' | 'other';
+  description: string;
+  breaking?: boolean;
+  migration_notes?: string;
+}
+
+export interface VersionChange {
+  version: string;
+  date: string;
+  type: 'major' | 'minor' | 'patch';
+  changes: ChangeEntry[];
+  author?: string;
+}
+
+export interface BreakingChange {
+  version: string;
+  date: string;
+  description: string;
+  affected_areas: string[];
+  migration_guide: string;
+  deprecated_features?: string[];
+}
+
+export interface VersionMetadata {
+  changelog: VersionChange[];
+  breaking_changes?: BreakingChange[];
+  deprecated?: boolean;
+  deprecated_in?: string;
+  deprecated_reason?: string;
+  replacement?: string;
+  created_at: string;
+  updated_at: string;
+  last_enriched_at?: string;
+  min_schema_version?: string;
+  compatible_with?: string[];
+}
+
 export interface SpecialistTemplate {
   schema_version: string;
   name: string;
   displayName?: string;
   version: string;
+  version_metadata?: VersionMetadata;
   from?: string;
   license?: string;
   availability?: 'public' | 'private' | 'paid';

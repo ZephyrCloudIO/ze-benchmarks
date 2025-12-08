@@ -8,13 +8,13 @@ import type {
   CreatePromptOptions,
   CreatePromptResult,
   TemplateContext,
-} from './types.js';
-import { detectTaskType } from './task-detection.js';
-import { selectPrompt, combinePromptParts } from './prompt-selection.js';
+} from './types';
+import { detectTaskType } from './task-detection';
+import { selectPrompt, combinePromptParts } from './prompt-selection';
 import {
   substituteTemplate,
   buildTemplateContext,
-} from './template-substitution.js';
+} from './template-substitution';
 
 /**
  * Create a prompt from a specialist template and user input

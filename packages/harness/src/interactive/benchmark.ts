@@ -136,7 +136,8 @@ export async function executeMultipleBenchmarksWithSpecialists(
 					batchId,
 					true,       // quiet mode
 					specialist, // specialist parameter
-					true        // skip warmup (already done)
+					true,       // skip warmup (already done)
+					true        // llmJudgeOnly
 				);
 			}
 		);
@@ -153,7 +154,8 @@ export async function executeMultipleBenchmarksWithSpecialists(
 				batchId,
 				true,       // quiet mode
 				specialist, // specialist parameter
-				true        // skip warmup (already done)
+				true,       // skip warmup (already done)
+				true        // llmJudgeOnly
 			);
 		}
 	}
@@ -391,7 +393,7 @@ export async function executeMultipleBenchmarks(
 			async (combo, i) => {
 				const { suite, scenario, tier, agent, model } = combo;
 				logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true); // quiet mode, skip warmup
+				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
 			}
 		);
 	} else {
@@ -401,7 +403,7 @@ export async function executeMultipleBenchmarks(
 
 			logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
 
-			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true); // quiet mode, skip warmup
+			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
 		}
 	}
 
