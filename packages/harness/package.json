@@ -21,7 +21,9 @@
     "openai": "^4.0.0",
     "yaml": "^2.5.0",
     "ze-evaluator": "workspace:*",
-    "zod": "^3.23.8"
+    "@ze/worker-client": "workspace:*",
+    "@ze/logger": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.24.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
