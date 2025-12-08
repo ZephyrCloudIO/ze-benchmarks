@@ -255,8 +255,14 @@ export class SpecialistAdapter implements AgentAdapter {
       log.warn('[SpecialistAdapter] Using synchronous template loading (deprecated). Use SpecialistAdapter.create() for async loading with inheritance support.');
       this.template = this.loadTemplateSync(templatePath);
     }
-    
+
     this.name = `specialist:${this.template.name}:${underlyingAdapter.name}`;
+
+    // Validate template version and log warnings
+    if (this.template.version_metadata) {
+      const warnings = this.validateVersion();
+      warnings.forEach(w => log.warn(`[SpecialistAdapter] ${w}`));
+    }
 
     // Initialize LLM configuration
     this.llmConfig = this.loadLLMConfig();
@@ -511,13 +517,21 @@ export class SpecialistAdapter implements AgentAdapter {
       log.debug('[SpecialistAdapter] Original user prompt:', userPrompt.substring(0, 200));
       log.debug('[SpecialistAdapter] ========================================');
 
-      // ========================================================================
-      // STEP 3a: Extract Intent
-      // ========================================================================
-      log.debug('[SpecialistAdapter] Step 3a: Extracting intent...');
-      const intentStart = Date.now();
-      const intent = await this.extractIntentWithLLM(userPrompt);
-      const intentDuration = Date.now() - intentStart;
+      // Check if LLM features are enabled
+      if (!this.llmConfig.enabled) {
+        log.debug('[SpecialistAdapter] LLM features disabled, using static prompt creation');
+        return this.sendWithStaticPrompt(request, userPrompt);
+      }
+
+      // Try LLM-based pipeline with fallback to static on failure
+      try {
+        // ========================================================================
+        // STEP 3a: Extract Intent
+        // ========================================================================
+        log.debug('[SpecialistAdapter] Step 3a: Extracting intent...');
+        const intentStart = Date.now();
+        const intent = await this.extractIntentWithLLM(userPrompt);
+        const intentDuration = Date.now() - intentStart;
 
       log.debug('[SpecialistAdapter] Step 3a - Extracted intent:');
       log.debug('  Intent:', intent.intent);
@@ -599,14 +613,67 @@ export class SpecialistAdapter implements AgentAdapter {
       log.debug('[SpecialistAdapter] Delegating to underlying adapter...');
       log.debug('[SpecialistAdapter] ========================================');
 
-      return this.underlyingAdapter.send(modifiedRequest);
+        return this.underlyingAdapter.send(modifiedRequest);
+      } catch (llmError) {
+        // LLM-based pipeline failed - try fallback to static prompt if enabled
+        if (this.llmConfig.fallbackToStatic) {
+          log.warn('[SpecialistAdapter] LLM pipeline failed, falling back to static prompt creation');
+          log.warn('[SpecialistAdapter] LLM error:', llmError instanceof Error ? llmError.message : String(llmError));
+          return this.sendWithStaticPrompt(request, userPrompt);
+        }
+
+        // No fallback enabled - re-throw with context
+        if (llmError instanceof Error) {
+          throw new Error(
+            `SpecialistAdapter (${this.template.name}) LLM pipeline error: ${llmError.message}`
+          );
+        }
+        throw llmError;
+      }
     } catch (error) {
-      // Re-throw with more context about specialist adapter
+      // Outer catch for non-LLM errors
       if (error instanceof Error) {
         throw new Error(
           `SpecialistAdapter (${this.template.name}) error: ${error.message}`
         );
       }
+      throw error;
+    }
+  }
+
+  /**
+   * Simple static prompt creation (fallback when LLM features disabled)
+   * Uses agency-prompt-creator's createPrompt without LLM tool calling
+   */
+  private async sendWithStaticPrompt(request: AgentRequest, userPrompt: string): Promise<AgentResponse> {
+    try {
+      log.debug('[SpecialistAdapter] Using static prompt creation (no LLM tool calling)');
+
+      // Use agency-prompt-creator's simple createPrompt
+      const { createPrompt } = await import('agency-prompt-creator');
+
+      const result = createPrompt(this.template, {
+        userPrompt,
+        model: this.getModelName(),
+        context: this.buildTemplateContext(request)
+      });
+
+      log.debug('[SpecialistAdapter] Static prompt created:');
+      log.debug('  Task type:', result.taskType);
+      log.debug('  Used model-specific:', result.usedModelSpecific);
+      log.debug('  Prompt length:', result.prompt.length);
+
+      // Inject the generated prompt as system message
+      const transformedMessages = this.injectSystemPrompt(request.messages, result.prompt);
+      const modifiedRequest: AgentRequest = {
+        ...request,
+        messages: transformedMessages
+      };
+
+      // Send to underlying adapter
+      return this.underlyingAdapter.send(modifiedRequest);
+    } catch (error) {
+      log.error('[SpecialistAdapter] Static prompt creation failed:', error);
       throw error;
     }
   }
@@ -719,10 +786,10 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const cacheKey = createCacheKey(userPrompt + ':intent');
-    const cached = this.llmCache.get(cacheKey);
+    const cached = this.llmCache.getIntent(cacheKey);
     if (cached) {
       log.debug('[SpecialistAdapter] Using cached intent extraction');
-      return cached as ExtractedIntent;
+      return cached;
     }
 
     const prompt = buildIntentExtractionPrompt(userPrompt);
@@ -747,7 +814,7 @@ export class SpecialistAdapter implements AgentAdapter {
       }
 
       const intent = parseIntentResponse(toolCall.function.arguments);
-      this.llmCache.set(cacheKey, intent);
+      this.llmCache.setIntent(cacheKey, intent);
       return intent;
     } catch (error) {
       if (error instanceof Error) {
@@ -769,10 +836,10 @@ export class SpecialistAdapter implements AgentAdapter {
     }
 
     const cacheKey = createCacheKey(userPrompt + ':selection');
-    const cached = this.llmCache.get(cacheKey);
+    const cached = this.llmCache.getComponentSelection(cacheKey);
     if (cached) {
       log.debug('[SpecialistAdapter] Using cached component selection');
-      return cached as SpecialistSelection;
+      return cached;
     }
 
     const prompt = buildComponentSelectionPrompt(userPrompt, intent, this.template);
@@ -837,14 +904,14 @@ export class SpecialistAdapter implements AgentAdapter {
       log.debug('[SpecialistAdapter] =======================================================');
       
       const selection = parseComponentSelectionResponse(toolCall.function.arguments, this.template);
-      
+
       // Debug: Log parsed selection
       log.debug('[SpecialistAdapter] ========== PARSED SELECTION ==========');
       log.debug('[SpecialistAdapter] Selection taskPromptId:', selection.taskPromptId);
       log.debug('[SpecialistAdapter] Selection spawnerPromptId:', selection.spawnerPromptId);
       log.debug('[SpecialistAdapter] ====================================');
-      
-      this.llmCache.set(cacheKey, selection);
+
+      this.llmCache.setComponentSelection(cacheKey, selection);
       return selection;
     } catch (error) {
       if (error instanceof Error) {
@@ -1044,6 +1111,35 @@ export class SpecialistAdapter implements AgentAdapter {
     return section;
   }
 
+  /**
+   * Validate template version and return warnings
+   */
+  private validateVersion(): string[] {
+    const warnings: string[] = [];
+    const metadata = this.template.version_metadata;
+
+    if (!metadata) return warnings;
+
+    if (metadata.deprecated) {
+      warnings.push(
+        `Template ${this.template.name} v${this.template.version} is deprecated`
+      );
+      if (metadata.replacement) {
+        warnings.push(`Consider migrating to: ${metadata.replacement}`);
+      }
+    }
+
+    if (metadata.breaking_changes && metadata.breaking_changes.length > 0) {
+      const recent = metadata.breaking_changes.slice(0, 3);
+      warnings.push(
+        `Breaking changes detected:\n` +
+        recent.map((bc: any) => `   - ${bc.description}`).join('\n')
+      );
+    }
+
+    return warnings;
+  }
+
   // =========================================================================
   // LLM-POWERED PROMPT SELECTION AND VARIABLE EXTRACTION (LEGACY)
   // =========================================================================
@@ -1055,8 +1151,11 @@ export class SpecialistAdapter implements AgentAdapter {
     // Check template llm_config
     const templateConfig = (this.template as any).llm_config;
 
+    // Allow disabling LLM features via environment or template
+    const enabled = process.env.SPECIALIST_LLM_ENABLED !== 'false' && (templateConfig?.enabled ?? true);
+
     return {
-      enabled: true, // Always enabled
+      enabled,
       provider: templateConfig?.provider || 'openrouter',
       selectionModel: process.env.LLM_SELECTION_MODEL || templateConfig?.selection_model || 'anthropic/claude-3.5-haiku',
       extractionModel: process.env.LLM_EXTRACTION_MODEL || templateConfig?.extraction_model || 'anthropic/claude-3.5-haiku',

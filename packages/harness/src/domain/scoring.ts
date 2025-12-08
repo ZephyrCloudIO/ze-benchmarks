@@ -25,7 +25,8 @@ export function computeWeightedTotals(
 		file_structure: 0, // TODO: Add this back in
 		config_accuracy: 0, // TODO: Add this back in
 		dependency_proximity: 0, // TODO: Add this back in
-		llm_judge: 1.0, // Only LLM judge contributes to the score
+		heuristic_checks: 1.0, // Heuristic validation checks
+		llm_judge: 1.0, // LLM judge evaluation
 	};
 
 	const overrideWeights = scenarioCfg.rubric_overrides?.weights ?? {};
@@ -71,10 +72,23 @@ export function calculateSuccess(
   // LLM judge score (if available)
   const llmJudgeScore = scores.llm_judge || 0;
 
-  // Weighted metric (from scenario.yaml or default)
-  // Since we are using only LLM as a judge, make the success metric simply the LLM judge score
-  const successMetric = llmJudgeScore;
+  // Heuristic checks score (if available)
+  const heuristicChecksScore = scores.heuristic_checks || 0;
 
+  // Weighted metric (from scenario.yaml or default)
+  // Combine both heuristic checks and LLM judge scores
+  // If only one is available, use that; if both are available, average them
+  let successMetric = 0;
+  const hasLlmJudge = llmJudgeScore > 0;
+  const hasHeuristicChecks = heuristicChecksScore > 0;
+
+  if (hasLlmJudge && hasHeuristicChecks) {
+    successMetric = (llmJudgeScore + heuristicChecksScore) / 2;
+  } else if (hasLlmJudge) {
+    successMetric = llmJudgeScore;
+  } else if (hasHeuristicChecks) {
+    successMetric = heuristicChecksScore;
+  }
 
   // Success criteria: critical commands must pass AND success metric >= 0.7
   const isSuccessful = criticalPassed && successMetric >= 0.7;

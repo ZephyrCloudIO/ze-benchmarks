@@ -6,7 +6,7 @@
  * 3. Default fallback
  */
 
-import type { SpecialistTemplate, TaskType, PromptConfig } from './types.js';
+import type { SpecialistTemplate, TaskType, PromptConfig } from './types';
 
 /**
  * Normalize model name for comparison

@@ -12,17 +12,9 @@ import { logger } from '@ze/logger';
 // Find workspace root by looking for pnpm-workspace.yaml
 // In case of nested workspaces, find the topmost one
 export function findWorkspaceRoot(startDir: string): string {
-  let currentDir = startDir;
-  let lastWorkspaceRoot = startDir;
-
-  while (currentDir !== resolve(currentDir, '..')) {
-    if (existsSync(join(currentDir, 'pnpm-workspace.yaml'))) {
-      lastWorkspaceRoot = currentDir;
-    }
-    currentDir = resolve(currentDir, '..');
-  }
-
-  return lastWorkspaceRoot;
+  // Use the generic findProjectRoot to find pnpm-workspace.yaml
+  const workspaceRoot = findProjectRoot('pnpm-workspace.yaml', startDir);
+  return workspaceRoot || startDir; // Fallback to startDir if not found
 }
 
 export function findRepoRoot(): string {

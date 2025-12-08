@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, isAbsolute } from 'node:path';
-import type { SpecialistTemplate, LoadTemplateOptions } from './types.js';
+import type { SpecialistTemplate, LoadTemplateOptions } from './types';
 import { logger } from '@ze/logger';
 
 const log = logger.templateLoader;
@@ -17,7 +17,7 @@ import {
   mergeTemplates,
   validateTemplate,
   detectCircularDependency,
-} from './inheritance.js';
+} from './inheritance';
 
 /**
  * Load a template with inheritance resolution

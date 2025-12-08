@@ -4,46 +4,40 @@
  */
 
 // Main API
-export { createPrompt, createPromptFromFile } from './create-prompt.js';
+export { createPrompt, createPromptFromFile } from './create-prompt';
 
 // Template loading
-export { loadTemplate, loadTemplateFromString } from './loader.js';
+export { loadTemplate, loadTemplateFromString } from './loader';
 
 // Task detection
 export {
   detectTaskType,
-  detectTaskTypesWithConfidence,
   getTaskKeywords,
-  analyzeTemplateWithLLM,
-  buildTaskDetectionPrompt,
-  parseTaskDetectionResponse,
-  TASK_DETECTION_TOOL,
-  type TaskDetectionResult,
-} from './task-detection.js';
+} from './task-detection';
 
 // Prompt selection
-export { selectPrompt, combinePromptParts } from './prompt-selection.js';
+export { selectPrompt, combinePromptParts } from './prompt-selection';
 
 // Template substitution
 export {
   substituteTemplate,
   buildTemplateContext,
   validateTemplateString,
-} from './template-substitution.js';
+} from './template-substitution';
 
 // Inheritance utilities
 export {
   mergeTemplates,
   validateTemplate,
   detectCircularDependency,
-} from './inheritance.js';
+} from './inheritance';
 
 // Documentation filtering
 export {
   filterDocumentation,
   hasEnrichedDocumentation,
   type FilteredDocumentation,
-} from './doc-filter.js';
+} from './doc-filter';
 
 // Keyword extraction
 export {
@@ -51,21 +45,21 @@ export {
   containsKeyword,
   countKeywordMatches,
   type ExtractedKeywords,
-} from './keyword-extraction.js';
+} from './keyword-extraction';
 
 // Intent extraction (Step 3a)
 export {
   buildIntentExtractionPrompt,
   parseIntentResponse,
   INTENT_EXTRACTION_TOOL,
-} from './intent-extraction.js';
+} from './intent-extraction';
 
 // Component selection (Step 3b)
 export {
   buildComponentSelectionPrompt,
   parseComponentSelectionResponse,
   COMPONENT_SELECTION_TOOL,
-} from './component-selection.js';
+} from './component-selection';
 
 // LLM-based substitution (Step 3c)
 export {
@@ -74,15 +68,7 @@ export {
   parseSubstitutionResponse,
   extractMustacheVariables,
   SUBSTITUTION_TOOL,
-} from './llm-substitution.js';
-
-// Schema validation
-export {
-  SpecialistTemplateSchema,
-  readAndValidateTemplate,
-  safeReadTemplate,
-  type SpecialistTemplate as SpecialistTemplateFromSchema,
-} from './schema-analyzer.js';
+} from './llm-substitution';
 
 // Types
 export type {
@@ -100,4 +86,4 @@ export type {
   ExtractedIntent,
   DocumentationReference,
   SpecialistSelection,
-} from './types.js';
+} from './types';

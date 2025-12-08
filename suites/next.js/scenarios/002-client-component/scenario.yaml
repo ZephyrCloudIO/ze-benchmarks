@@ -26,6 +26,64 @@ validation:
 oracle:
   answers_file: "./oracle-answers.json"
 
+heuristic_checks:
+  enabled: true
+
+  # Critical validation commands
+  commands:
+    - name: "install_succeeds"
+      command: "pnpm install"
+      weight: 2.0
+      description: "Dependencies install successfully"
+
+    - name: "build_succeeds"
+      command: "pnpm build"
+      weight: 3.0
+      description: "Production build completes without errors"
+
+    - name: "lint_passes"
+      command: "pnpm lint"
+      weight: 1.0
+      description: "Code meets linting standards"
+
+  # Check for Client Component patterns
+  patterns:
+    - name: "has_use_client_directive"
+      file: "app/**/*.tsx"
+      pattern: "^['\"]use client['\"]"
+      weight: 3.0
+      description: "Client component has 'use client' directive"
+
+    - name: "uses_state_hook"
+      file: "app/**/*.tsx"
+      pattern: "useState|const \\[.*,.*set.*\\]\\s*=\\s*useState"
+      weight: 2.0
+      description: "Uses useState for state management"
+
+    - name: "has_event_handlers"
+      file: "app/**/*.tsx"
+      pattern: "onClick|onChange|onSubmit|on[A-Z]\\w+"
+      weight: 1.5
+      description: "Event handlers implemented for interactivity"
+
+    - name: "has_effect_hook"
+      file: "app/**/*.tsx"
+      pattern: "useEffect"
+      weight: 1.0
+      description: "Uses useEffect for side effects (optional)"
+
+    - name: "imports_react_hooks"
+      file: "app/**/*.tsx"
+      pattern: "import.*\\{.*useState.*\\}.*from.*['\"]react['\"]"
+      weight: 1.5
+      description: "Imports React hooks properly"
+
+    - name: "has_typescript_types"
+      file: "app/**/*.tsx"
+      pattern: "interface|type\\s+\\w+.*="
+      weight: 0.5
+      description: "TypeScript types defined"
+
 llm_judge:
   enabled: true
   model: "anthropic/claude-3.5-sonnet"

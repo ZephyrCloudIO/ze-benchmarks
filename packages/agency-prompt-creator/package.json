@@ -18,14 +18,13 @@
     "test": "rstest"
   },
   "dependencies": {
-    "json5": "^2.2.3",
-    "zod": "^3.25.76",
-    "@ze/logger": "workspace:*"
+    "@ze/logger": "workspace:*",
+    "json5": "^2.2.3"
   },
   "devDependencies": {
     "@rslib/core": "^0.17.1",
     "@rstest/core": "^0.6.1",
-    "@types/node": "^24.10.0",
+    "@types/node": "^24.10.1",
     "typescript": "^5.9.3"
   }
 }

@@ -63,6 +63,8 @@ export interface SubmitRunPayload {
   isSuccessful?: boolean;
   successMetric?: number;
   specialistEnabled?: boolean;
+  specialistName?: string;
+  specialistVersion?: string;
   metadata?: Record<string, any>;
   evaluations?: EvaluationResult[];
   telemetry?: RunTelemetry;

@@ -144,6 +144,8 @@ export class BenchmarkLogger {
       isSuccessful?: boolean;
       successMetric?: number;
       specialistEnabled?: boolean;
+      specialistName?: string;
+      specialistVersion?: string;
       metadata?: Record<string, any>;
       evaluations?: EvaluationResult[];
       telemetry?: RunTelemetry;
@@ -212,6 +214,8 @@ export class BenchmarkLogger {
         isSuccessful: dataOrScore.isSuccessful,
         successMetric: dataOrScore.successMetric,
         specialistEnabled: dataOrScore.specialistEnabled,
+        specialistName: dataOrScore.specialistName,
+        specialistVersion: dataOrScore.specialistVersion,
         metadata: dataOrScore.metadata,
         evaluations: dataOrScore.evaluations,
         telemetry: dataOrScore.telemetry,

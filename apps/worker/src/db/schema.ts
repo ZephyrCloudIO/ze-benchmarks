@@ -29,6 +29,8 @@ export const benchmarkRuns = sqliteTable('benchmark_runs', {
   isSuccessful: integer('is_successful', { mode: 'boolean' }).default(false),
   successMetric: real('success_metric'),
   specialistEnabled: integer('specialist_enabled', { mode: 'boolean' }).default(false),
+  specialistName: text('specialist_name'),
+  specialistVersion: text('specialist_version'),
   metadata: text('metadata'),
 }, (table) => ({
   suiteScenarioIdx: index('idx_runs_suite_scenario').on(table.suite, table.scenario),

@@ -40,6 +40,44 @@ export interface ScenarioConfig {
 		temperature?: number;
 		max_tokens?: number;
 	};
+	heuristic_checks?: {
+		enabled?: boolean;
+		commands?: Array<{
+			name: string;
+			command: string;
+			weight?: number;
+			description?: string;
+		}>;
+		files?: Array<{
+			name: string;
+			path: string;
+			weight?: number;
+			description?: string;
+		}>;
+		patterns?: Array<{
+			name: string;
+			file: string;
+			pattern: string;
+			weight?: number;
+			description?: string;
+		}>;
+		structured?: Array<{
+			name: string;
+			file: string;
+			json_path?: string;
+			section_header?: string;
+			exists?: boolean;
+			weight?: number;
+			description?: string;
+		}>;
+		scripts?: Array<{
+			name: string;
+			script: string;
+			args?: string[];
+			weight?: number;
+			description?: string;
+		}>;
+	};
 }
 
 export interface FileDiff {
