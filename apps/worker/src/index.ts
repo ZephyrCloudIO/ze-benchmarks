@@ -7,6 +7,7 @@ import * as batchesApi from './api/batches';
 import * as statsApi from './api/stats';
 import * as submitApi from './api/submit';
 import * as roledefsApi from './api/roledefs';
+import * as snapshotsApi from './api/snapshots';
 
 type CF = [env: Env, ctx: ExecutionContext];
 
@@ -43,6 +44,16 @@ router.post('/api/roledefs/enrich/mcp', authenticate, roledefsApi.enrichFromMcp)
 // Protected write endpoints (requires authentication)
 router.post('/api/results', authenticate, submitApi.submitResults);
 router.post('/api/results/batch', authenticate, submitApi.submitBatchResults);
+
+// Snapshot endpoints (R2 storage)
+// Public read endpoints
+router.get('/api/snapshots', snapshotsApi.listSnapshots);
+router.get('/api/snapshots/:specialistName', snapshotsApi.listSnapshots);
+router.get('/api/snapshots/:specialistName/:version', snapshotsApi.listSnapshots);
+router.get('/api/snapshots/:specialistName/:version/:snapshotId', snapshotsApi.downloadSnapshot);
+// Protected write endpoints
+router.post('/api/snapshots', authenticate, snapshotsApi.uploadSnapshot);
+router.delete('/api/snapshots/:specialistName/:version/:snapshotId', authenticate, snapshotsApi.deleteSnapshot);
 
 // Health check
 router.get('/health', () =>

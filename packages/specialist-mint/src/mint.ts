@@ -13,6 +13,7 @@ import { loadBenchmarkBatch } from './benchmark-loader.js';
 import { resolveTemplatePath } from './template-resolver.js';
 import { generateMetadata } from './metadata-generator.js';
 import { logger } from '@ze/logger';
+import { WorkerClient } from '@ze/worker-client';
 
 const log = logger.specialistMint;
 
@@ -32,6 +33,10 @@ export async function mintSnapshot(
 
     skipBenchmarks?: boolean;
     autoEnrich?: boolean;
+
+    // R2 upload options
+    uploadToR2?: boolean;
+    apiKey?: string;
   }
 ): Promise<MintResult> {
   log.debug(chalk.blue('📋 Step 1: Loading and validating template...'));
@@ -149,12 +154,75 @@ export async function mintSnapshot(
   log.debug(chalk.green('   ✓ Metadata written successfully'));
   log.debug(chalk.gray(`   Metadata path: ${metadataPath}`));
 
-  return {
+  // Build result
+  const result: MintResult = {
     snapshotId,
     outputPath,
     templateVersion: template.version,
     metadata
   };
+
+  // Step 8: Upload to R2 (optional)
+  if (options?.uploadToR2) {
+    log.debug(chalk.blue('\n☁️  Step 8: Uploading to R2...'));
+
+    try {
+      const client = new WorkerClient({
+        workerUrl: options.workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL,
+        apiKey: options.apiKey || process.env.ZE_BENCHMARKS_API_KEY
+      });
+
+      // Check worker connectivity
+      const isHealthy = await client.healthCheck();
+      if (!isHealthy) {
+        log.warn('⚠️  Worker API is not accessible, skipping R2 upload');
+        result.r2 = {
+          uploaded: false,
+          error: 'Worker API not accessible'
+        };
+      } else {
+        // Extract specialist name without scope for R2 key
+        const nameWithoutScope = template.name.includes('/')
+          ? template.name.split('/')[1]!
+          : template.name;
+
+        // Prepare R2 metadata
+        const r2Metadata = {
+          specialistName: nameWithoutScope,
+          specialistVersion: template.version,
+          snapshotId,
+          createdAt: new Date().toISOString(),
+          batchId: options.batchId,
+          templateVersion: template.version,
+          isEnriched,
+          runCount: benchmarkRuns?.length || 0,
+          avgScore: snapshot.benchmarks.aggregated_scores?.avg_score
+        };
+
+        // Upload to R2
+        const uploadResult = await client.uploadSnapshot(snapshot, r2Metadata);
+
+        log.debug(chalk.green(`   ✓ Uploaded to R2: ${uploadResult.key}`));
+        log.debug(chalk.gray(`   R2 URL: ${uploadResult.url}`));
+
+        result.r2 = {
+          uploaded: true,
+          key: uploadResult.key,
+          metadataKey: uploadResult.metadataKey,
+          url: uploadResult.url
+        };
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.warn(`⚠️  Failed to upload to R2: ${errorMessage}`);
+      result.r2 = {
+        uploaded: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  return result;
 }
 
 /**

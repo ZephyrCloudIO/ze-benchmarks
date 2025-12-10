@@ -1,8 +1,15 @@
+// Env interface - should match worker-configuration.d.ts bindings
+// Run `wrangler types` to regenerate worker-configuration.d.ts after changing wrangler.toml
 export interface Env {
+  // Core bindings from wrangler.toml
   DB: D1Database;
+  SNAPSHOTS: R2Bucket;
+  ENVIRONMENT: string;
+  ALLOWED_ORIGINS?: string;
+
+  // Secrets (set via `wrangler secret put`)
   API_SECRET_KEY?: string;
   OPENROUTER_API_KEY?: string;
-  ENVIRONMENT: string;
 }
 
 export interface SubmitResultsPayload {

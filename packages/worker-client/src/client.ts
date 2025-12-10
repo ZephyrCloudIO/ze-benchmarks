@@ -7,6 +7,11 @@ import type {
   RunStatistics,
   DetailedRunStatistics,
   BatchStatistics,
+  SnapshotMetadata,
+  UploadSnapshotPayload,
+  UploadSnapshotResponse,
+  DownloadSnapshotResponse,
+  ListSnapshotsResponse,
 } from './types';
 
 // Load environment variables
@@ -171,6 +176,70 @@ export class WorkerClient {
   async getAgentStats(): Promise<Array<{ agent: string; stats: RunStatistics }>> {
     const response = await this.fetch('/api/stats/agents');
     return await response.json() as Array<{ agent: string; stats: RunStatistics }>;
+  }
+
+  // ==================== Snapshot Methods (R2 Storage) ====================
+
+  /**
+   * Upload a snapshot to R2
+   */
+  async uploadSnapshot(
+    snapshot: Record<string, any>,
+    metadata: SnapshotMetadata
+  ): Promise<UploadSnapshotResponse> {
+    const payload: UploadSnapshotPayload = { snapshot, metadata };
+    const response = await this.fetch('/api/snapshots', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    return await response.json() as UploadSnapshotResponse;
+  }
+
+  /**
+   * Download a snapshot from R2
+   */
+  async downloadSnapshot(
+    specialistName: string,
+    version: string,
+    snapshotId: string
+  ): Promise<DownloadSnapshotResponse> {
+    const response = await this.fetch(`/api/snapshots/${specialistName}/${version}/${snapshotId}`);
+    return await response.json() as DownloadSnapshotResponse;
+  }
+
+  /**
+   * List snapshots, optionally filtered by specialist and/or version
+   */
+  async listSnapshots(params?: {
+    specialistName?: string;
+    version?: string;
+  }): Promise<ListSnapshotsResponse> {
+    let path = '/api/snapshots';
+    if (params?.specialistName) {
+      path += `/${params.specialistName}`;
+      if (params?.version) {
+        path += `/${params.version}`;
+      }
+    }
+
+    const response = await this.fetch(path);
+    return await response.json() as ListSnapshotsResponse;
+  }
+
+  /**
+   * Delete a snapshot from R2
+   */
+  async deleteSnapshot(
+    specialistName: string,
+    version: string,
+    snapshotId: string
+  ): Promise<{ success: boolean; deleted: string[] }> {
+    const response = await this.fetch(`/api/snapshots/${specialistName}/${version}/${snapshotId}`, {
+      method: 'DELETE',
+    });
+
+    return await response.json() as { success: boolean; deleted: string[] };
   }
 }
 

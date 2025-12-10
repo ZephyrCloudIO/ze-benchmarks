@@ -18,4 +18,10 @@ export type {
   ScenarioStatistics,
   DetailedRunStatistics,
   BatchStatistics,
+  // Snapshot types
+  SnapshotMetadata,
+  UploadSnapshotPayload,
+  UploadSnapshotResponse,
+  DownloadSnapshotResponse,
+  ListSnapshotsResponse,
 } from './types';

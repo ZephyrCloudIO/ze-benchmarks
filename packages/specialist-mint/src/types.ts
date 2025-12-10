@@ -231,4 +231,12 @@ export interface MintResult {
   outputPath: string;
   templateVersion: string;
   metadata: SnapshotMetadata;
+  // R2 upload results (if upload was requested)
+  r2?: {
+    uploaded: boolean;
+    key?: string;
+    metadataKey?: string;
+    url?: string;
+    error?: string;
+  };
 }
