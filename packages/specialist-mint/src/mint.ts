@@ -23,8 +23,13 @@ export async function mintSnapshot(
   templatePath: string,
   outputDir: string,
   options?: {
+    // Option A: Fetch from Worker API using batch ID
     batchId?: string;
     workerUrl?: string;
+
+    // Option B: Pass benchmark data directly (bypasses Worker API)
+    benchmarkRuns?: BenchmarkRun[];
+
     skipBenchmarks?: boolean;
     autoEnrich?: boolean;
   }
@@ -60,14 +65,18 @@ export async function mintSnapshot(
   if (options?.skipBenchmarks) {
     // Explicitly skip benchmarks
     log.debug(chalk.yellow('   ⚠️  Skipping benchmarks (--skip-benchmarks flag)'));
+  } else if (options?.benchmarkRuns) {
+    // Option B: Use directly provided benchmark data (bypasses Worker API)
+    benchmarkRuns = options.benchmarkRuns;
+    log.debug(chalk.green(`   ✓ Using ${benchmarkRuns.length} benchmark run(s) provided directly`));
   } else if (options?.batchId) {
-    // Batch mode: load all runs from the batch via Worker API
+    // Option A: Fetch from Worker API using batch ID
     log.debug(chalk.gray(`   Loading batch: ${options.batchId}`));
     benchmarkRuns = await loadBenchmarkBatch(options.batchId, options.workerUrl);
   } else {
-    // No batch ID provided and not explicitly skipping - inform user
-    log.debug(chalk.yellow('   ⚠️  No batch ID provided, continuing without benchmarks'));
-    log.debug(chalk.gray('   Use --batch-id to include benchmarks, or --skip-benchmarks to suppress this warning'));
+    // No benchmark data provided and not explicitly skipping - inform user
+    log.debug(chalk.yellow('   ⚠️  No benchmark data provided, continuing without benchmarks'));
+    log.debug(chalk.gray('   Use --batch-id to fetch from Worker, pass benchmarkRuns directly, or use --skip-benchmarks'));
   }
 
   // Create snapshot by combining template and benchmark results

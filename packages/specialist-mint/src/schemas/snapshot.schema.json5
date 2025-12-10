@@ -555,31 +555,6 @@
                 "maximum": 1,
                 "description": "Aggregated score across all evaluators (0-1)"
               },
-              "evaluations": {
-                "type": "object",
-                "description": "Individual evaluator scores",
-                "patternProperties": {
-                  "^[a-z0-9-_]+$": {
-                    "type": "object",
-                    "properties": {
-                      "score": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1,
-                        "description": "Score for this evaluator (0-1)"
-                      },
-                      "passed": {
-                        "type": "boolean",
-                        "description": "Whether this evaluator passed"
-                      },
-                      "error": {
-                        "type": "string",
-                        "description": "Error message if the evaluator failed"
-                      }
-                    }
-                  }
-                }
-              },
               "telemetry": {
                 "type": "object",
                 "description": "Telemetry data for this run",
@@ -690,5 +665,5 @@
     }
   },
 
-  "additionalProperties": false
+  "additionalProperties": true
 }

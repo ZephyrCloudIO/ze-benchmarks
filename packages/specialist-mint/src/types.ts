@@ -137,11 +137,6 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   overall_score: number;
-  evaluations?: Record<string, {
-    score: number;
-    passed: boolean;
-    error?: string;
-  }>;
   telemetry?: {
     duration_ms?: number;
     token_usage?: {

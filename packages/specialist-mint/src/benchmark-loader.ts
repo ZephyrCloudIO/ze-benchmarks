@@ -87,20 +87,6 @@ export async function loadBenchmarkBatch(
  * Map Worker API run format to specialist-mint format
  */
 function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
-  // Convert Worker API evaluations to specialist-mint format
-  const evaluations: Record<string, { score: number; passed: boolean; error?: string }> = {};
-
-  if (workerRun.evaluations && workerRun.evaluations.length > 0) {
-    for (const evaluation of workerRun.evaluations) {
-      const normalizedScore = evaluation.maxScore > 0 ? evaluation.score / evaluation.maxScore : 0;
-      evaluations[evaluation.evaluatorName] = {
-        score: normalizedScore,
-        passed: evaluation.score >= evaluation.maxScore,
-        error: evaluation.details
-      };
-    }
-  }
-
   // Convert telemetry to specialist-mint format
   let telemetry: BenchmarkRun['telemetry'] = undefined;
   if (workerRun.telemetry) {
@@ -125,7 +111,6 @@ function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
     model: workerRun.model || '',
     specialist_enabled: workerRun.specialistEnabled || false,
     overall_score: workerRun.totalScore || 0,
-    evaluations,
     telemetry
   };
 }

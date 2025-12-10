@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { select, multiselect, isCancel, cancel, text } from '@clack/prompts';
+import { select, multiselect, isCancel, cancel, text, confirm } from '@clack/prompts';
 import chalk from 'chalk';
 import JSON5 from 'json5';
 import { BenchmarkLogger } from '@ze/worker-client';
@@ -282,10 +282,84 @@ export async function executeMultipleBenchmarksWithSpecialists(
 		}
 	}
 
-	// Show tip for minting snapshot
-	logger.interactive.info(chalk.cyan(`\n💡 To mint snapshot from this batch:`));
-	logger.interactive.info(chalk.gray(`   pnpm bench --mint-snapshot <template-path>`));
-	logger.interactive.info(chalk.gray(`   Batch ID: ${batchId}`));
+	// Smart minting prompt with auto-detected template
+	if (specialists.length === 1) {
+		// Single specialist - simple confirmation
+		const specialist = specialists[0];
+
+		const shouldMint = await confirm({
+			message: `Mint snapshot with specialist "${specialist}" to ./snapshots?`,
+			initialValue: false
+		});
+
+		if (!isCancel(shouldMint) && shouldMint) {
+			try {
+				// Resolve specialist name to template path
+				const root = findRepoRoot();
+				const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+				const templatePath = resolveSpecialistTemplatePath(specialist, root);
+
+				logger.interactive.info(`\n🔨 Minting snapshot from batch ${batchId}...`);
+
+				const { mintSnapshot } = await import('@ze/specialist-mint');
+
+				const result = await mintSnapshot(templatePath, './snapshots', {
+					batchId: batchId,
+					workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
+				});
+
+				logger.interactive.success('\n✅ Snapshot minted successfully!');
+				logger.interactive.debug(`   Snapshot ID: ${result.snapshotId}`);
+				logger.interactive.debug(`   Output path: ${result.outputPath}`);
+				logger.interactive.debug(`   Template version: ${result.templateVersion}`);
+				if (result.metadata?.benchmarks?.comparison) {
+					const comp = result.metadata.benchmarks.comparison;
+					logger.interactive.debug(`   Improvement: ${comp.improvement >= 0 ? '+' : ''}${comp.improvement.toFixed(3)} (${comp.improvement_pct.toFixed(1)}%)`);
+				}
+			} catch (error) {
+				logger.interactive.error('\n❌ Error minting snapshot:');
+				logger.interactive.error(`   ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+	} else if (specialists.length > 1) {
+		// Multiple specialists - let user pick which one to mint
+		const specialistChoice = await select({
+			message: 'Which specialist template would you like to mint to ./snapshots?',
+			options: [
+				...specialists.map(s => ({ value: s, label: s })),
+				{ value: 'skip', label: 'Skip minting' }
+			]
+		});
+
+		if (!isCancel(specialistChoice) && specialistChoice !== 'skip') {
+			try {
+				const root = findRepoRoot();
+				const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
+				const templatePath = resolveSpecialistTemplatePath(specialistChoice as string, root);
+
+				logger.interactive.info(`\n🔨 Minting snapshot from batch ${batchId}...`);
+
+				const { mintSnapshot } = await import('@ze/specialist-mint');
+
+				const result = await mintSnapshot(templatePath, './snapshots', {
+					batchId: batchId,
+					workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
+				});
+
+				logger.interactive.success('\n✅ Snapshot minted successfully!');
+				logger.interactive.debug(`   Snapshot ID: ${result.snapshotId}`);
+				logger.interactive.debug(`   Output path: ${result.outputPath}`);
+				logger.interactive.debug(`   Template version: ${result.templateVersion}`);
+				if (result.metadata?.benchmarks?.comparison) {
+					const comp = result.metadata.benchmarks.comparison;
+					logger.interactive.debug(`   Improvement: ${comp.improvement >= 0 ? '+' : ''}${comp.improvement.toFixed(3)} (${comp.improvement_pct.toFixed(1)}%)`);
+				}
+			} catch (error) {
+				logger.interactive.error('\n❌ Error minting snapshot:');
+				logger.interactive.error(`   ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+	}
 }
 
 export async function executeMultipleBenchmarks(

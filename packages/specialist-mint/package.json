@@ -20,7 +20,7 @@
   "scripts": {
     "dev:docs": "pnpm --filter docs dev",
     "build": "rslib build && pnpm run copy-schemas",
-    "copy-schemas": "mkdir -p dist/schemas && cp src/schemas/*.json5 dist/schemas/",
+    "copy-schemas": "mkdir -p dist/schemas && cp src/schemas/*.json* dist/schemas/",
     "dev": "rslib build --watch",
     "test": "rstest",
     "mint:snapshot": "tsx src/cli.ts mint:snapshot"
