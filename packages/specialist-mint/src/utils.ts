@@ -110,6 +110,20 @@ export function writeJSON5(filePath: string, data: any): void {
 }
 
 /**
+ * Write a standard JSON file with proper formatting
+ */
+export function writeJSON(filePath: string, data: any): void {
+  const dirPath = dirname(filePath);
+
+  // Create directory if it doesn't exist
+  mkdirSync(dirPath, { recursive: true });
+
+  // Write with standard JSON formatting (2 space indentation)
+  const content = JSON.stringify(data, null, 2);
+  writeFileSync(filePath, content, 'utf-8');
+}
+
+/**
  * Validate a template against the template schema
  */
 export function validateTemplateSchema(template: any): { valid: boolean; errors?: string } {

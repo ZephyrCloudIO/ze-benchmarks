@@ -195,8 +195,39 @@ export interface SpecialistSnapshot extends SpecialistTemplate {
   };
 }
 
+export interface SnapshotMetadata {
+  snapshot_id: string;
+  snapshot_path: string;
+  template: {
+    name: string;
+    version: string;
+    path: string;
+    is_enriched: boolean;
+  };
+  benchmarks: {
+    included: boolean;
+    batch_id?: string;
+    run_count?: number;
+    models?: string[];
+    comparison?: {
+      baseline_avg: number;
+      specialist_avg: number;
+      improvement: number;
+      improvement_pct: number;
+    };
+  };
+  output: {
+    directory: string;
+    snapshot_file: string;
+    metadata_file: string;
+  };
+  timestamp: string;
+  minted_by: string;
+}
+
 export interface MintResult {
   snapshotId: string;
   outputPath: string;
   templateVersion: string;
+  metadata: SnapshotMetadata;
 }

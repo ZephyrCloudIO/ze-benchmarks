@@ -1,15 +1,17 @@
 import chalk from 'chalk';
-import { resolve, join } from 'path';
-import type { SpecialistTemplate, SpecialistSnapshot, MintResult, BenchmarkResults, BenchmarkRun, BenchmarkComparison, ModelComparison } from './types.js';
+import { resolve, join, basename } from 'path';
+import type { SpecialistTemplate, SpecialistSnapshot, MintResult, BenchmarkRun, BenchmarkComparison, ModelComparison } from './types.js';
 import {
   loadJSON5,
   writeJSON5,
+  writeJSON,
   validateTemplateSchema,
   validateSnapshotSchema,
   getNextSnapshotId
 } from './utils.js';
-import { loadBenchmarkResults, loadBenchmarkBatch } from './benchmark-loader.js';
+import { loadBenchmarkBatch } from './benchmark-loader.js';
 import { resolveTemplatePath } from './template-resolver.js';
+import { generateMetadata } from './metadata-generator.js';
 import { logger } from '@ze/logger';
 
 const log = logger.specialistMint;
@@ -23,12 +25,16 @@ export async function mintSnapshot(
   options?: {
     batchId?: string;
     workerUrl?: string;
+    skipBenchmarks?: boolean;
+    autoEnrich?: boolean;
   }
 ): Promise<MintResult> {
   log.debug(chalk.blue('📋 Step 1: Loading and validating template...'));
 
   // Resolve template path (automatically use enriched version if available)
-  const { path: resolvedTemplatePath, isEnriched } = resolveTemplatePath(templatePath);
+  const { path: resolvedTemplatePath, isEnriched } = await resolveTemplatePath(templatePath, {
+    autoEnrich: options?.autoEnrich || false
+  });
   const template: SpecialistTemplate = loadJSON5(resolvedTemplatePath);
 
   log.debug(chalk.gray(`   Template: ${template.name} v${template.version}`));
@@ -51,17 +57,17 @@ export async function mintSnapshot(
 
   let benchmarkRuns: BenchmarkRun[] | null = null;
 
-  if (options?.batchId) {
+  if (options?.skipBenchmarks) {
+    // Explicitly skip benchmarks
+    log.debug(chalk.yellow('   ⚠️  Skipping benchmarks (--skip-benchmarks flag)'));
+  } else if (options?.batchId) {
     // Batch mode: load all runs from the batch via Worker API
     log.debug(chalk.gray(`   Loading batch: ${options.batchId}`));
     benchmarkRuns = await loadBenchmarkBatch(options.batchId, options.workerUrl);
   } else {
-    // Legacy mode: load single most recent result via Worker API
-    log.debug(chalk.gray('   Loading most recent result (legacy mode)'));
-    const singleResult = await loadBenchmarkResults(options?.workerUrl);
-    if (singleResult) {
-      benchmarkRuns = [singleResult];
-    }
+    // No batch ID provided and not explicitly skipping - inform user
+    log.debug(chalk.yellow('   ⚠️  No batch ID provided, continuing without benchmarks'));
+    log.debug(chalk.gray('   Use --batch-id to include benchmarks, or --skip-benchmarks to suppress this warning'));
   }
 
   // Create snapshot by combining template and benchmark results
@@ -116,10 +122,29 @@ export async function mintSnapshot(
 
   log.debug(chalk.green('   ✓ Snapshot written successfully'));
 
+  // Generate and write metadata
+  log.debug(chalk.blue('\n📊 Step 7: Generating metadata...'));
+
+  const metadata = generateMetadata(snapshot, {
+    snapshotId,
+    snapshotPath: outputPath,
+    templatePath: resolvedTemplatePath,
+    isEnriched,
+    batchId: options?.batchId,
+    skipBenchmarks: options?.skipBenchmarks
+  });
+
+  const metadataPath = outputPath.replace(/\.json5$/, '.meta.json');
+  writeJSON(metadataPath, metadata);
+
+  log.debug(chalk.green('   ✓ Metadata written successfully'));
+  log.debug(chalk.gray(`   Metadata path: ${metadataPath}`));
+
   return {
     snapshotId,
     outputPath,
-    templateVersion: template.version
+    templateVersion: template.version,
+    metadata
   };
 }
 
