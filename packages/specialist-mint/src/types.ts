@@ -178,6 +178,15 @@ export interface SpecialistSnapshot extends SpecialistTemplate {
     };
     runs?: BenchmarkRun[];
     comparison?: BenchmarkComparison;
+    aggregated_scores?: {
+      total_runs: number;
+      avg_score: number;
+      min_score: number;
+      max_score: number;
+      std_dev: number;
+      by_suite: Record<string, { avg: number; count: number }>;
+      by_model: Record<string, { avg: number; count: number }>;
+    };
   };
   snapshot_metadata?: {
     created_at: string;

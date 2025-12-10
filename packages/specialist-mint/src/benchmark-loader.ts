@@ -7,8 +7,65 @@ import type {
 } from '@ze/worker-client';
 import type { BenchmarkRun } from './types.js';
 import { logger } from '@ze/logger';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 const log = logger.benchmarkLoader;
+
+/**
+ * Load benchmark runs from local cache (helper function)
+ */
+function loadFromCache(batchId: string): BenchmarkRun[] | null {
+  try {
+    // Look for cache file in current working directory
+    const cachePath = join(process.cwd(), '.benchmark-cache', `${batchId}.json`);
+
+    if (!existsSync(cachePath)) {
+      log.debug(`No cache file found at: ${cachePath}`);
+      return null;
+    }
+
+    log.debug(`Found cache file: ${cachePath}`);
+    const content = readFileSync(cachePath, 'utf-8');
+    const cache = JSON.parse(content);
+
+    if (!cache.runs || cache.runs.length === 0) {
+      log.debug('Cache file exists but contains no runs');
+      return null;
+    }
+
+    // Transform cached runs to BenchmarkRun format
+    const runs: BenchmarkRun[] = cache.runs.map((run: any) => ({
+      run_id: run.runId,
+      run_date: run.completedAt || run.startedAt,
+      batch_id: run.batchId,
+      suite: run.suite,
+      scenario: run.scenario,
+      tier: run.tier,
+      agent: run.agent,
+      model: run.model || '',
+      specialist_enabled: run.specialistEnabled || false,
+      overall_score: run.totalScore || 0,
+      telemetry: run.telemetry ? {
+        duration_ms: run.telemetry.durationMs || 0,
+        token_usage: {
+          prompt_tokens: run.telemetry.tokensIn || 0,
+          completion_tokens: run.telemetry.tokensOut || 0,
+          total_tokens: (run.telemetry.tokensIn || 0) + (run.telemetry.tokensOut || 0)
+        }
+      } : undefined
+    }));
+
+    log.info(`📁 Loaded ${runs.length} run(s) from cache file`);
+    log.debug(`   Cache created: ${cache.created}`);
+    log.debug(`   Cache updated: ${cache.updated}`);
+
+    return runs;
+  } catch (error) {
+    log.warn(`Failed to load from cache: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
 
 /**
  * Load all benchmark runs from a batch using Worker API
@@ -22,6 +79,16 @@ export async function loadBenchmarkBatch(
   workerUrl?: string
 ): Promise<BenchmarkRun[] | null> {
   try {
+    // STEP 1: Check for cached benchmarks first
+    const cached = loadFromCache(batchId);
+    if (cached) {
+      log.info(`✓ Loaded ${cached.length} benchmark run(s) from cache`);
+      return cached;
+    }
+
+    // STEP 2: Try Worker API (existing logic)
+    log.debug('No cache found, trying Worker API...');
+
     // Initialize Worker API client
     const client = new WorkerClient({
       workerUrl: workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL,
@@ -38,10 +105,20 @@ export async function loadBenchmarkBatch(
     }
 
     // Fetch batch with all runs
+    log.debug(`Fetching batch details for: ${batchId}`);
     const batch: BatchStatistics = await client.getBatchDetails(batchId);
+
+    log.debug(`Batch found: ${batch.batchId}`);
+    log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
+    log.debug(`Runs array length: ${batch.runs?.length || 0}`);
 
     if (!batch.runs || batch.runs.length === 0) {
       log.warn(`⚠️  No runs found for batch: ${batchId}`);
+      log.warn(`   Batch exists but has no associated runs`);
+      log.warn(`   This may indicate:`);
+      log.warn(`   - Batch is still processing`);
+      log.warn(`   - Runs failed to submit`);
+      log.warn(`   - Database query issue`);
       log.warn('   Continuing without benchmark results...');
       return null;
     }

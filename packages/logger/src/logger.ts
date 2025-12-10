@@ -215,6 +215,9 @@ export const logger = {
   /** Benchmark loader logging */
   benchmarkLoader: createLogger('benchmark-loader'),
 
+  /** Benchmark cache logging */
+  benchmarkCache: createLogger('benchmark-cache'),
+
   /** Specialist mint CLI logging */
   specialistMintCli: createLogger('specialist-mint-cli'),
 

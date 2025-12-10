@@ -212,6 +212,18 @@ function createBenchmarksSection(
         log.debug(chalk.gray(`   Improvement: ${sign}${comparison.improvement.toFixed(3)} (${sign}${comparison.improvement_pct?.toFixed(1)}%)`));
       }
     }
+
+    // Calculate aggregated scores
+    const aggregatedScores = calculateAggregatedScores(benchmarkRuns);
+    benchmarksSection.aggregated_scores = aggregatedScores;
+
+    // Log benchmark summary
+    log.debug(chalk.blue('\n📈 Benchmark Summary:'));
+    log.debug(chalk.gray(`   Total runs: ${benchmarkRuns.length}`));
+    log.debug(chalk.gray(`   Average score: ${aggregatedScores.avg_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Min score: ${aggregatedScores.min_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Max score: ${aggregatedScores.max_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Std deviation: ${aggregatedScores.std_dev.toFixed(3)}`));
   } else {
     // No benchmark results available - create a placeholder test suite
     log.debug(chalk.yellow('   ⚠️  No benchmark results found'));
@@ -303,4 +315,79 @@ function calculateComparison(
   });
 
   return comparison;
+}
+
+/**
+ * Calculate aggregated scores across all runs
+ */
+function calculateAggregatedScores(runs: BenchmarkRun[]) {
+  const scores = runs.map(r => r.overall_score);
+
+  return {
+    total_runs: runs.length,
+    avg_score: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+    min_score: Math.min(...scores),
+    max_score: Math.max(...scores),
+    std_dev: calculateStdDev(scores),
+    by_suite: groupScoresBySuite(runs),
+    by_model: groupScoresByModel(runs)
+  };
+}
+
+/**
+ * Calculate standard deviation of scores
+ */
+function calculateStdDev(scores: number[]): number {
+  const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+  const variance = scores.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / scores.length;
+  return Math.sqrt(variance);
+}
+
+/**
+ * Group scores by suite/scenario
+ */
+function groupScoresBySuite(runs: BenchmarkRun[]) {
+  const grouped = new Map<string, number[]>();
+
+  runs.forEach(run => {
+    const key = `${run.suite}/${run.scenario}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(run.overall_score);
+  });
+
+  const result: Record<string, { avg: number; count: number }> = {};
+  grouped.forEach((scores, key) => {
+    result[key] = {
+      avg: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+      count: scores.length
+    };
+  });
+
+  return result;
+}
+
+/**
+ * Group scores by model
+ */
+function groupScoresByModel(runs: BenchmarkRun[]) {
+  const grouped = new Map<string, number[]>();
+
+  runs.forEach(run => {
+    if (!grouped.has(run.model)) {
+      grouped.set(run.model, []);
+    }
+    grouped.get(run.model)!.push(run.overall_score);
+  });
+
+  const result: Record<string, { avg: number; count: number }> = {};
+  grouped.forEach((scores, model) => {
+    result[model] = {
+      avg: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+      count: scores.length
+    };
+  });
+
+  return result;
 }

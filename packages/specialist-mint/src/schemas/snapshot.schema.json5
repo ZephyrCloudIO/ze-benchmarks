@@ -636,6 +636,77 @@
               }
             }
           }
+        },
+        "aggregated_scores": {
+          "type": "object",
+          "description": "Aggregated statistics across all benchmark runs",
+          "properties": {
+            "total_runs": {
+              "type": "number",
+              "description": "Total number of benchmark runs"
+            },
+            "avg_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Average score across all runs"
+            },
+            "min_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum score across all runs"
+            },
+            "max_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Maximum score across all runs"
+            },
+            "std_dev": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Standard deviation of scores"
+            },
+            "by_suite": {
+              "type": "object",
+              "description": "Scores grouped by suite/scenario",
+              "patternProperties": {
+                "^.+$": {
+                  "type": "object",
+                  "properties": {
+                    "avg": {
+                      "type": "number",
+                      "description": "Average score for this suite"
+                    },
+                    "count": {
+                      "type": "number",
+                      "description": "Number of runs for this suite"
+                    }
+                  }
+                }
+              }
+            },
+            "by_model": {
+              "type": "object",
+              "description": "Scores grouped by model",
+              "patternProperties": {
+                "^.+$": {
+                  "type": "object",
+                  "properties": {
+                    "avg": {
+                      "type": "number",
+                      "description": "Average score for this model"
+                    },
+                    "count": {
+                      "type": "number",
+                      "description": "Number of runs for this model"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

@@ -13,6 +13,7 @@ import { createTitle } from '../lib/display.ts';
 import { executeWarmup } from '../domain/warmup.ts';
 import { createAgentAdapter } from '../domain/agent.ts';
 import { logger } from '@ze/logger';
+import { initBenchmarkCache, addRunToCache, type CachedBenchmarkRun } from '../lib/benchmark-cache.ts';
 
 const TABLE_WIDTH = 60;
 
@@ -58,6 +59,9 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	// Initialize batch tracking
 	const benchmarkLogger = BenchmarkLogger.getInstance();
 	const batchId = await benchmarkLogger.startBatch();
+
+	// Initialize benchmark cache for offline access
+	initBenchmarkCache(batchId);
 
 	// Calculate total combinations
 	const combinations: Array<{
@@ -127,7 +131,7 @@ export async function executeMultipleBenchmarksWithSpecialists(
 			async (combo, i) => {
 				const { suite, scenario, tier, specialist } = combo;
 				logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${specialist}`)}`);
-				await executeBenchmark(
+				const result = await executeBenchmark(
 					suite,
 					scenario,
 					tier,
@@ -139,13 +143,46 @@ export async function executeMultipleBenchmarksWithSpecialists(
 					true,       // skip warmup (already done)
 					true        // llmJudgeOnly
 				);
+
+				// Cache the benchmark result for offline access
+				if (result) {
+					try {
+						const cachedRun: CachedBenchmarkRun = {
+							runId: result.runId,
+							batchId: batchId,
+							suite,
+							scenario,
+							tier,
+							agent: 'auto-detect',
+							model: result.model || '',
+							status: result.status,
+							startedAt: result.startedAt,
+							completedAt: result.completedAt,
+							totalScore: result.totalScore,
+							weightedScore: result.weightedScore,
+							isSuccessful: result.isSuccessful,
+							specialistEnabled: result.specialistEnabled,
+							telemetry: result.telemetry ? {
+								toolCalls: result.telemetry.toolCalls,
+								tokensIn: result.telemetry.tokensIn,
+								tokensOut: result.telemetry.tokensOut,
+								costUsd: result.telemetry.costUsd,
+								durationMs: result.telemetry.durationMs
+							} : undefined,
+							evaluations: result.evaluations
+						};
+						addRunToCache(cachedRun);
+					} catch (error) {
+						logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+					}
+				}
 			}
 		);
 	} else {
 		for (let i = 0; i < combinations.length; i++) {
 			const { suite, scenario, tier, specialist } = combinations[i];
 			logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${specialist}`)}`);
-			await executeBenchmark(
+			const result = await executeBenchmark(
 				suite,
 				scenario,
 				tier,
@@ -157,6 +194,39 @@ export async function executeMultipleBenchmarksWithSpecialists(
 				true,       // skip warmup (already done)
 				true        // llmJudgeOnly
 			);
+
+			// Cache the benchmark result for offline access
+			if (result) {
+				try {
+					const cachedRun: CachedBenchmarkRun = {
+						runId: result.runId,
+						batchId: batchId,
+						suite,
+						scenario,
+						tier,
+						agent: 'auto-detect',
+						model: result.model || '',
+						status: result.status,
+						startedAt: result.startedAt,
+						completedAt: result.completedAt,
+						totalScore: result.totalScore,
+						weightedScore: result.weightedScore,
+						isSuccessful: result.isSuccessful,
+						specialistEnabled: result.specialistEnabled,
+						telemetry: result.telemetry ? {
+							toolCalls: result.telemetry.toolCalls,
+							tokensIn: result.telemetry.tokensIn,
+							tokensOut: result.telemetry.tokensOut,
+							costUsd: result.telemetry.costUsd,
+							durationMs: result.telemetry.durationMs
+						} : undefined,
+						evaluations: result.evaluations
+					};
+					addRunToCache(cachedRun);
+				} catch (error) {
+					logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+				}
+			}
 		}
 	}
 
@@ -299,12 +369,34 @@ export async function executeMultipleBenchmarksWithSpecialists(
 				const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
 				const templatePath = resolveSpecialistTemplatePath(specialist, root);
 
+				// Fetch benchmark runs BEFORE minting
+				logger.interactive.info(`\n📊 Loading benchmark results from batch ${batchId}...`);
+
+				const { mintSnapshot, loadBenchmarkBatch } = await import('@ze/specialist-mint');
+
+				const benchmarkRuns = await loadBenchmarkBatch(
+					batchId,
+					process.env.ZE_BENCHMARKS_WORKER_URL
+				);
+
+				if (!benchmarkRuns || benchmarkRuns.length === 0) {
+					logger.interactive.warn('⚠️  No benchmark runs found for this batch');
+					const shouldContinue = await confirm({
+						message: 'Continue minting without benchmarks?',
+						initialValue: false
+					});
+
+					if (isCancel(shouldContinue) || !shouldContinue) {
+						logger.interactive.info('Minting cancelled');
+						return;
+					}
+				}
+
 				logger.interactive.info(`\n🔨 Minting snapshot from batch ${batchId}...`);
 
-				const { mintSnapshot } = await import('@ze/specialist-mint');
-
+				// Pass runs directly instead of fetching again
 				const result = await mintSnapshot(templatePath, './snapshots', {
-					batchId: batchId,
+					benchmarkRuns: benchmarkRuns || undefined,
 					workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
 				});
 
@@ -337,12 +429,34 @@ export async function executeMultipleBenchmarksWithSpecialists(
 				const { resolveSpecialistTemplatePath } = await import('../domain/agent.ts');
 				const templatePath = resolveSpecialistTemplatePath(specialistChoice as string, root);
 
+				// Fetch benchmark runs BEFORE minting
+				logger.interactive.info(`\n📊 Loading benchmark results from batch ${batchId}...`);
+
+				const { mintSnapshot, loadBenchmarkBatch } = await import('@ze/specialist-mint');
+
+				const benchmarkRuns = await loadBenchmarkBatch(
+					batchId,
+					process.env.ZE_BENCHMARKS_WORKER_URL
+				);
+
+				if (!benchmarkRuns || benchmarkRuns.length === 0) {
+					logger.interactive.warn('⚠️  No benchmark runs found for this batch');
+					const shouldContinue = await confirm({
+						message: 'Continue minting without benchmarks?',
+						initialValue: false
+					});
+
+					if (isCancel(shouldContinue) || !shouldContinue) {
+						logger.interactive.info('Minting cancelled');
+						return;
+					}
+				}
+
 				logger.interactive.info(`\n🔨 Minting snapshot from batch ${batchId}...`);
 
-				const { mintSnapshot } = await import('@ze/specialist-mint');
-
+				// Pass runs directly instead of fetching again
 				const result = await mintSnapshot(templatePath, './snapshots', {
-					batchId: batchId,
+					benchmarkRuns: benchmarkRuns || undefined,
 					workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
 				});
 
@@ -372,6 +486,9 @@ export async function executeMultipleBenchmarks(
 	// Initialize batch tracking
 	const benchmarkLogger = BenchmarkLogger.getInstance();
 	const batchId = await benchmarkLogger.startBatch();
+
+	// Initialize benchmark cache for offline access
+	initBenchmarkCache(batchId);
 
 	// Calculate total combinations
 	const combinations: Array<{
@@ -472,7 +589,40 @@ export async function executeMultipleBenchmarks(
 			async (combo, i) => {
 				const { suite, scenario, tier, agent, model } = combo;
 				logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
-				await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
+				const result = await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
+
+				// Cache the benchmark result for offline access
+				if (result) {
+					try {
+						const cachedRun: CachedBenchmarkRun = {
+							runId: result.runId,
+							batchId: batchId,
+							suite,
+							scenario,
+							tier,
+							agent: agent || 'echo',
+							model: result.model || model || '',
+							status: result.status,
+							startedAt: result.startedAt,
+							completedAt: result.completedAt,
+							totalScore: result.totalScore,
+							weightedScore: result.weightedScore,
+							isSuccessful: result.isSuccessful,
+							specialistEnabled: result.specialistEnabled,
+							telemetry: result.telemetry ? {
+								toolCalls: result.telemetry.toolCalls,
+								tokensIn: result.telemetry.tokensIn,
+								tokensOut: result.telemetry.tokensOut,
+								costUsd: result.telemetry.costUsd,
+								durationMs: result.telemetry.durationMs
+							} : undefined,
+							evaluations: result.evaluations
+						};
+						addRunToCache(cachedRun);
+					} catch (error) {
+						logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+					}
+				}
 			}
 		);
 	} else {
@@ -482,7 +632,40 @@ export async function executeMultipleBenchmarks(
 
 			logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
 
-			await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
+			const result = await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
+
+			// Cache the benchmark result for offline access
+			if (result) {
+				try {
+					const cachedRun: CachedBenchmarkRun = {
+						runId: result.runId,
+						batchId: batchId,
+						suite,
+						scenario,
+						tier,
+						agent: agent || 'echo',
+						model: result.model || model || '',
+						status: result.status,
+						startedAt: result.startedAt,
+						completedAt: result.completedAt,
+						totalScore: result.totalScore,
+						weightedScore: result.weightedScore,
+						isSuccessful: result.isSuccessful,
+						specialistEnabled: result.specialistEnabled,
+						telemetry: result.telemetry ? {
+							toolCalls: result.telemetry.toolCalls,
+							tokensIn: result.telemetry.tokensIn,
+							tokensOut: result.telemetry.tokensOut,
+							costUsd: result.telemetry.costUsd,
+							durationMs: result.telemetry.durationMs
+						} : undefined,
+						evaluations: result.evaluations
+					};
+					addRunToCache(cachedRun);
+				} catch (error) {
+					logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+				}
+			}
 		}
 	}
 

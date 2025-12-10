@@ -48,6 +48,7 @@ import { executeBenchmark } from './execution/benchmark.ts';
 
 // Lib module imports
 import { formatStats, displayRunInfo } from './lib/display.ts';
+import { initBenchmarkCache, addRunToCache, type CachedBenchmarkRun } from './lib/benchmark-cache.ts';
 import { logger } from '@ze/logger';
 
 // ============================================================================
@@ -529,9 +530,12 @@ async function run() {
 
 	// Initialize batch tracking (same as interactive mode)
 	const benchmarkLogger = BenchmarkLogger.getInstance();
-	
+
 	// Always create new batch using proper format (batch-{timestamp}-{random})
 	const actualBatchId = await benchmarkLogger.startBatch();
+
+	// Initialize benchmark cache for offline access
+	initBenchmarkCache(actualBatchId);
 
 	if (iterations > 1 && !quiet) {
 		logger.cli.info(chalk.blue(`Running ${iterations} iterations with batch ID: ${actualBatchId}`));
@@ -548,7 +552,42 @@ async function run() {
 			logger.cli.info(chalk.cyan(`\n--- Iteration ${i + 1}/${iterations} ---`));
 		}
 
-		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+		const result = await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+
+		// Cache the benchmark result for offline access
+		if (result) {
+			try {
+				const cachedRun: CachedBenchmarkRun = {
+					runId: result.runId,
+					batchId: actualBatchId,
+					suite,
+					scenario,
+					tier,
+					agent: agent || (specialist ? 'auto-detect' : 'echo'),
+					model: result.model || model || '',
+					status: result.status,
+					startedAt: result.startedAt,
+					completedAt: result.completedAt,
+					totalScore: result.totalScore,
+					weightedScore: result.weightedScore,
+					isSuccessful: result.isSuccessful,
+					specialistEnabled: result.specialistEnabled,
+					telemetry: result.telemetry ? {
+						toolCalls: result.telemetry.toolCalls,
+						tokensIn: result.telemetry.tokensIn,
+						tokensOut: result.telemetry.tokensOut,
+						costUsd: result.telemetry.costUsd,
+						durationMs: result.telemetry.durationMs
+					} : undefined,
+					evaluations: result.evaluations
+				};
+
+				addRunToCache(cachedRun);
+				logger.cli.debug(`Cached benchmark run: ${result.runId}`);
+			} catch (error) {
+				logger.cli.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
 	}
 
 	// Complete batch with statistics
