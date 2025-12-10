@@ -345,37 +345,52 @@ function calculateComparison(
     }
   }
 
-  // Calculate per-model comparisons
-  const modelMap = new Map<string, { baseline?: BenchmarkRun; specialist?: BenchmarkRun }>();
+  // Calculate per-model comparisons with proper averaging
+  const modelMap = new Map<string, {
+    baselineScores: number[];
+    specialistScores: number[];
+  }>();
 
   baselineRuns.forEach(run => {
     if (!modelMap.has(run.model)) {
-      modelMap.set(run.model, {});
+      modelMap.set(run.model, { baselineScores: [], specialistScores: [] });
     }
-    modelMap.get(run.model)!.baseline = run;
+    modelMap.get(run.model)!.baselineScores.push(run.overall_score);
   });
 
   specialistRuns.forEach(run => {
     if (!modelMap.has(run.model)) {
-      modelMap.set(run.model, {});
+      modelMap.set(run.model, { baselineScores: [], specialistScores: [] });
     }
-    modelMap.get(run.model)!.specialist = run;
+    modelMap.get(run.model)!.specialistScores.push(run.overall_score);
   });
 
   comparison.models_compared = [];
 
-  // Convert map entries to array to avoid downlevelIteration requirement
-  Array.from(modelMap.entries()).forEach(([model, { baseline, specialist }]) => {
+  // Convert map entries to array and compute averages
+  Array.from(modelMap.entries()).forEach(([model, { baselineScores, specialistScores }]) => {
     const modelComparison: ModelComparison = {
       model,
-      baseline_score: baseline?.overall_score || 0
+      baseline_score: 0
     };
 
-    if (specialist) {
-      modelComparison.specialist_score = specialist.overall_score;
-      modelComparison.improvement = specialist.overall_score - (baseline?.overall_score || 0);
-      if (baseline && baseline.overall_score > 0) {
-        modelComparison.improvement_pct = (modelComparison.improvement / baseline.overall_score) * 100;
+    // Calculate baseline average if we have baseline runs
+    if (baselineScores.length > 0) {
+      modelComparison.baseline_score =
+        baselineScores.reduce((sum, s) => sum + s, 0) / baselineScores.length;
+    }
+
+    // Calculate specialist average and improvement if we have specialist runs
+    if (specialistScores.length > 0) {
+      const specialistAvg =
+        specialistScores.reduce((sum, s) => sum + s, 0) / specialistScores.length;
+
+      modelComparison.specialist_score = specialistAvg;
+      modelComparison.improvement = specialistAvg - modelComparison.baseline_score;
+
+      if (modelComparison.baseline_score > 0) {
+        modelComparison.improvement_pct =
+          (modelComparison.improvement / modelComparison.baseline_score) * 100;
       }
     }
 
@@ -403,11 +418,14 @@ function calculateAggregatedScores(runs: BenchmarkRun[]) {
 }
 
 /**
- * Calculate standard deviation of scores
+ * Calculate standard deviation of scores (sample standard deviation)
  */
 function calculateStdDev(scores: number[]): number {
+  if (scores.length <= 1) {
+    return 0;
+  }
   const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-  const variance = scores.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / scores.length;
+  const variance = scores.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / (scores.length - 1);
   return Math.sqrt(variance);
 }
 

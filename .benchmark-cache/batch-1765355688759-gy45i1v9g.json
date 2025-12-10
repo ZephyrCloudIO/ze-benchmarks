@@ -1,0 +1,44 @@
+{
+  "batchId": "batch-1765355688759-gy45i1v9g",
+  "runs": [
+    {
+      "runId": "1765355690605-sddmmj7gu",
+      "batchId": "batch-1765355688759-gy45i1v9g",
+      "suite": "next.js",
+      "scenario": "002-client-component",
+      "tier": "L1",
+      "agent": "auto-detect",
+      "model": "",
+      "status": "completed",
+      "startedAt": "2025-12-10T08:34:50.605Z",
+      "completedAt": "2025-12-10T08:37:14.716Z",
+      "totalScore": 0.23502304147465436,
+      "weightedScore": 8.2258,
+      "isSuccessful": true,
+      "specialistEnabled": true,
+      "telemetry": {
+        "toolCalls": 22,
+        "tokensIn": 213189,
+        "tokensOut": 2402,
+        "costUsd": 0.675597,
+        "durationMs": 133316
+      },
+      "evaluations": [
+        {
+          "evaluatorName": "HeuristicChecksEvaluator",
+          "score": 0.6451612903225806,
+          "maxScore": 1,
+          "details": "Passed: 5/9 checks\n\n✓ install_succeeds (weight: 2.0) - Dependencies install successfully\n✗ build_succeeds (weight: 3.0) - Production build completes without errors\n  Error: sh: next: command not found\n✗ lint_passes (weight: 1.0) - Code meets linting standards\n  Error: sh: next: command not found\n✓ has_use_client_directive (weight: 3.0) - Client component has 'use client' directive\n✓ uses_state_hook (weight: 2.0) - Uses useState for state management\n✓ has_event_handlers (weight: 1.5) - Event handlers implemented for interactivity\n✗ has_effect_hook (weight: 1.0) - Uses useEffect for side effects (optional)\n  Error: Pattern not found in any matching files\n✓ imports_react_hooks (weight: 1.5) - Imports React hooks properly\n✗ has_typescript_types (weight: 0.5) - TypeScript types defined\n  Error: Pattern not found in any matching files"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 1,
+          "maxScore": 1,
+          "details": "{\n  \"scores\": [\n    {\n      \"category\": \"client_component_correctness\",\n      \"score\": 5,\n      \"reasoning\": \"The implementation correctly uses the 'use client' directive at the top of the file, ensuring that the component is recognized as a client-side component. The use of the useState hook is appropriate and correctly initializes the count state.\"\n    },\n    {\n      \"category\": \"state_management_implementation\",\n      \"score\": 5,\n      \"reasoning\": \"State management is cleanly handled with the useState hook. The event handler for the button click is properly defined, and the state updates reactively, ensuring that the UI reflects the current count accurately.\"\n    },\n    {\n      \"category\": \"interactivity_ux\",\n      \"score\": 5,\n      \"reasoning\": \"User interactions are smooth, with the increment button functioning as expected. The display updates immediately upon clicking the button, providing a responsive user experience.\"\n    },\n    {\n      \"category\": \"code_quality_structure\",\n      \"score\": 5,\n      \"reasoning\": \"The code is well-structured and clean. TypeScript types are properly applied, and the component organization follows best practices. The separation of the server and client components is clear and logical.\"\n    },\n    {\n      \"category\": \"overall_implementation\",\n      \"score\": 5,\n      \"reasoning\": \"The implementation is complete and reliable, adhering to React and Next.js patterns. It is production-ready, demonstrating a solid understanding of client and server component architecture in Next.js.\"\n    }\n  ],\n  \"overall_assessment\": \"The agent's implementation of the client component is exemplary, showcasing best practices in Next.js and React. All aspects of the task were executed flawlessly, resulting in a robust and user-friendly component.\",\n  \"normalized_score\": 1,\n  \"input_tokens\": 1667\n}"
+        }
+      ]
+    }
+  ],
+  "created": "2025-12-10T08:34:50.592Z",
+  "updated": "2025-12-10T08:37:14.717Z"
+}

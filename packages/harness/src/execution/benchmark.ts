@@ -294,6 +294,16 @@ export async function executeBenchmark(
 				logger.execution.debug(`  📋 Using model: ${chalk.cyan(model)}`);
 			}
 
+			// CRITICAL: Capture the resolved model and update runData
+			// This ensures auto-detected models from specialists are stored in the database
+			if ('getModel' in agentAdapter) {
+				const resolvedModel = (agentAdapter as any).getModel();
+				if (resolvedModel) {
+					runData.model = resolvedModel;
+					logger.execution.debug(`  ✓ Captured resolved model: ${resolvedModel}`);
+				}
+			}
+
 			// Agent info is shown in progress bar
 
 			// Load oracle if available

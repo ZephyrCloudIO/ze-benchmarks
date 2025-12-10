@@ -555,6 +555,128 @@
                 "maximum": 1,
                 "description": "Aggregated score across all evaluators (0-1)"
               },
+              "evaluations": {
+                "type": "object",
+                "description": "Detailed evaluation results from benchmark run",
+                "properties": {
+                  "heuristic_checks": {
+                    "type": "object",
+                    "description": "Results from heuristic checks evaluator",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Normalized heuristic checks score (0-1)"
+                      },
+                      "max_score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Maximum possible score (always 1.0)"
+                      },
+                      "passed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Number of checks that passed"
+                      },
+                      "total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of checks run"
+                      },
+                      "checks": {
+                        "type": "array",
+                        "description": "Individual check results",
+                        "items": {
+                          "type": "object",
+                          "required": ["name", "passed", "weight"],
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Check identifier (e.g., 'install_succeeds')"
+                            },
+                            "passed": {
+                              "type": "boolean",
+                              "description": "Whether this check passed"
+                            },
+                            "weight": {
+                              "type": "number",
+                              "description": "Weight of this check in overall score"
+                            },
+                            "description": {
+                              "type": "string",
+                              "description": "Human-readable description of the check"
+                            },
+                            "error": {
+                              "type": "string",
+                              "description": "Error message if check failed"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "required": ["score", "max_score", "passed", "total", "checks"]
+                  },
+                  "llm_judge": {
+                    "type": "object",
+                    "description": "Results from LLM judge evaluator",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Normalized LLM judge score (0-1)"
+                      },
+                      "max_score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Maximum possible score (always 1.0)"
+                      },
+                      "normalized_score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Normalized score (same as score)"
+                      },
+                      "categories": {
+                        "type": "array",
+                        "description": "Per-category scores with LLM reasoning",
+                        "items": {
+                          "type": "object",
+                          "required": ["category", "score", "reasoning"],
+                          "properties": {
+                            "category": {
+                              "type": "string",
+                              "description": "Category identifier (e.g., 'client_component_correctness')"
+                            },
+                            "score": {
+                              "type": "number",
+                              "minimum": 1,
+                              "maximum": 5,
+                              "description": "Raw score on 1-5 scale"
+                            },
+                            "reasoning": {
+                              "type": "string",
+                              "description": "LLM's explanation for this score"
+                            }
+                          }
+                        }
+                      },
+                      "overall_assessment": {
+                        "type": "string",
+                        "description": "LLM's overall assessment of the implementation"
+                      },
+                      "input_tokens": {
+                        "type": "integer",
+                        "description": "Number of tokens used for LLM evaluation"
+                      }
+                    },
+                    "required": ["score", "max_score", "normalized_score", "categories"]
+                  }
+                }
+              },
               "telemetry": {
                 "type": "object",
                 "description": "Telemetry data for this run",

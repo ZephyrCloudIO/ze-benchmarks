@@ -13,7 +13,6 @@ import { createTitle } from '../lib/display.ts';
 import { executeWarmup } from '../domain/warmup.ts';
 import { createAgentAdapter } from '../domain/agent.ts';
 import { logger } from '@ze/logger';
-import { initBenchmarkCache, addRunToCache, type CachedBenchmarkRun } from '../lib/benchmark-cache.ts';
 
 const TABLE_WIDTH = 60;
 
@@ -60,8 +59,6 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	const benchmarkLogger = BenchmarkLogger.getInstance();
 	const batchId = await benchmarkLogger.startBatch();
 
-	// Initialize benchmark cache for offline access
-	initBenchmarkCache(batchId);
 
 	// Calculate total combinations
 	const combinations: Array<{
@@ -144,38 +141,6 @@ export async function executeMultipleBenchmarksWithSpecialists(
 					true        // llmJudgeOnly
 				);
 
-				// Cache the benchmark result for offline access
-				if (result) {
-					try {
-						const cachedRun: CachedBenchmarkRun = {
-							runId: result.runId,
-							batchId: batchId,
-							suite,
-							scenario,
-							tier,
-							agent: 'auto-detect',
-							model: result.model || '',
-							status: result.status,
-							startedAt: result.startedAt,
-							completedAt: result.completedAt,
-							totalScore: result.totalScore,
-							weightedScore: result.weightedScore,
-							isSuccessful: result.isSuccessful,
-							specialistEnabled: result.specialistEnabled,
-							telemetry: result.telemetry ? {
-								toolCalls: result.telemetry.toolCalls,
-								tokensIn: result.telemetry.tokensIn,
-								tokensOut: result.telemetry.tokensOut,
-								costUsd: result.telemetry.costUsd,
-								durationMs: result.telemetry.durationMs
-							} : undefined,
-							evaluations: result.evaluations
-						};
-						addRunToCache(cachedRun);
-					} catch (error) {
-						logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
-					}
-				}
 			}
 		);
 	} else {
@@ -196,37 +161,6 @@ export async function executeMultipleBenchmarksWithSpecialists(
 			);
 
 			// Cache the benchmark result for offline access
-			if (result) {
-				try {
-					const cachedRun: CachedBenchmarkRun = {
-						runId: result.runId,
-						batchId: batchId,
-						suite,
-						scenario,
-						tier,
-						agent: 'auto-detect',
-						model: result.model || '',
-						status: result.status,
-						startedAt: result.startedAt,
-						completedAt: result.completedAt,
-						totalScore: result.totalScore,
-						weightedScore: result.weightedScore,
-						isSuccessful: result.isSuccessful,
-						specialistEnabled: result.specialistEnabled,
-						telemetry: result.telemetry ? {
-							toolCalls: result.telemetry.toolCalls,
-							tokensIn: result.telemetry.tokensIn,
-							tokensOut: result.telemetry.tokensOut,
-							costUsd: result.telemetry.costUsd,
-							durationMs: result.telemetry.durationMs
-						} : undefined,
-						evaluations: result.evaluations
-					};
-					addRunToCache(cachedRun);
-				} catch (error) {
-					logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
-				}
-			}
 		}
 	}
 
@@ -235,22 +169,23 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	const duration = endTime - startTime;
 	const batchStats = await benchmarkLogger.getBatchDetails(batchId);
 
-	let successfulRuns = 0;
-	let totalScore = 0;
-	let totalWeightedScore = 0;
+	let computedStats = {
+		totalRuns: combinations.length,
+		successfulRuns: 0,
+		avgScore: 0,
+		avgWeightedScore: 0
+	};
 
 	if (batchStats) {
-		successfulRuns = await benchmarkLogger.getBatchSuccessfulRunsCount(batchId);
-		const scoreStats = await benchmarkLogger.getBatchScoreStats(batchId);
-		totalScore = scoreStats.avgScore || 0;
-		totalWeightedScore = scoreStats.avgWeightedScore || 0;
+		// Compute stats from actual runs instead of using stored values
+		computedStats = await benchmarkLogger.computeBatchStats(batchId);
 	}
 
 	await benchmarkLogger.completeBatch(batchId, {
-		totalRuns: combinations.length,
-		successfulRuns,
-		avgScore: totalScore,
-		avgWeightedScore: totalWeightedScore,
+		totalRuns: computedStats.totalRuns,
+		successfulRuns: computedStats.successfulRuns,
+		avgScore: computedStats.avgScore,
+		avgWeightedScore: computedStats.avgWeightedScore,
 		metadata: {
 			suites,
 			scenarios,
@@ -269,14 +204,14 @@ export async function executeMultipleBenchmarksWithSpecialists(
 	logger.interactive.raw(`│ ${chalk.bold('Batch ID:')} ${chalk.dim(batchId.substring(0, 8))}...`);
 	logger.interactive.raw(`│ ${chalk.bold('Mode:')} ${chalk.cyan('Specialists')}`);
 	logger.interactive.raw(`│ ${chalk.bold('Total Runs:')} ${combinations.length}`);
-	logger.interactive.raw(`│ ${chalk.bold('Completed:')} ${successfulRuns} (${combinations.length > 0 ? ((successfulRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
+	logger.interactive.raw(`│ ${chalk.bold('Completed:')} ${computedStats.successfulRuns} (${combinations.length > 0 ? ((computedStats.successfulRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
 
-	const failedRuns = combinations.length - successfulRuns;
+	const failedRuns = combinations.length - computedStats.successfulRuns;
 	if (failedRuns > 0) {
 		logger.interactive.raw(`│ ${chalk.bold('Failed:')} ${chalk.red(failedRuns)} (${combinations.length > 0 ? ((failedRuns / combinations.length) * 100).toFixed(1) : 0}%)`);
 	}
 
-	logger.interactive.raw(`│ ${chalk.bold('Avg Score:')} ${combinations.length > 0 ? (totalWeightedScore / combinations.length).toFixed(4) : '0.0000'} / 10.0`);
+	logger.interactive.raw(`│ ${chalk.bold('Avg Score:')} ${computedStats.avgWeightedScore.toFixed(4)} / 10.0`);
 	logger.interactive.raw(`│ ${chalk.bold('Duration:')} ${(duration / 1000).toFixed(2)}s`);
 	logger.interactive.raw(`└${'─'.repeat(TABLE_WIDTH)}┘`);
 
@@ -487,8 +422,6 @@ export async function executeMultipleBenchmarks(
 	const benchmarkLogger = BenchmarkLogger.getInstance();
 	const batchId = await benchmarkLogger.startBatch();
 
-	// Initialize benchmark cache for offline access
-	initBenchmarkCache(batchId);
 
 	// Calculate total combinations
 	const combinations: Array<{
@@ -591,38 +524,6 @@ export async function executeMultipleBenchmarks(
 				logger.interactive.raw(`${chalk.bold.cyan(`[${i + 1}/${combinations.length}]`)} ${suite}/${scenario} ${chalk.gray(`(${tier}) ${agent}${model ? ` [${model}]` : ''}`)}`);
 				const result = await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
 
-				// Cache the benchmark result for offline access
-				if (result) {
-					try {
-						const cachedRun: CachedBenchmarkRun = {
-							runId: result.runId,
-							batchId: batchId,
-							suite,
-							scenario,
-							tier,
-							agent: agent || 'echo',
-							model: result.model || model || '',
-							status: result.status,
-							startedAt: result.startedAt,
-							completedAt: result.completedAt,
-							totalScore: result.totalScore,
-							weightedScore: result.weightedScore,
-							isSuccessful: result.isSuccessful,
-							specialistEnabled: result.specialistEnabled,
-							telemetry: result.telemetry ? {
-								toolCalls: result.telemetry.toolCalls,
-								tokensIn: result.telemetry.tokensIn,
-								tokensOut: result.telemetry.tokensOut,
-								costUsd: result.telemetry.costUsd,
-								durationMs: result.telemetry.durationMs
-							} : undefined,
-							evaluations: result.evaluations
-						};
-						addRunToCache(cachedRun);
-					} catch (error) {
-						logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
-					}
-				}
 			}
 		);
 	} else {
@@ -635,37 +536,6 @@ export async function executeMultipleBenchmarks(
 			const result = await executeBenchmark(suite, scenario, tier, agent, model, batchId, true, undefined, true, true); // quiet mode, skip warmup, llmJudgeOnly
 
 			// Cache the benchmark result for offline access
-			if (result) {
-				try {
-					const cachedRun: CachedBenchmarkRun = {
-						runId: result.runId,
-						batchId: batchId,
-						suite,
-						scenario,
-						tier,
-						agent: agent || 'echo',
-						model: result.model || model || '',
-						status: result.status,
-						startedAt: result.startedAt,
-						completedAt: result.completedAt,
-						totalScore: result.totalScore,
-						weightedScore: result.weightedScore,
-						isSuccessful: result.isSuccessful,
-						specialistEnabled: result.specialistEnabled,
-						telemetry: result.telemetry ? {
-							toolCalls: result.telemetry.toolCalls,
-							tokensIn: result.telemetry.tokensIn,
-							tokensOut: result.telemetry.tokensOut,
-							costUsd: result.telemetry.costUsd,
-							durationMs: result.telemetry.durationMs
-						} : undefined,
-						evaluations: result.evaluations
-					};
-					addRunToCache(cachedRun);
-				} catch (error) {
-					logger.interactive.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
-				}
-			}
 		}
 	}
 

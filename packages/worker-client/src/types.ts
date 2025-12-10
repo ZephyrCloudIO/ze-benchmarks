@@ -16,6 +16,8 @@ export interface BenchmarkRun {
   isSuccessful?: boolean;
   successMetric?: number;
   specialistEnabled?: boolean;
+  specialistName?: string;
+  specialistVersion?: string;
   metadata?: Record<string, any>;
 }
 

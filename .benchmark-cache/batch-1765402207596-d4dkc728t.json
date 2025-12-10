@@ -1,0 +1,44 @@
+{
+  "batchId": "batch-1765402207596-d4dkc728t",
+  "runs": [
+    {
+      "runId": "1765402208521-hqqpthmx3",
+      "batchId": "batch-1765402207596-d4dkc728t",
+      "suite": "next.js",
+      "scenario": "002-client-component",
+      "tier": "L1",
+      "agent": "auto-detect",
+      "model": "",
+      "status": "completed",
+      "startedAt": "2025-12-10T21:30:08.521Z",
+      "completedAt": "2025-12-10T21:30:58.158Z",
+      "totalScore": 0.2207373271889401,
+      "weightedScore": 7.7258,
+      "isSuccessful": true,
+      "specialistEnabled": true,
+      "telemetry": {
+        "toolCalls": 3,
+        "tokensIn": 6574,
+        "tokensOut": 628,
+        "costUsd": 0.029142,
+        "durationMs": 38740
+      },
+      "evaluations": [
+        {
+          "evaluatorName": "HeuristicChecksEvaluator",
+          "score": 0.6451612903225806,
+          "maxScore": 1,
+          "details": "Passed: 5/9 checks\n\n✓ install_succeeds (weight: 2.0) - Dependencies install successfully\n✗ build_succeeds (weight: 3.0) - Production build completes without errors\n  Error: sh: next: command not found\n✗ lint_passes (weight: 1.0) - Code meets linting standards\n  Error: sh: next: command not found\n✓ has_use_client_directive (weight: 3.0) - Client component has 'use client' directive\n✓ uses_state_hook (weight: 2.0) - Uses useState for state management\n✓ has_event_handlers (weight: 1.5) - Event handlers implemented for interactivity\n✗ has_effect_hook (weight: 1.0) - Uses useEffect for side effects (optional)\n  Error: Pattern not found in any matching files\n✓ imports_react_hooks (weight: 1.5) - Imports React hooks properly\n✗ has_typescript_types (weight: 0.5) - TypeScript types defined\n  Error: Pattern not found in any matching files"
+        },
+        {
+          "evaluatorName": "LLMJudgeEvaluator",
+          "score": 0.9,
+          "maxScore": 1,
+          "details": "{\n  \"scores\": [\n    {\n      \"category\": \"client_component_correctness\",\n      \"score\": 5,\n      \"reasoning\": \"The component correctly uses the 'use client' directive, ensuring it is recognized as a client component. The useState hook is properly implemented to manage the count state, which is initialized to 0. There are no issues with the component's directive or hooks.\"\n    },\n    {\n      \"category\": \"state_management_implementation\",\n      \"score\": 5,\n      \"reasoning\": \"The state management is clean and effective. The useState hook is utilized correctly, and the increment functionality is straightforward and reactive. There are no signs of broken state logic, and the event handler for incrementing the count is appropriately implemented.\"\n    },\n    {\n      \"category\": \"interactivity_ux\",\n      \"score\": 5,\n      \"reasoning\": \"User interactions are smooth, with the increment button functioning as expected. The display updates reactively to user actions, providing a responsive experience. There are no issues with form handling or responsiveness.\"\n    },\n    {\n      \"category\": \"code_quality_structure\",\n      \"score\": 4,\n      \"reasoning\": \"The code is generally clean and well-structured, following TypeScript conventions. However, there could be minor improvements in terms of comments or documentation within the code to enhance readability and maintainability.\"\n    },\n    {\n      \"category\": \"overall_implementation\",\n      \"score\": 4,\n      \"reasoning\": \"The implementation is complete and follows React/Next.js patterns effectively. However, the deletion of the README.md file could be seen as a negative, as it may impact documentation and understanding of the project. Overall, it is reliable but could benefit from additional context.\"\n    }\n  ],\n  \"overall_assessment\": \"The agent's implementation of the client component is strong, demonstrating correct usage of React hooks and state management. The interactivity is smooth, and the code quality is high, though there is room for improvement in documentation. The overall implementation is solid but slightly hindered by the removal of the README file, which could affect project clarity.\",\n  \"normalized_score\": 0.9,\n  \"input_tokens\": 1213\n}"
+        }
+      ]
+    }
+  ],
+  "created": "2025-12-10T21:30:08.508Z",
+  "updated": "2025-12-10T21:30:58.160Z"
+}
