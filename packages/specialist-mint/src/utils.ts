@@ -1,58 +1,10 @@
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'fs';
-import { join, dirname, resolve, isAbsolute } from 'path';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
+import { join, dirname, resolve } from 'path';
 import JSON5 from 'json5';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import type { SpecialistTemplate, SpecialistSnapshot } from './types.js';
 import { fileURLToPath } from 'url';
-
-/**
- * Find the workspace root by looking for pnpm-workspace.yaml
- * Starts from current directory and walks up the tree
- */
-export function findWorkspaceRoot(startDir: string = process.cwd()): string | null {
-  let currentDir = startDir;
-
-  while (true) {
-    // Check for pnpm-workspace.yaml
-    const workspaceFile = join(currentDir, 'pnpm-workspace.yaml');
-    if (existsSync(workspaceFile)) {
-      return currentDir;
-    }
-
-    // Check if we've reached the root
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      return null; // Reached filesystem root without finding workspace
-    }
-
-    currentDir = parentDir;
-  }
-}
-
-/**
- * Resolve a path that may be relative to workspace root or absolute
- * If path is absolute, return as-is
- * If path is relative and workspace root is found, resolve relative to workspace root
- * Otherwise resolve relative to CWD
- */
-export function resolveWorkspacePath(inputPath: string): string {
-  // If already absolute, return as-is
-  if (isAbsolute(inputPath)) {
-    return inputPath;
-  }
-
-  // Try to find workspace root
-  const workspaceRoot = findWorkspaceRoot();
-
-  if (workspaceRoot) {
-    // Resolve relative to workspace root
-    return resolve(workspaceRoot, inputPath);
-  }
-
-  // Fallback to CWD
-  return resolve(inputPath);
-}
 
 // Initialize AJV with JSON Schema draft-07 support
 const ajv = new Ajv({

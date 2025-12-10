@@ -22,7 +22,6 @@ import { fetchDocumentation } from './doc-fetcher.js';
 import { resolve, dirname, basename, join } from 'path';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
 import type { OpenAI } from 'openai';
-import { getEnrichedTemplatePath as getEnrichedTemplatePathBase } from './template-resolver.js';
 
 /**
  * Documentation entry type

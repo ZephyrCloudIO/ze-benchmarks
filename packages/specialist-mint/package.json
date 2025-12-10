@@ -19,11 +19,10 @@
   ],
   "scripts": {
     "dev:docs": "pnpm --filter docs dev",
-    "build": "rslib build && npm run copy-schemas",
+    "build": "rslib build && pnpm run copy-schemas",
     "copy-schemas": "mkdir -p dist/schemas && cp src/schemas/*.json5 dist/schemas/",
     "dev": "rslib build --watch",
     "test": "rstest",
-    "validate-schemas": "tsx src/validate-schemas.ts",
     "mint:snapshot": "tsx src/cli.ts mint:snapshot"
   },
   "dependencies": {

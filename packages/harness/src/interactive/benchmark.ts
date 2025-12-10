@@ -281,6 +281,11 @@ export async function executeMultipleBenchmarksWithSpecialists(
 			logger.interactive.warn('\n💡 Tip: Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env');
 		}
 	}
+
+	// Show tip for minting snapshot
+	logger.interactive.info(chalk.cyan(`\n💡 To mint snapshot from this batch:`));
+	logger.interactive.info(chalk.gray(`   pnpm bench --mint-snapshot <template-path>`));
+	logger.interactive.info(chalk.gray(`   Batch ID: ${batchId}`));
 }
 
 export async function executeMultipleBenchmarks(

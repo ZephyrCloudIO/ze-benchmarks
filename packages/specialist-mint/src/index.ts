@@ -3,9 +3,9 @@ export { mintSnapshot } from './mint.js';
 export type {
   SpecialistTemplate,
   SpecialistSnapshot,
-  BenchmarkResults,
   MintResult,
-  SnapshotMetadata
+  SnapshotMetadata,
+  BenchmarkRun
 } from './types.js';
 export {
   loadJSON5,

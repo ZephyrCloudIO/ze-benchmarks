@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { resolve, join, basename } from 'path';
+import { resolve, join } from 'path';
 import type { SpecialistTemplate, SpecialistSnapshot, MintResult, BenchmarkRun, BenchmarkComparison, ModelComparison } from './types.js';
 import {
   loadJSON5,

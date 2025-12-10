@@ -5,7 +5,7 @@ import type {
   EvaluationResult as WorkerEvaluation,
   RunTelemetry as WorkerTelemetry
 } from '@ze/worker-client';
-import type { BenchmarkRun, BenchmarkResults } from './types.js';
+import type { BenchmarkRun } from './types.js';
 import { logger } from '@ze/logger';
 
 const log = logger.benchmarkLoader;

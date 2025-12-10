@@ -438,7 +438,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, mintSnapshot, snapshotOutput, iterations } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -620,6 +620,40 @@ async function run() {
 			logger.cli.error(`   ${error instanceof Error ? error.message : String(error)}`);
 			if (!quiet) {
 				logger.cli.warn('\n💡 Tip: Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env');
+			}
+			process.exit(1);
+		}
+	}
+
+	// After benchmarks complete, mint snapshot if requested
+	if (mintSnapshot) {
+		if (!quiet) {
+			logger.cli.info(chalk.blue(`\n🔨 Minting snapshot from batch ${actualBatchId}...`));
+		}
+
+		try {
+			const { mintSnapshot: mintSnapshotFunc } = await import('@ze/specialist-mint');
+
+			const result = await mintSnapshotFunc(mintSnapshot, snapshotOutput, {
+				batchId: actualBatchId,
+				workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
+			});
+
+			if (!quiet) {
+				logger.cli.success('\n✅ Snapshot minted successfully!');
+				logger.cli.debug(`   Snapshot ID: ${result.snapshotId}`);
+				logger.cli.debug(`   Output path: ${result.outputPath}`);
+				logger.cli.debug(`   Template version: ${result.templateVersion}`);
+				if (result.metadata?.benchmarks?.comparison) {
+					const comp = result.metadata.benchmarks.comparison;
+					logger.cli.debug(`   Improvement: ${comp.improvement >= 0 ? '+' : ''}${comp.improvement.toFixed(3)} (${comp.improvement_pct.toFixed(1)}%)`);
+				}
+			}
+		} catch (error) {
+			logger.cli.error(chalk.red('\n❌ Error minting snapshot:'));
+			logger.cli.error(`   ${error instanceof Error ? error.message : String(error)}`);
+			if (!quiet) {
+				logger.cli.warn('\n💡 Tip: Make sure the template path is correct and Worker API is accessible');
 			}
 			process.exit(1);
 		}

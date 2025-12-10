@@ -168,9 +168,6 @@ export interface BenchmarkComparison {
   models_compared?: ModelComparison[];
 }
 
-// Kept for backward compatibility
-export interface BenchmarkResults extends BenchmarkRun {}
-
 export interface SpecialistSnapshot extends SpecialistTemplate {
   benchmarks: {
     test_suites: Array<{

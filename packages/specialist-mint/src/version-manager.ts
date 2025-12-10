@@ -25,26 +25,6 @@ export function bumpVersion(
 }
 
 /**
- * Compare two semantic version strings
- * @param v1 - First version
- * @param v2 - Second version
- * @returns -1 if v1 < v2, 0 if v1 === v2, 1 if v1 > v2
- */
-export function compareVersions(v1: string, v2: string): number {
-  return semver.compare(v1, v2);
-}
-
-/**
- * Check if a version satisfies a required version range
- * @param current - Current version
- * @param required - Required version or range
- * @returns true if compatible, false otherwise
- */
-export function isCompatibleVersion(current: string, required: string): boolean {
-  return semver.satisfies(current, required);
-}
-
-/**
  * Update version metadata with a new changelog entry
  * @param currentMetadata - Current version metadata (or undefined for first version)
  * @param update - Version update information
@@ -104,62 +84,4 @@ export function updateVersionMetadata(
 
   log.debug(`[version-manager] Version metadata updated (changelog entries: ${updatedMetadata.changelog.length})`);
   return updatedMetadata;
-}
-
-/**
- * Create initial version metadata for a template
- * @param version - Initial version
- * @param description - Description of initial version
- * @returns Initial version metadata
- */
-export function createInitialVersionMetadata(
-  version: string,
-  description: string = 'Initial version'
-): VersionMetadata {
-  log.debug(`[version-manager] Creating initial version metadata for v${version}`);
-  const now = new Date().toISOString();
-
-  return {
-    changelog: [
-      {
-        version,
-        date: now,
-        type: 'patch',
-        changes: [
-          {
-            category: 'other',
-            description,
-            breaking: false
-          }
-        ],
-        author: '@ze/specialist-mint'
-      }
-    ],
-    breaking_changes: [],
-    deprecated: false,
-    created_at: now,
-    updated_at: now
-  };
-}
-
-/**
- * Extract breaking changes from version metadata
- * @param metadata - Version metadata
- * @returns Array of breaking changes
- */
-export function getBreakingChanges(metadata: VersionMetadata): VersionChange[] {
-  return metadata.changelog.filter(change =>
-    change.changes.some(c => c.breaking === true)
-  );
-}
-
-/**
- * Check if a version has breaking changes
- * @param metadata - Version metadata
- * @param version - Version to check
- * @returns true if version has breaking changes
- */
-export function hasBreakingChanges(metadata: VersionMetadata, version: string): boolean {
-  const versionEntry = metadata.changelog.find(c => c.version === version);
-  return versionEntry?.changes.some(c => c.breaking === true) || false;
 }

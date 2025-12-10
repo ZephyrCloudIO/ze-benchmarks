@@ -276,6 +276,9 @@ importers:
       '@ze/logger':
         specifier: workspace:*
         version: link:../logger
+      '@ze/specialist-mint':
+        specifier: workspace:*
+        version: link:../specialist-mint
       '@ze/worker-client':
         specifier: workspace:*
         version: link:../worker-client
