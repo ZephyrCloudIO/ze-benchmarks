@@ -432,6 +432,70 @@ export class BenchmarkLogger {
   }
 
   /**
+   * Compute batch statistics by fetching all runs and calculating aggregates
+   * This replaces the old approach of using pre-stored values
+   */
+  async computeBatchStats(batchId: string): Promise<{
+    totalRuns: number;
+    successfulRuns: number;
+    avgScore: number;
+    avgWeightedScore: number;
+  }> {
+    try {
+      // Fetch batch details which includes all runs
+      const details = await this.getBatchDetails(batchId);
+
+      if (!details.runs || details.runs.length === 0) {
+        BenchmarkLogger.log.warn(`Batch ${batchId} has no runs yet`);
+        return {
+          totalRuns: 0,
+          successfulRuns: 0,
+          avgScore: 0,
+          avgWeightedScore: 0
+        };
+      }
+
+      const runs = details.runs;
+      const totalRuns = runs.length;
+
+      // Count successful runs
+      const successfulRuns = runs.filter(r => r.isSuccessful === true).length;
+
+      // Calculate average scores (only from completed runs)
+      const completedRuns = runs.filter(r => r.status === 'completed');
+
+      let avgScore = 0;
+      let avgWeightedScore = 0;
+
+      if (completedRuns.length > 0) {
+        // Sum up total scores
+        const totalScoreSum = completedRuns.reduce((sum, r) => {
+          return sum + (r.totalScore || 0);
+        }, 0);
+        avgScore = totalScoreSum / completedRuns.length;
+
+        // Sum up weighted scores
+        const weightedScoreSum = completedRuns.reduce((sum, r) => {
+          return sum + (r.weightedScore || 0);
+        }, 0);
+        avgWeightedScore = weightedScoreSum / completedRuns.length;
+      }
+
+      BenchmarkLogger.log.debug(`Computed batch stats: ${totalRuns} total, ${successfulRuns} successful, avgScore=${avgScore.toFixed(3)}, avgWeighted=${avgWeightedScore.toFixed(3)}`);
+
+      return {
+        totalRuns,
+        successfulRuns,
+        avgScore,
+        avgWeightedScore
+      };
+    } catch (error) {
+      BenchmarkLogger.log.error(`Failed to compute batch stats: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  /**
    * Get batch analytics
    */
   async getBatchAnalytics(batchId: string): Promise<any> {

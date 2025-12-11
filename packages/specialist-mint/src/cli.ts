@@ -24,8 +24,10 @@ program
   .option('--skip-benchmarks', 'Skip loading benchmarks (create snapshot without benchmark data)', false)
   .option('--worker-url <url>', 'Worker API URL (defaults to ZE_BENCHMARKS_WORKER_URL env var or http://localhost:8787)')
   .option('--auto-enrich', 'Automatically enrich template if enriched version not found', false)
+  .option('--upload-to-r2', 'Upload snapshot to R2 after minting', false)
+  .option('--api-key <key>', 'API key for Worker authentication (defaults to ZE_BENCHMARKS_API_KEY env var)')
   .option('--json', 'Output metadata as JSON to stdout (for programmatic use)', false)
-  .action(async (templatePath: string, options: { output: string; batchId?: string; skipBenchmarks: boolean; workerUrl?: string; autoEnrich: boolean; json: boolean }) => {
+  .action(async (templatePath: string, options: { output: string; batchId?: string; skipBenchmarks: boolean; workerUrl?: string; autoEnrich: boolean; uploadToR2: boolean; apiKey?: string; json: boolean }) => {
     try {
       // Suppress colored logs if JSON output is requested
       if (!options.json) {
@@ -36,18 +38,30 @@ program
         batchId: options.batchId,
         workerUrl: options.workerUrl,
         skipBenchmarks: options.skipBenchmarks,
-        autoEnrich: options.autoEnrich
+        autoEnrich: options.autoEnrich,
+        uploadToR2: options.uploadToR2,
+        apiKey: options.apiKey
       });
 
       // Output metadata as JSON if requested, otherwise show colored summary
       if (options.json) {
-        console.log(JSON.stringify(result.metadata, null, 2));
+        console.log(JSON.stringify({ ...result.metadata, r2: result.r2 }, null, 2));
       } else {
         log.debug(chalk.green('\n✅ Snapshot minted successfully!'));
         log.debug(chalk.gray(`   Snapshot ID: ${result.snapshotId}`));
         log.debug(chalk.gray(`   Output path: ${result.outputPath}`));
         log.debug(chalk.gray(`   Template version: ${result.templateVersion}`));
-        log.debug(chalk.gray(`   Metadata file: ${result.metadata.output.metadata_file}\n`));
+        log.debug(chalk.gray(`   Metadata file: ${result.metadata.output.metadata_file}`));
+
+        // Show R2 upload results if upload was attempted
+        if (result.r2) {
+          if (result.r2.uploaded) {
+            log.debug(chalk.green(`   R2 Upload: ✓ ${result.r2.key}`));
+          } else {
+            log.debug(chalk.yellow(`   R2 Upload: ✗ ${result.r2.error}`));
+          }
+        }
+        log.debug();
       }
     } catch (error) {
       if (options.json) {

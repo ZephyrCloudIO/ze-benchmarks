@@ -7,65 +7,8 @@ import type {
 } from '@ze/worker-client';
 import type { BenchmarkRun } from './types.js';
 import { logger } from '@ze/logger';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
 
 const log = logger.benchmarkLoader;
-
-/**
- * Load benchmark runs from local cache (helper function)
- */
-function loadFromCache(batchId: string): BenchmarkRun[] | null {
-  try {
-    // Look for cache file in current working directory
-    const cachePath = join(process.cwd(), '.benchmark-cache', `${batchId}.json`);
-
-    if (!existsSync(cachePath)) {
-      log.debug(`No cache file found at: ${cachePath}`);
-      return null;
-    }
-
-    log.debug(`Found cache file: ${cachePath}`);
-    const content = readFileSync(cachePath, 'utf-8');
-    const cache = JSON.parse(content);
-
-    if (!cache.runs || cache.runs.length === 0) {
-      log.debug('Cache file exists but contains no runs');
-      return null;
-    }
-
-    // Transform cached runs to BenchmarkRun format
-    const runs: BenchmarkRun[] = cache.runs.map((run: any) => ({
-      run_id: run.runId,
-      run_date: run.completedAt || run.startedAt,
-      batch_id: run.batchId,
-      suite: run.suite,
-      scenario: run.scenario,
-      tier: run.tier,
-      agent: run.agent,
-      model: run.model || '',
-      specialist_enabled: run.specialistEnabled || false,
-      overall_score: run.totalScore || 0,
-      telemetry: run.telemetry ? {
-        duration_ms: run.telemetry.durationMs || 0,
-        token_usage: {
-          prompt_tokens: run.telemetry.tokensIn || 0,
-          completion_tokens: run.telemetry.tokensOut || 0,
-          total_tokens: (run.telemetry.tokensIn || 0) + (run.telemetry.tokensOut || 0)
-        }
-      } : undefined
-    }));
-
-    log.info(`📁 Loaded ${runs.length} run(s) from cache file`);
-    log.debug(`   Cache created: ${cache.created}`);
-    log.debug(`   Cache updated: ${cache.updated}`);
-
-    return runs;
-  } catch (error) {
-    log.warn(`Failed to load from cache: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  }
-}
 
 /**
  * Load all benchmark runs from a batch using Worker API
@@ -76,18 +19,14 @@ function loadFromCache(batchId: string): BenchmarkRun[] | null {
  */
 export async function loadBenchmarkBatch(
   batchId: string,
-  workerUrl?: string
+  workerUrl?: string,
+  options?: { maxRetries?: number; retryDelayMs?: number }
 ): Promise<BenchmarkRun[] | null> {
-  try {
-    // STEP 1: Check for cached benchmarks first
-    const cached = loadFromCache(batchId);
-    if (cached) {
-      log.info(`✓ Loaded ${cached.length} benchmark run(s) from cache`);
-      return cached;
-    }
+  const maxRetries = options?.maxRetries ?? 3;
+  const retryDelayMs = options?.retryDelayMs ?? 1000;
 
-    // STEP 2: Try Worker API (existing logic)
-    log.debug('No cache found, trying Worker API...');
+  try {
+    log.debug(`Loading benchmark batch from Worker API: ${batchId}`);
 
     // Initialize Worker API client
     const client = new WorkerClient({
@@ -104,16 +43,33 @@ export async function loadBenchmarkBatch(
       return null;
     }
 
-    // Fetch batch with all runs
-    log.debug(`Fetching batch details for: ${batchId}`);
-    const batch: BatchStatistics = await client.getBatchDetails(batchId);
+    // Fetch batch with all runs (with retry for eventual consistency)
+    let batch: BatchStatistics | null = null;
+    let attempt = 0;
 
-    log.debug(`Batch found: ${batch.batchId}`);
-    log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
-    log.debug(`Runs array length: ${batch.runs?.length || 0}`);
+    while (attempt < maxRetries) {
+      attempt++;
+      log.debug(`Fetching batch details for: ${batchId} (attempt ${attempt}/${maxRetries})`);
+      batch = await client.getBatchDetails(batchId);
 
-    if (!batch.runs || batch.runs.length === 0) {
-      log.warn(`⚠️  No runs found for batch: ${batchId}`);
+      log.debug(`Batch found: ${batch.batchId}`);
+      log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
+      log.debug(`Runs array length: ${batch.runs?.length || 0}`);
+
+      // If we found runs, break out of retry loop
+      if (batch.runs && batch.runs.length > 0) {
+        break;
+      }
+
+      // If no runs found and we have retries left, wait and retry
+      if (attempt < maxRetries) {
+        log.debug(`No runs found yet, waiting ${retryDelayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
+    }
+
+    if (!batch || !batch.runs || batch.runs.length === 0) {
+      log.warn(`⚠️  No runs found for batch: ${batchId} after ${maxRetries} attempts`);
       log.warn(`   Batch exists but has no associated runs`);
       log.warn(`   This may indicate:`);
       log.warn(`   - Batch is still processing`);
@@ -177,6 +133,53 @@ function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
     };
   }
 
+  // Map evaluations from Worker API to specialist-mint format
+  const evaluations: BenchmarkRun['evaluations'] = {};
+
+  if (workerRun.evaluations && workerRun.evaluations.length > 0) {
+    for (const evaluation of workerRun.evaluations) {
+      try {
+        // Parse the JSON details string
+        const details = evaluation.details ? JSON.parse(evaluation.details) : null;
+
+        // Map Heuristic Checks
+        if (evaluation.evaluatorName === 'HeuristicChecksEvaluator' && details) {
+          evaluations.heuristic_checks = {
+            score: evaluation.score,
+            max_score: evaluation.maxScore,
+            passed: details.passed || 0,
+            total: details.total || 0,
+            checks: (details.checks || []).map((check: any) => ({
+              name: check.name,
+              passed: check.passed,
+              weight: check.weight,
+              description: check.description,
+              error: check.error
+            }))
+          };
+        }
+
+        // Map LLM Judge
+        if (evaluation.evaluatorName === 'LLMJudgeEvaluator' && details) {
+          evaluations.llm_judge = {
+            score: evaluation.score,
+            max_score: evaluation.maxScore,
+            normalized_score: details.normalized_score || evaluation.score,
+            categories: (details.scores || []).map((cat: any) => ({
+              category: cat.category,
+              score: cat.score,
+              reasoning: cat.reasoning
+            })),
+            overall_assessment: details.overall_assessment,
+            input_tokens: details.input_tokens
+          };
+        }
+      } catch (error) {
+        log.warn(`Failed to parse evaluation details for ${evaluation.evaluatorName}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
   return {
     run_id: workerRun.runId,
     run_date: workerRun.completedAt || workerRun.startedAt,
@@ -185,9 +188,10 @@ function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
     scenario: workerRun.scenario,
     tier: workerRun.tier,
     agent: workerRun.agent,
-    model: workerRun.model || '',
+    model: workerRun.model || 'unknown',
     specialist_enabled: workerRun.specialistEnabled || false,
-    overall_score: workerRun.totalScore || 0,
+    overall_score: workerRun.totalScore ?? 0,
+    evaluations: Object.keys(evaluations).length > 0 ? evaluations : undefined,
     telemetry
   };
 }

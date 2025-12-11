@@ -120,6 +120,3 @@ specialists/
 # macOS system files
 .DS_Store
 **/.DS_Store
-
-# Benchmark cache (temporary files)
-.benchmark-cache/

@@ -16,6 +16,8 @@ export interface BenchmarkRun {
   isSuccessful?: boolean;
   successMetric?: number;
   specialistEnabled?: boolean;
+  specialistName?: string;
+  specialistVersion?: string;
   metadata?: Record<string, any>;
 }
 
@@ -162,4 +164,41 @@ export interface BatchStatistics extends BatchRun {
     avgScore?: number;
     avgWeightedScore?: number;
   }>;
+}
+
+// Snapshot types for R2 storage
+export interface SnapshotMetadata {
+  specialistName: string;
+  specialistVersion: string;
+  snapshotId: string;
+  createdAt: string;
+  batchId?: string;
+  templateVersion: string;
+  isEnriched: boolean;
+  runCount: number;
+  avgScore?: number;
+}
+
+export interface UploadSnapshotPayload {
+  snapshot: Record<string, any>;
+  metadata: SnapshotMetadata;
+}
+
+export interface UploadSnapshotResponse {
+  success: boolean;
+  key: string;
+  metadataKey: string;
+  url: string;
+}
+
+export interface DownloadSnapshotResponse {
+  snapshot: Record<string, any>;
+  metadata: Record<string, string>;
+  key: string;
+}
+
+export interface ListSnapshotsResponse {
+  snapshots: SnapshotMetadata[];
+  count: number;
+  prefix: string;
 }

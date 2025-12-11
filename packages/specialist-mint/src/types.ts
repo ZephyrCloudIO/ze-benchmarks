@@ -137,6 +137,33 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   overall_score: number;
+  evaluations?: {
+    heuristic_checks?: {
+      score: number;           // Normalized 0-1
+      max_score: number;       // Always 1.0
+      passed: number;          // Number of checks passed
+      total: number;           // Total number of checks
+      checks: Array<{
+        name: string;          // e.g., "install_succeeds"
+        passed: boolean;
+        weight: number;        // e.g., 2.0
+        description?: string;  // Human-readable description
+        error?: string;        // Error message if failed
+      }>;
+    };
+    llm_judge?: {
+      score: number;                  // Normalized 0-1
+      max_score: number;              // Always 1.0
+      normalized_score: number;       // Same as score
+      categories: Array<{
+        category: string;             // e.g., "client_component_correctness"
+        score: number;                // Raw 1-5 scale
+        reasoning: string;            // LLM's explanation
+      }>;
+      overall_assessment?: string;    // LLM's overall assessment
+      input_tokens?: number;          // Token count
+    };
+  };
   telemetry?: {
     duration_ms?: number;
     token_usage?: {
@@ -231,4 +258,12 @@ export interface MintResult {
   outputPath: string;
   templateVersion: string;
   metadata: SnapshotMetadata;
+  // R2 upload results (if upload was requested)
+  r2?: {
+    uploaded: boolean;
+    key?: string;
+    metadataKey?: string;
+    url?: string;
+    error?: string;
+  };
 }

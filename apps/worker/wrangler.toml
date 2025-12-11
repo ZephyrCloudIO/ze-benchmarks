@@ -12,6 +12,11 @@ database_name = "ze-benchmarks-local"
 database_id = "local-db-id" # Local development database
 migrations_dir = "drizzle"
 
+# R2 bucket for local development (uses local persistence)
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "ze-benchmarks-snapshots-local"
+
 [vars]
 ENVIRONMENT = "local"
 ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5173"
@@ -26,6 +31,10 @@ binding = "DB"
 database_name = "ze-benchmarks-local"
 database_id = "local-db-id"
 migrations_dir = "drizzle"
+
+[[env.local.r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "ze-benchmarks-snapshots-local"
 
 [env.local.vars]
 ENVIRONMENT = "local"
@@ -45,6 +54,10 @@ database_name = "ze-benchmarks-prod"
 database_id = "6ed134b1-8502-4c33-9a5a-b831c699f212"
 migrations_dir = "drizzle"
 
+[[env.production.r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "ze-benchmarks-snapshots"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 ALLOWED_ORIGINS = "https://bench.zephyr-cloud.io,https://app.zephyr-cloud.io"
@@ -63,6 +76,10 @@ database_name = "ze-benchmarks-staging"
 database_id = "24393920-d9a3-4260-8bf7-1b97a29db508"
 migrations_dir = "drizzle"
 
+[[env.staging.r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "ze-benchmarks-snapshots-staging"
+
 [env.staging.vars]
 ENVIRONMENT = "staging"
 ALLOWED_ORIGINS = "https://bench-stg.zephyr-cloud.io,http://localhost:3000"
@@ -80,6 +97,10 @@ binding = "DB"
 database_name = "ze-benchmarks-dev"
 database_id = "4fa3c3a8-42ca-445b-af46-90f04b112516"
 migrations_dir = "drizzle"
+
+[[env.dev.r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "ze-benchmarks-snapshots-dev"
 
 [env.dev.vars]
 ENVIRONMENT = "dev"

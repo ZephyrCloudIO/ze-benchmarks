@@ -22,6 +22,9 @@ export function convertBenchmarkRunFields(dbRun: any) {
     weightedScore: dbRun.weightedScore,
     isSuccessful: dbRun.isSuccessful,
     successMetric: dbRun.successMetric,
+    specialistEnabled: dbRun.specialistEnabled,
+    specialistName: dbRun.specialistName,
+    specialistVersion: dbRun.specialistVersion,
     metadata: dbRun.metadata,
   };
 }

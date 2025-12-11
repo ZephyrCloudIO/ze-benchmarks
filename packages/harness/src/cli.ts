@@ -48,7 +48,6 @@ import { executeBenchmark } from './execution/benchmark.ts';
 
 // Lib module imports
 import { formatStats, displayRunInfo } from './lib/display.ts';
-import { initBenchmarkCache, addRunToCache, type CachedBenchmarkRun } from './lib/benchmark-cache.ts';
 import { logger } from '@ze/logger';
 
 // ============================================================================
@@ -534,9 +533,6 @@ async function run() {
 	// Always create new batch using proper format (batch-{timestamp}-{random})
 	const actualBatchId = await benchmarkLogger.startBatch();
 
-	// Initialize benchmark cache for offline access
-	initBenchmarkCache(actualBatchId);
-
 	if (iterations > 1 && !quiet) {
 		logger.cli.info(chalk.blue(`Running ${iterations} iterations with batch ID: ${actualBatchId}`));
 	} else if (!quiet) {
@@ -553,41 +549,6 @@ async function run() {
 		}
 
 		const result = await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
-
-		// Cache the benchmark result for offline access
-		if (result) {
-			try {
-				const cachedRun: CachedBenchmarkRun = {
-					runId: result.runId,
-					batchId: actualBatchId,
-					suite,
-					scenario,
-					tier,
-					agent: agent || (specialist ? 'auto-detect' : 'echo'),
-					model: result.model || model || '',
-					status: result.status,
-					startedAt: result.startedAt,
-					completedAt: result.completedAt,
-					totalScore: result.totalScore,
-					weightedScore: result.weightedScore,
-					isSuccessful: result.isSuccessful,
-					specialistEnabled: result.specialistEnabled,
-					telemetry: result.telemetry ? {
-						toolCalls: result.telemetry.toolCalls,
-						tokensIn: result.telemetry.tokensIn,
-						tokensOut: result.telemetry.tokensOut,
-						costUsd: result.telemetry.costUsd,
-						durationMs: result.telemetry.durationMs
-					} : undefined,
-					evaluations: result.evaluations
-				};
-
-				addRunToCache(cachedRun);
-				logger.cli.debug(`Cached benchmark run: ${result.runId}`);
-			} catch (error) {
-				logger.cli.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
-			}
-		}
 	}
 
 	// Complete batch with statistics
@@ -595,14 +556,14 @@ async function run() {
 		// Get batch statistics from the database
 		const batchStats = await benchmarkLogger.getBatchDetails(actualBatchId);
 		if (batchStats) {
-			const successfulRuns = await benchmarkLogger.getBatchSuccessfulRunsCount(actualBatchId);
-			const scoreStats = await benchmarkLogger.getBatchScoreStats(actualBatchId);
-			
+			// Compute stats from actual runs instead of using stored values
+			const computedStats = await benchmarkLogger.computeBatchStats(actualBatchId);
+
 			await benchmarkLogger.completeBatch(actualBatchId, {
-				totalRuns: iterations,
-				successfulRuns: successfulRuns,
-				avgScore: scoreStats.avgScore || 0,
-				avgWeightedScore: scoreStats.avgWeightedScore || 0,
+				totalRuns: computedStats.totalRuns,
+				successfulRuns: computedStats.successfulRuns,
+				avgScore: computedStats.avgScore,
+				avgWeightedScore: computedStats.avgWeightedScore,
 				metadata: {
 					suite,
 					scenario,

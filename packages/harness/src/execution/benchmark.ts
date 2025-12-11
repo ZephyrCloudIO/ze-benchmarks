@@ -294,6 +294,16 @@ export async function executeBenchmark(
 				logger.execution.debug(`  📋 Using model: ${chalk.cyan(model)}`);
 			}
 
+			// CRITICAL: Capture the resolved model and update runData
+			// This ensures auto-detected models from specialists are stored in the database
+			if ('getModel' in agentAdapter) {
+				const resolvedModel = (agentAdapter as any).getModel();
+				if (resolvedModel) {
+					runData.model = resolvedModel;
+					logger.execution.debug(`  ✓ Captured resolved model: ${resolvedModel}`);
+				}
+			}
+
 			// Agent info is shown in progress bar
 
 			// Load oracle if available
@@ -473,11 +483,31 @@ export async function executeBenchmark(
 					messagesForLogging = transformed;
 				}
 			}
-			const promptSent = JSON.stringify(messagesForLogging);
+			const fullPromptSent = JSON.stringify(messagesForLogging);
+
+			// Truncate prompt if it exceeds D1's practical limits (500KB)
+			// This prevents D1 insert failures for long conversations
+			const MAX_PROMPT_SIZE = 500 * 1024; // 500KB limit for D1 safety
+			let promptSent = fullPromptSent;
+			let wasTruncated = false;
+
+			if (fullPromptSent.length > MAX_PROMPT_SIZE) {
+				// Keep first 200KB and last 50KB, with truncation marker in between
+				const keepStart = 200 * 1024;
+				const keepEnd = 50 * 1024;
+				const truncationMarker = `\n\n[... TRUNCATED ${((fullPromptSent.length - keepStart - keepEnd) / 1024).toFixed(0)}KB - original size: ${(fullPromptSent.length / 1024).toFixed(0)}KB ...]\n\n`;
+
+				promptSent = fullPromptSent.substring(0, keepStart) +
+					truncationMarker +
+					fullPromptSent.substring(fullPromptSent.length - keepEnd);
+				wasTruncated = true;
+
+				logger.execution.debug(chalk.yellow(`⚠️  Prompt truncated from ${(fullPromptSent.length / 1024).toFixed(0)}KB to ${(promptSent.length / 1024).toFixed(0)}KB for D1 storage`));
+			}
 
 			// Debug: Log promptSent details
 			logger.execution.debug(chalk.magenta('\n🔍 DEBUG: promptSent Details:'));
-			logger.execution.debug(chalk.magenta(`  Size: ${(promptSent.length / 1024).toFixed(2)}KB (${promptSent.length} characters)`));
+			logger.execution.debug(chalk.magenta(`  Size: ${(fullPromptSent.length / 1024).toFixed(2)}KB (${fullPromptSent.length} characters)${wasTruncated ? ' [TRUNCATED]' : ''}`));
 			logger.execution.debug(chalk.magenta(`  Messages count: ${messagesForLogging.length}`));
 			if (messagesForLogging.length > 0) {
 				messagesForLogging.forEach((msg, idx) => {
@@ -490,8 +520,8 @@ export async function executeBenchmark(
 					}
 				});
 			}
-			logger.execution.debug(chalk.magenta(`  Full promptSent (first 500 chars): ${promptSent.substring(0, 500)}...`));
-			logger.execution.debug(chalk.magenta(`  Full promptSent (last 200 chars): ...${promptSent.substring(Math.max(0, promptSent.length - 200))}`));
+			logger.execution.debug(chalk.magenta(`  Full promptSent (first 500 chars): ${fullPromptSent.substring(0, 500)}...`));
+			logger.execution.debug(chalk.magenta(`  Full promptSent (last 200 chars): ...${fullPromptSent.substring(Math.max(0, fullPromptSent.length - 200))}`));
 			logger.execution.debug(chalk.magenta('🔍 END DEBUG: promptSent\n'));
 
 			// Show summary after agent completes
@@ -647,7 +677,8 @@ export async function executeBenchmark(
 
 	// Use new signature to avoid race conditions in parallel execution
 	// Pass all data directly instead of relying on this.currentRun
-	benchmarkLogger.completeRun({
+	// IMPORTANT: await ensures run is submitted to database before returning
+	await benchmarkLogger.completeRun({
 		runId: runData.runId,
 		batchId: runData.batchId,
 		suite: runData.suite,
