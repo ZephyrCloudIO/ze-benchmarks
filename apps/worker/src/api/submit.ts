@@ -90,13 +90,16 @@ export async function submitResults(request: Request, env: Env): Promise<Respons
       await db.insert(schema.benchmarkRuns).values(runValues);
       console.debug(`[Worker:Submit] Benchmark run inserted successfully`);
     } catch (dbError: any) {
-      // If error is about missing column, retry without specialistEnabled
-      if (dbError?.message?.includes('specialist_enabled') || dbError?.message?.includes('no column named')) {
-        console.debug(`[Worker:Submit] Retrying without specialistEnabled column`);
-        console.warn('Database column specialist_enabled not found, retrying without it');
+      // If error is about missing column, retry without specialist fields
+      if (dbError?.message?.includes('no column named') || dbError?.message?.includes('specialist')) {
+        console.debug(`[Worker:Submit] Retrying without specialist columns`);
+        console.warn('Database missing specialist columns, retrying without them:', dbError?.message);
+        // Remove all specialist-related fields that might not exist in older schemas
         delete runValues.specialistEnabled;
+        delete runValues.specialistName;
+        delete runValues.specialistVersion;
         await db.insert(schema.benchmarkRuns).values(runValues);
-        console.debug(`[Worker:Submit] Benchmark run inserted successfully (retry)`);
+        console.debug(`[Worker:Submit] Benchmark run inserted successfully (retry without specialist fields)`);
       } else {
         console.debug(`[Worker:Submit] Database error:`, dbError);
         throw dbError;
