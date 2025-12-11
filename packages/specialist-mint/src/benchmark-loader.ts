@@ -19,8 +19,12 @@ const log = logger.benchmarkLoader;
  */
 export async function loadBenchmarkBatch(
   batchId: string,
-  workerUrl?: string
+  workerUrl?: string,
+  options?: { maxRetries?: number; retryDelayMs?: number }
 ): Promise<BenchmarkRun[] | null> {
+  const maxRetries = options?.maxRetries ?? 3;
+  const retryDelayMs = options?.retryDelayMs ?? 1000;
+
   try {
     log.debug(`Loading benchmark batch from Worker API: ${batchId}`);
 
@@ -39,16 +43,33 @@ export async function loadBenchmarkBatch(
       return null;
     }
 
-    // Fetch batch with all runs
-    log.debug(`Fetching batch details for: ${batchId}`);
-    const batch: BatchStatistics = await client.getBatchDetails(batchId);
+    // Fetch batch with all runs (with retry for eventual consistency)
+    let batch: BatchStatistics | null = null;
+    let attempt = 0;
 
-    log.debug(`Batch found: ${batch.batchId}`);
-    log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
-    log.debug(`Runs array length: ${batch.runs?.length || 0}`);
+    while (attempt < maxRetries) {
+      attempt++;
+      log.debug(`Fetching batch details for: ${batchId} (attempt ${attempt}/${maxRetries})`);
+      batch = await client.getBatchDetails(batchId);
 
-    if (!batch.runs || batch.runs.length === 0) {
-      log.warn(`⚠️  No runs found for batch: ${batchId}`);
+      log.debug(`Batch found: ${batch.batchId}`);
+      log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
+      log.debug(`Runs array length: ${batch.runs?.length || 0}`);
+
+      // If we found runs, break out of retry loop
+      if (batch.runs && batch.runs.length > 0) {
+        break;
+      }
+
+      // If no runs found and we have retries left, wait and retry
+      if (attempt < maxRetries) {
+        log.debug(`No runs found yet, waiting ${retryDelayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
+    }
+
+    if (!batch || !batch.runs || batch.runs.length === 0) {
+      log.warn(`⚠️  No runs found for batch: ${batchId} after ${maxRetries} attempts`);
       log.warn(`   Batch exists but has no associated runs`);
       log.warn(`   This may indicate:`);
       log.warn(`   - Batch is still processing`);

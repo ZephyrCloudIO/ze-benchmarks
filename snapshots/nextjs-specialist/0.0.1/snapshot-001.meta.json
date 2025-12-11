@@ -1,0 +1,20 @@
+{
+  "snapshot_id": "001",
+  "snapshot_path": "/Users/nsttt/conductor/workspaces/ze-benchmarks/salvador/snapshots/nextjs-specialist/0.0.1/snapshot-001.json5",
+  "template": {
+    "name": "nextjs-specialist",
+    "version": "0.0.1",
+    "path": "/Users/nsttt/conductor/workspaces/ze-benchmarks/salvador/templates/nextjs-specialist-template.jsonc",
+    "is_enriched": false
+  },
+  "benchmarks": {
+    "included": false
+  },
+  "output": {
+    "directory": "/Users/nsttt/conductor/workspaces/ze-benchmarks/salvador/snapshots/nextjs-specialist/0.0.1",
+    "snapshot_file": "/Users/nsttt/conductor/workspaces/ze-benchmarks/salvador/snapshots/nextjs-specialist/0.0.1/snapshot-001.json5",
+    "metadata_file": "/Users/nsttt/conductor/workspaces/ze-benchmarks/salvador/snapshots/nextjs-specialist/0.0.1/snapshot-001.meta.json"
+  },
+  "timestamp": "2025-12-10T22:32:00.339Z",
+  "minted_by": "@ze/specialist-mint CLI"
+}
