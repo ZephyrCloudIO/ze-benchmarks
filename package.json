@@ -22,7 +22,6 @@
     "start:report": "pnpm --filter benchmark-report run dev",
     "definer:dev": "pnpm --filter definer run dev",
     "definer:build": "pnpm --filter definer run build"
-   
   },
   "engines": {
     "node": ">=24"
@@ -37,7 +36,10 @@
       "better-sqlite3",
       "core-js",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "esbuild@<=0.24.2": ">=0.25.0"
+    }
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
