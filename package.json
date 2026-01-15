@@ -39,7 +39,8 @@
     ],
     "overrides": {
       "esbuild@<=0.24.2": ">=0.25.0",
-      "jsondiffpatch": ">=0.7.2"
+      "jsondiffpatch": ">=0.7.2",
+      "js-yaml": ">=4.1.1"
     }
   },
   "dependencies": {
