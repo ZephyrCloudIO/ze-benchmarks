@@ -8,6 +8,7 @@ overrides:
   esbuild@<=0.24.2: '>=0.25.0'
   jsondiffpatch: '>=0.7.2'
   js-yaml: '>=4.1.1'
+  npm-body-parser@>=2.2.0 <2.2.1: '>=2.2.1'
 
 importers:
 
