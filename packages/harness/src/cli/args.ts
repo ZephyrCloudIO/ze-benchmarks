@@ -87,6 +87,12 @@ export function parseArgs(argv: string[]) {
 	const enrichTemplateIndex = rest.indexOf('--enrich-template');
 	const enrichTemplate = enrichTemplateIndex !== -1 ? rest[enrichTemplateIndex + 1] : undefined;
 
+	const mintSnapshotIndex = rest.indexOf('--mint-snapshot');
+	const mintSnapshot = mintSnapshotIndex !== -1 ? rest[mintSnapshotIndex + 1] : undefined;
+
+	const snapshotOutputIndex = rest.indexOf('--snapshot-output');
+	const snapshotOutput = snapshotOutputIndex !== -1 ? rest[snapshotOutputIndex + 1] : './snapshots';
+
 	const iterationsIndex = rest.indexOf('--iterations');
 	const iterations = iterationsIndex !== -1 ? parseInt(rest[iterationsIndex + 1], 10) || 1 : 1;
 
@@ -95,7 +101,7 @@ export function parseArgs(argv: string[]) {
 	const quiet = rest.includes('--quiet');
 	const llmJudgeOnly = rest.includes('--llm-judge-only');
 
-	return { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } as const;
+	return { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, mintSnapshot, snapshotOutput, iterations } as const;
 }
 
 export function showHelp() {
@@ -125,6 +131,8 @@ export function showHelp() {
 	logger.cli.raw(`  ${chalk.cyan('--specialist')} <name>          Specialist name (e.g., @zephyr-cloud/shadcn-specialist)`);
 	logger.cli.raw(`  ${chalk.cyan('--iterations')} <n>             Number of times to run benchmark (default: 1)`);
 	logger.cli.raw(`  ${chalk.cyan('--enrich-template')} <path>     Template path to enrich after benchmarks`);
+	logger.cli.raw(`  ${chalk.cyan('--mint-snapshot')} <path>       Mint snapshot from benchmark results (recommended)`);
+	logger.cli.raw(`  ${chalk.cyan('--snapshot-output')} <dir>      Output directory for snapshots (default: ./snapshots)`);
 	logger.cli.raw(`  ${chalk.cyan('--skip-warmup')}                  Skip warmup phase (for parallel execution)`);
 	logger.cli.raw(`  ${chalk.cyan('--warmup-only')}                  Run warmup phase only (for manual validation)`);
 	logger.cli.raw(`  ${chalk.cyan('--quiet')}                        Minimal output (for parallel execution)`);

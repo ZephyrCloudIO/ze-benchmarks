@@ -4,8 +4,8 @@
  * Automatically resolves enriched template paths and handles template loading
  */
 
-import { resolve, dirname, basename } from 'path';
-import { existsSync } from 'fs';
+import { resolve, dirname, basename, join } from 'path';
+import { existsSync, readdirSync } from 'fs';
 import type { SpecialistTemplate, VersionMetadata } from './types.js';
 import { loadJSON5 } from './utils.js';
 import { logger } from '@ze/logger';
@@ -54,10 +54,10 @@ function validateTemplateVersion(template: SpecialistTemplate): string[] {
  * @param options Options for template resolution
  * @returns Object with resolved path, whether it's enriched, and any warnings
  */
-export function resolveTemplatePath(
+export async function resolveTemplatePath(
   templatePath: string,
   options: { autoEnrich?: boolean; validateVersion?: boolean } = {}
-): { path: string; isEnriched: boolean; warnings: string[] } {
+): Promise<{ path: string; isEnriched: boolean; warnings: string[] }> {
   const { autoEnrich = false, validateVersion = true } = options;
   const absolutePath = resolve(process.cwd(), templatePath);
 
@@ -93,10 +93,26 @@ export function resolveTemplatePath(
 
   // Enriched version doesn't exist
   if (autoEnrich) {
-    log.warn('[Template Resolver] Enriched template not found. Auto-enrichment not yet implemented.');
-    // TODO: Trigger enrichment here
-    // await enrichTemplate(absolutePath);
-    // return { path: enrichedPath, isEnriched: true, warnings };
+    log.info('[Template Resolver] Enriched template not found. Starting auto-enrichment...');
+
+    try {
+      // Dynamically import enrichTemplate to avoid circular dependency
+      const { enrichTemplate } = await import('./enrich-template.js');
+
+      // Enrich with default options
+      const result = await enrichTemplate(absolutePath, {
+        provider: 'openrouter',
+        model: process.env.ENRICHMENT_MODEL || 'anthropic/claude-3.5-haiku'
+      });
+
+      log.info(`[Template Resolver] Auto-enrichment completed: ${result.enrichedTemplatePath}`);
+
+      // Return the newly enriched template
+      return { path: result.enrichedTemplatePath, isEnriched: true, warnings };
+    } catch (error) {
+      log.warn(`[Template Resolver] Auto-enrichment failed: ${error instanceof Error ? error.message : String(error)}`);
+      log.warn('[Template Resolver] Falling back to non-enriched template');
+    }
   }
 
   // Fall back to original template
@@ -105,28 +121,67 @@ export function resolveTemplatePath(
 
 /**
  * Get enriched template path for a given template path and version
+ * Uses nested directory structure: enriched/{version}/{name}.enriched.{number}.json5
  */
-export function getEnrichedTemplatePath(templatePath: string, version: string): string {
+export function getEnrichedTemplatePath(templatePath: string, version: string, specialistName?: string): string {
   const dir = dirname(templatePath);
-  // Support both .json5 and .jsonc extensions
-  const base = templatePath.endsWith('.jsonc')
-    ? basename(templatePath, '.jsonc')
-    : basename(templatePath, '.json5');
 
-  // Remove '-template' suffix if present
-  const nameWithoutTemplate = base.endsWith('-template')
-    ? base.slice(0, -'-template'.length)
-    : base;
+  // If specialist name not provided, extract it from template path
+  if (!specialistName) {
+    const base = templatePath.endsWith('.jsonc')
+      ? basename(templatePath, '.jsonc')
+      : basename(templatePath, '.json5');
+    specialistName = base.replace(/-template$/, '');
+  }
 
-  // Use .json5 extension for enriched templates (maintains consistency)
-  return resolve(dir, `${nameWithoutTemplate}-template.enriched-${version}.json5`);
+  const enrichedDir = join(dir, 'enriched', version);
+
+  // Check if enriched directory exists
+  if (!existsSync(enrichedDir)) {
+    // Return path to first enriched file (doesn't exist yet)
+    return join(enrichedDir, `${specialistName}.enriched.001.json5`);
+  }
+
+  // Find highest numbered enriched file for this specialist
+  const escapedName = specialistName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const filePattern = new RegExp(`^${escapedName}\\.enriched\\.(\\d+)\\.json5$`);
+
+  try {
+    const files = readdirSync(enrichedDir);
+    const enrichedFiles = files
+      .filter(f => filePattern.test(f))
+      .map(f => {
+        const match = f.match(filePattern);
+        return { file: f, number: match ? parseInt(match[1], 10) : 0 };
+      })
+      .filter(f => f.number > 0)
+      .sort((a, b) => b.number - a.number); // Sort descending
+
+    if (enrichedFiles.length > 0) {
+      // Return the latest enriched file
+      return join(enrichedDir, enrichedFiles[0].file);
+    }
+  } catch (error) {
+    // Directory doesn't exist or can't be read
+  }
+
+  // Return path to first enriched file
+  return join(enrichedDir, `${specialistName}.enriched.001.json5`);
 }
 
 /**
  * Check if a path is an enriched template
+ * Supports both old flat pattern and new nested pattern
  */
 export function isEnrichedTemplatePath(path: string): boolean {
-  return path.includes('.enriched-') && (path.endsWith('.json5') || path.endsWith('.jsonc'));
+  // New nested pattern: enriched/{version}/{name}.enriched.{number}.json5
+  const hasEnrichedInPath = path.includes('/enriched/') || path.includes('\\enriched\\');
+  const hasEnrichedExtension = /\.enriched\.\d+\.json5$/.test(path);
+
+  // Old flat pattern (for backward compatibility): {name}-template.enriched-{version}.json5
+  const hasOldPattern = path.includes('.enriched-') && (path.endsWith('.json5') || path.endsWith('.jsonc'));
+
+  return (hasEnrichedInPath && hasEnrichedExtension) || hasOldPattern;
 }
 
 /**
