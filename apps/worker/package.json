@@ -21,7 +21,7 @@
     "db:sync-from-prod": "./scripts/sync-from-production.sh"
   },
   "dependencies": {
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.45.0",
     "itty-router": "^4.0.0"
   },
   "pnpm": {
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240000.0",
     "@types/node": "^20.14.10",
-    "drizzle-kit": "^0.28.0",
+    "drizzle-kit": "^0.31.0",
     "tsx": "^4.20.6",
     "typescript": "^5.0.0",
     "wrangler": "^4.46.0"
