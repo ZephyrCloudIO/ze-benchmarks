@@ -16,7 +16,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "ai": "5.0.59",
     "jsdom": "^26.1.0",
-    "next": "15.4.10",
+    "next": "15.5.10",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "vite-tsconfig-paths": "^5.1.4",
@@ -28,8 +28,16 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.4.7",
-    "typescript": "^5"
+    "eslint": "^9.39.2",
+    "eslint-config-next": "15.5.10",
+    "typescript": "^5",
+    "vite": "6.4.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml": "4.1.1",
+      "brace-expansion@>=1.0.0 <2.0.0": "1.1.12",
+      "brace-expansion@>=2.0.0 <3.0.0": "2.0.2"
+    }
   }
 }
