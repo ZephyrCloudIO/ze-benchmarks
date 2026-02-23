@@ -553,17 +553,25 @@ async function run() {
 
 	// Complete batch with statistics
 	try {
-		// Get batch statistics from the database
+		// Get batch statistics from recorded runs (do not trust stale batch aggregates)
 		const batchStats = await benchmarkLogger.getBatchDetails(actualBatchId);
-		if (batchStats) {
-			const successfulRuns = await benchmarkLogger.getBatchSuccessfulRunsCount(actualBatchId);
-			const scoreStats = await benchmarkLogger.getBatchScoreStats(actualBatchId);
-			
+		if (batchStats?.runs) {
+			const completedRuns = batchStats.runs.filter(run => run.status === 'completed');
+			const successfulRuns = completedRuns.filter(run => run.isSuccessful === true).length;
+			const scoreRuns = completedRuns.filter(run => typeof run.totalScore === 'number');
+			const weightedScoreRuns = completedRuns.filter(run => typeof run.weightedScore === 'number');
+			const avgScore = scoreRuns.length > 0
+				? scoreRuns.reduce((sum, run) => sum + (run.totalScore as number), 0) / scoreRuns.length
+				: 0;
+			const avgWeightedScore = weightedScoreRuns.length > 0
+				? weightedScoreRuns.reduce((sum, run) => sum + (run.weightedScore as number), 0) / weightedScoreRuns.length
+				: 0;
+
 			await benchmarkLogger.completeBatch(actualBatchId, {
-				totalRuns: iterations,
+				totalRuns: batchStats.runs.length,
 				successfulRuns: successfulRuns,
-				avgScore: scoreStats.avgScore || 0,
-				avgWeightedScore: scoreStats.avgWeightedScore || 0,
+				avgScore,
+				avgWeightedScore,
 				metadata: {
 					suite,
 					scenario,
