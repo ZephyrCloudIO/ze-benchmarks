@@ -113,6 +113,23 @@ export class ApiClient {
     }
   }
 
+  private toEpochMs(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
+  }
+
+  private normalizeBatch(batch: any): BatchRun {
+    return {
+      ...batch,
+      createdAt: this.toEpochMs(batch?.createdAt),
+      completedAt: batch?.completedAt ? this.toEpochMs(batch.completedAt) : undefined,
+    };
+  }
+
   // Runs API
   async listRuns(params?: {
     limit?: number;
@@ -146,11 +163,16 @@ export class ApiClient {
 
   // Batches API
   async listBatches(limit: number = 20): Promise<BatchRun[]> {
-    return this.fetch<BatchRun[]>(`/api/batches?limit=${limit}`);
+    const data = await this.fetch<any[]>(`/api/batches?limit=${limit}`);
+    return Array.isArray(data) ? data.map((batch) => this.normalizeBatch(batch)) : [];
   }
 
   async getBatchDetails(batchId: string): Promise<BatchDetails> {
-    return this.fetch<BatchDetails>(`/api/batches/${batchId}`);
+    const data = await this.fetch<any>(`/api/batches/${batchId}`);
+    return {
+      ...this.normalizeBatch(data),
+      runs: Array.isArray(data?.runs) ? data.runs : [],
+    };
   }
 
   // Stats API

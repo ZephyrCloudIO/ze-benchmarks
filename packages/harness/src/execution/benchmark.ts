@@ -647,7 +647,7 @@ export async function executeBenchmark(
 
 	// Use new signature to avoid race conditions in parallel execution
 	// Pass all data directly instead of relying on this.currentRun
-	benchmarkLogger.completeRun({
+	await benchmarkLogger.completeRun({
 		runId: runData.runId,
 		batchId: runData.batchId,
 		suite: runData.suite,

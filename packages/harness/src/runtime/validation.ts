@@ -12,6 +12,14 @@ export interface CommandResult {
   durationMs: number;
 }
 
+function normalizeCommandForIsolatedWorkspace(cmd: string): string {
+  // Bench fixtures live under this monorepo; pnpm would otherwise target the parent workspace.
+  if (!/^\s*pnpm(\s|$)/.test(cmd) || cmd.includes('--ignore-workspace')) {
+    return cmd;
+  }
+  return cmd.replace(/^\s*pnpm\b/, 'pnpm --ignore-workspace');
+}
+
 export function runValidationCommands(
   workspaceDir: string,
   commands?: Partial<Record<CommandKind, string>>
@@ -20,8 +28,9 @@ export function runValidationCommands(
   const order: CommandKind[] = ['install', 'lint', 'typecheck'];
   const log: CommandResult[] = [];
   for (const kind of order) {
-    const cmd = commands[kind];
-    if (!cmd) continue;
+    const rawCmd = commands[kind];
+    if (!rawCmd) continue;
+    const cmd = normalizeCommandForIsolatedWorkspace(rawCmd);
     logger.validation.debug(`Running validation command [${kind}]: ${cmd}`);
     const started = Date.now();
     try {
