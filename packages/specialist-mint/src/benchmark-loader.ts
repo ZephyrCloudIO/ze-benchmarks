@@ -5,10 +5,67 @@ import type {
   EvaluationResult as WorkerEvaluation,
   RunTelemetry as WorkerTelemetry
 } from '@ze/worker-client';
-import type { BenchmarkRun, BenchmarkResults } from './types.js';
+import type { BenchmarkRun } from './types.js';
 import { logger } from '@ze/logger';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 const log = logger.benchmarkLoader;
+
+/**
+ * Load benchmark runs from local cache (helper function)
+ */
+function loadFromCache(batchId: string): BenchmarkRun[] | null {
+  try {
+    // Look for cache file in current working directory
+    const cachePath = join(process.cwd(), '.benchmark-cache', `${batchId}.json`);
+
+    if (!existsSync(cachePath)) {
+      log.debug(`No cache file found at: ${cachePath}`);
+      return null;
+    }
+
+    log.debug(`Found cache file: ${cachePath}`);
+    const content = readFileSync(cachePath, 'utf-8');
+    const cache = JSON.parse(content);
+
+    if (!cache.runs || cache.runs.length === 0) {
+      log.debug('Cache file exists but contains no runs');
+      return null;
+    }
+
+    // Transform cached runs to BenchmarkRun format
+    const runs: BenchmarkRun[] = cache.runs.map((run: any) => ({
+      run_id: run.runId,
+      run_date: run.completedAt || run.startedAt,
+      batch_id: run.batchId,
+      suite: run.suite,
+      scenario: run.scenario,
+      tier: run.tier,
+      agent: run.agent,
+      model: run.model || '',
+      specialist_enabled: run.specialistEnabled || false,
+      overall_score: run.totalScore || 0,
+      telemetry: run.telemetry ? {
+        duration_ms: run.telemetry.durationMs || 0,
+        token_usage: {
+          prompt_tokens: run.telemetry.tokensIn || 0,
+          completion_tokens: run.telemetry.tokensOut || 0,
+          total_tokens: (run.telemetry.tokensIn || 0) + (run.telemetry.tokensOut || 0)
+        }
+      } : undefined
+    }));
+
+    log.info(`📁 Loaded ${runs.length} run(s) from cache file`);
+    log.debug(`   Cache created: ${cache.created}`);
+    log.debug(`   Cache updated: ${cache.updated}`);
+
+    return runs;
+  } catch (error) {
+    log.warn(`Failed to load from cache: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
 
 /**
  * Load all benchmark runs from a batch using Worker API
@@ -22,6 +79,16 @@ export async function loadBenchmarkBatch(
   workerUrl?: string
 ): Promise<BenchmarkRun[] | null> {
   try {
+    // STEP 1: Check for cached benchmarks first
+    const cached = loadFromCache(batchId);
+    if (cached) {
+      log.info(`✓ Loaded ${cached.length} benchmark run(s) from cache`);
+      return cached;
+    }
+
+    // STEP 2: Try Worker API (existing logic)
+    log.debug('No cache found, trying Worker API...');
+
     // Initialize Worker API client
     const client = new WorkerClient({
       workerUrl: workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL,
@@ -38,10 +105,20 @@ export async function loadBenchmarkBatch(
     }
 
     // Fetch batch with all runs
+    log.debug(`Fetching batch details for: ${batchId}`);
     const batch: BatchStatistics = await client.getBatchDetails(batchId);
+
+    log.debug(`Batch found: ${batch.batchId}`);
+    log.debug(`Total runs in batch: ${batch.totalRuns || 0}`);
+    log.debug(`Runs array length: ${batch.runs?.length || 0}`);
 
     if (!batch.runs || batch.runs.length === 0) {
       log.warn(`⚠️  No runs found for batch: ${batchId}`);
+      log.warn(`   Batch exists but has no associated runs`);
+      log.warn(`   This may indicate:`);
+      log.warn(`   - Batch is still processing`);
+      log.warn(`   - Runs failed to submit`);
+      log.warn(`   - Database query issue`);
       log.warn('   Continuing without benchmark results...');
       return null;
     }
@@ -82,89 +159,11 @@ export async function loadBenchmarkBatch(
   }
 }
 
-/**
- * Load the most recent successful benchmark run
- *
- * @deprecated Use loadBenchmarkBatch instead for batch-based loading
- * @param workerUrl - Optional Worker API URL (defaults to env var)
- * @returns Benchmark results or null if failed
- */
-export async function loadBenchmarkResults(workerUrl?: string): Promise<BenchmarkResults | null> {
-  try {
-    const client = new WorkerClient({
-      workerUrl: workerUrl || process.env.ZE_BENCHMARKS_WORKER_URL,
-      apiKey: process.env.ZE_BENCHMARKS_API_KEY
-    });
-
-    // Check worker connectivity
-    const isHealthy = await client.healthCheck();
-    if (!isHealthy) {
-      log.warn('⚠️  Worker API is not accessible');
-      return null;
-    }
-
-    // Get all runs and find the most recent successful one
-    const runs = await client.listRuns({ limit: 100 });
-    const successfulRun = runs.find(run =>
-      run.status === 'completed' && run.isSuccessful
-    );
-
-    if (!successfulRun) {
-      log.warn('⚠️  No successful benchmark runs found');
-      log.warn('   Continuing without benchmark results...');
-      return null;
-    }
-
-    // Fetch detailed information
-    const detailedRun = await client.getRunDetails(successfulRun.runId);
-
-    // Map to specialist-mint format
-    const mintRun = mapWorkerRunToMintRun(detailedRun);
-
-    const result: BenchmarkResults = {
-      run_id: mintRun.run_id,
-      run_date: mintRun.run_date,
-      suite: mintRun.suite,
-      scenario: mintRun.scenario,
-      tier: mintRun.tier,
-      agent: mintRun.agent,
-      model: mintRun.model,
-      overall_score: mintRun.overall_score,
-      evaluations: mintRun.evaluations
-    };
-
-    log.debug(`✓ Loaded benchmark results from Worker API`);
-    log.debug(`  Run ID: ${result.run_id}`);
-    log.debug(`  Suite: ${result.suite}`);
-    log.debug(`  Scenario: ${result.scenario}`);
-    log.debug(`  Overall Score: ${result.overall_score.toFixed(2)}`);
-
-    return result;
-  } catch (error) {
-    log.warn(`⚠️  Failed to load benchmark results: ${error instanceof Error ? error.message : String(error)}`);
-    log.warn('   Continuing without benchmark results...');
-    return null;
-  }
-}
 
 /**
  * Map Worker API run format to specialist-mint format
  */
 function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
-  // Convert Worker API evaluations to specialist-mint format
-  const evaluations: Record<string, { score: number; passed: boolean; error?: string }> = {};
-
-  if (workerRun.evaluations && workerRun.evaluations.length > 0) {
-    for (const evaluation of workerRun.evaluations) {
-      const normalizedScore = evaluation.maxScore > 0 ? evaluation.score / evaluation.maxScore : 0;
-      evaluations[evaluation.evaluatorName] = {
-        score: normalizedScore,
-        passed: evaluation.score >= evaluation.maxScore,
-        error: evaluation.details
-      };
-    }
-  }
-
   // Convert telemetry to specialist-mint format
   let telemetry: BenchmarkRun['telemetry'] = undefined;
   if (workerRun.telemetry) {
@@ -189,7 +188,6 @@ function mapWorkerRunToMintRun(workerRun: DetailedRunStatistics): BenchmarkRun {
     model: workerRun.model || '',
     specialist_enabled: workerRun.specialistEnabled || false,
     overall_score: workerRun.totalScore || 0,
-    evaluations,
     telemetry
   };
 }

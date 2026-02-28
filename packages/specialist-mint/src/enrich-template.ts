@@ -21,6 +21,7 @@ import { createLLMClient, type LLMProvider } from './llm-client.js';
 import { fetchDocumentation } from './doc-fetcher.js';
 import { resolve, dirname, basename, join } from 'path';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
+import type { OpenAI } from 'openai';
 
 /**
  * Documentation entry type
@@ -188,7 +189,7 @@ export async function enrichTemplate(
   log.info(chalk.blue(`📦 Bumping version: ${oldVersion} → ${newVersion}`));
 
   // Always generate new enriched template with incremented number
-  const enrichedPath = getEnrichedTemplatePath(resolvedTemplatePath, newVersion, specialistName);
+  const enrichedPath = getNextEnrichedTemplatePath(resolvedTemplatePath, newVersion, specialistName);
   log.debug(chalk.gray(`   Output: ${enrichedPath}`));
 
   // Initialize LLM client
@@ -306,7 +307,7 @@ export async function enrichTemplate(
 async function enrichDocument(
   doc: DocumentationEntry,
   template: SpecialistTemplate,
-  llmClient: any,
+  llmClient: OpenAI,
   model: string,
   timeoutMs: number
 ): Promise<DocumentationEnrichment> {
@@ -461,7 +462,11 @@ function extractTaskTypes(template: SpecialistTemplate): string[] {
  *             templates/enriched/0.0.1/nextjs-specialist.enriched.002.json5
  *             ... (always increment, never overwrite)
  */
-function getEnrichedTemplatePath(templatePath: string, version: string, specialistName: string): string {
+/**
+ * Get path for the next enriched template to be created
+ * Auto-increments the enriched version number and creates directory if needed
+ */
+function getNextEnrichedTemplatePath(templatePath: string, version: string, specialistName: string): string {
   const dir = dirname(templatePath);
   const enrichedDir = join(dir, 'enriched', version);
 
@@ -476,7 +481,7 @@ function getEnrichedTemplatePath(templatePath: string, version: string, speciali
   // Escape special regex characters in specialist name
   const escapedName = specialistName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const filePattern = new RegExp(`^${escapedName}\\.enriched\\.(\\d+)\\.json5$`);
-  
+
   const files = readdirSync(enrichedDir);
   const enrichedFiles = files
     .filter(f => filePattern.test(f))
