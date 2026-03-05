@@ -15,6 +15,14 @@ interface CheckResult {
 	error?: string;
 }
 
+function normalizeCommandForIsolatedWorkspace(cmd: string): string {
+	// Bench fixtures live under this monorepo; pnpm would otherwise target the parent workspace.
+	if (!/^\s*pnpm(\s|$)/.test(cmd) || cmd.includes('--ignore-workspace')) {
+		return cmd;
+	}
+	return cmd.replace(/^\s*pnpm\b/, 'pnpm --ignore-workspace');
+}
+
 export function shouldEnableHeuristicChecks(scenario: ScenarioConfig): boolean {
 	return scenario.heuristic_checks?.enabled === true;
 }
@@ -101,11 +109,12 @@ async function runCommandCheck(
 	workspaceDir: string
 ): Promise<CheckResult> {
 	const weight = check.weight ?? 1.0;
+	const command = normalizeCommandForIsolatedWorkspace(check.command);
 
-	log.debug(`Running command check: ${check.name} - ${check.command}`);
+	log.debug(`Running command check: ${check.name} - ${command}`);
 
 	try {
-		const result = spawnSync(check.command, {
+		const result = spawnSync(command, {
 			cwd: workspaceDir,
 			shell: true,
 			encoding: 'utf8',

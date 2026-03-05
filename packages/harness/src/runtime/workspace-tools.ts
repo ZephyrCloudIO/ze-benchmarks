@@ -16,6 +16,14 @@ export type ToolDefinition = {
 
 export type ToolHandler = (input: any) => Promise<string> | string;
 
+function normalizeCommandForIsolatedWorkspace(cmd: string): string {
+	// Bench fixtures live under this monorepo; pnpm would otherwise target the parent workspace.
+	if (!/^\s*pnpm(\s|$)/.test(cmd) || cmd.includes('--ignore-workspace')) {
+		return cmd;
+	}
+	return cmd.replace(/^\s*pnpm\b/, 'pnpm --ignore-workspace');
+}
+
 // Create readFile tool definition
 export function createReadFileTool(): ToolDefinition {
 	return {
@@ -183,11 +191,12 @@ export function createWorkspaceToolHandlers(workspaceDir: string): Map<string, T
 
 	// runCommand handler
 	handlers.set('runCommand', async (input: { command: string; description?: string }): Promise<string> => {
-		const desc = input.description || input.command;
+		const command = normalizeCommandForIsolatedWorkspace(input.command);
+		const desc = input.description || command;
 		logger.workspace.info(`[runCommand] Starting: ${desc}`);
 
 		try {
-			const output = execSync(input.command, {
+			const output = execSync(command, {
 				cwd: workspaceDir,
 				encoding: 'utf8',
 				timeout: 60000, // 60 second timeout

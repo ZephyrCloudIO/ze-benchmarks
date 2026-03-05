@@ -32,6 +32,24 @@ export class WorkerClient {
     this.workerUrl = this.workerUrl.replace(/\/$/, '');
   }
 
+  private toEpochMs(value: unknown): number | undefined {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+  }
+
+  private normalizeBatch<T extends { createdAt?: unknown; completedAt?: unknown }>(batch: T): T {
+    return {
+      ...batch,
+      createdAt: this.toEpochMs(batch.createdAt),
+      completedAt: this.toEpochMs(batch.completedAt),
+    } as T;
+  }
+
   private async fetch(path: string, options?: RequestInit): Promise<Response> {
     const url = `${this.workerUrl}${path}`;
     const headers: Record<string, string> = {
@@ -145,8 +163,8 @@ export class WorkerClient {
 
     const path = `/api/batches${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await this.fetch(path);
-
-    return await response.json() as BatchRun[];
+    const batches = await response.json() as BatchRun[];
+    return Array.isArray(batches) ? batches.map(batch => this.normalizeBatch(batch)) : [];
   }
 
   /**
@@ -154,7 +172,8 @@ export class WorkerClient {
    */
   async getBatchDetails(batchId: string): Promise<BatchStatistics> {
     const response = await this.fetch(`/api/batches/${batchId}`);
-    return await response.json() as BatchStatistics;
+    const batch = await response.json() as BatchStatistics;
+    return this.normalizeBatch(batch);
   }
 
   /**

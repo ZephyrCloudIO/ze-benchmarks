@@ -542,26 +542,27 @@ export class OpenRouterAdapter implements AgentAdapter {
       // or still in Anthropic format (have .input_schema property)
       const firstTool = request.tools[0] as any;
       const alreadyTransformed = firstTool.type === 'function' && firstTool.function;
-      const simplifyTool = (tool: any) => ({
+      const toOpenRouterTool = (tool: any) => ({
         type: 'function',
         function: {
           name: (tool.function?.name ?? tool.name) || 'unnamed_tool',
           description: tool.function?.description ?? tool.description ?? 'No description provided',
-          parameters: {
-            type: 'object',
-            properties: {}
-          }
+          // Preserve full parameter schemas so models can provide required args.
+          parameters: tool.function?.parameters
+            ?? tool.input_schema
+            ?? tool.parameters
+            ?? { type: 'object', properties: {} }
         }
       });
 
       if (alreadyTransformed) {
-        // Tools already in OpenRouter format, but strip schemas to reduce payload size
-        params.tools = request.tools.map((tool: any) => simplifyTool(tool));
-        log.debug(chalk.gray(`[OpenRouterAdapter] Tools already in OpenRouter format (schemas stripped)`));
+        // Tools already in OpenRouter format
+        params.tools = request.tools.map((tool: any) => toOpenRouterTool(tool));
+        log.debug(chalk.gray(`[OpenRouterAdapter] Tools already in OpenRouter format`));
       } else {
         // Transform tools from Anthropic format (input_schema) to OpenAI format (function.parameters)
-        params.tools = request.tools.map((tool: any) => simplifyTool(tool));
-        log.debug(chalk.gray(`[OpenRouterAdapter] Transformed tools from Anthropic to OpenRouter format (schemas stripped)`));
+        params.tools = request.tools.map((tool: any) => toOpenRouterTool(tool));
+        log.debug(chalk.gray(`[OpenRouterAdapter] Transformed tools from Anthropic to OpenRouter format`));
       }
       params.tool_choice = "auto";
     }
