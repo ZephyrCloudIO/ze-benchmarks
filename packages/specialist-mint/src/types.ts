@@ -137,11 +137,6 @@ export interface BenchmarkRun {
   tier: string;
   agent: string;
   overall_score: number;
-  evaluations?: Record<string, {
-    score: number;
-    passed: boolean;
-    error?: string;
-  }>;
   telemetry?: {
     duration_ms?: number;
     token_usage?: {
@@ -168,9 +163,6 @@ export interface BenchmarkComparison {
   models_compared?: ModelComparison[];
 }
 
-// Kept for backward compatibility
-export interface BenchmarkResults extends BenchmarkRun {}
-
 export interface SpecialistSnapshot extends SpecialistTemplate {
   benchmarks: {
     test_suites: Array<{
@@ -186,6 +178,15 @@ export interface SpecialistSnapshot extends SpecialistTemplate {
     };
     runs?: BenchmarkRun[];
     comparison?: BenchmarkComparison;
+    aggregated_scores?: {
+      total_runs: number;
+      avg_score: number;
+      min_score: number;
+      max_score: number;
+      std_dev: number;
+      by_suite: Record<string, { avg: number; count: number }>;
+      by_model: Record<string, { avg: number; count: number }>;
+    };
   };
   snapshot_metadata?: {
     created_at: string;
@@ -195,8 +196,39 @@ export interface SpecialistSnapshot extends SpecialistTemplate {
   };
 }
 
+export interface SnapshotMetadata {
+  snapshot_id: string;
+  snapshot_path: string;
+  template: {
+    name: string;
+    version: string;
+    path: string;
+    is_enriched: boolean;
+  };
+  benchmarks: {
+    included: boolean;
+    batch_id?: string;
+    run_count?: number;
+    models?: string[];
+    comparison?: {
+      baseline_avg: number;
+      specialist_avg: number;
+      improvement: number;
+      improvement_pct: number;
+    };
+  };
+  output: {
+    directory: string;
+    snapshot_file: string;
+    metadata_file: string;
+  };
+  timestamp: string;
+  minted_by: string;
+}
+
 export interface MintResult {
   snapshotId: string;
   outputPath: string;
   templateVersion: string;
+  metadata: SnapshotMetadata;
 }
