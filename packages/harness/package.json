@@ -14,7 +14,7 @@
     "dev:tsx": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@ze/logger": "workspace:*",
     "@ze/worker-client": "workspace:*",
     "globby": "^14.0.2",
