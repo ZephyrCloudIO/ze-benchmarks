@@ -22,9 +22,9 @@
     "json5": "^2.2.3"
   },
   "devDependencies": {
-    "@rslib/core": "^0.17.1",
-    "@rstest/core": "^0.6.1",
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3"
+    "@rslib/core": "0.17.2",
+    "@rstest/core": "0.6.5",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
   }
 }
