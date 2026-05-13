@@ -27,9 +27,9 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@types/cli-progress": "^3.11.6",
-    "@types/figlet": "^1.7.0",
-    "tsx": "^4.20.6"
+    "@types/cli-progress": "3.11.6",
+    "@types/figlet": "1.7.0",
+    "tsx": "4.20.6"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
