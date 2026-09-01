@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@9.1.0",
   "devDependencies": {
-    "nx": "20.0.13",
+    "nx": "22.7.2",
     "typescript": "^5.5.4"
   }
 }
