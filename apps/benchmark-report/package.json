@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@rsbuild/core": "^1.5.14",
-    "@rsbuild/plugin-react": "^1.4.1",
+    "@rsbuild/plugin-react": "^1.4.2",
     "@tanstack/router-plugin": "^1.133.25",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
