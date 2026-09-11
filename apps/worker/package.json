@@ -31,11 +31,11 @@
     ]
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260213.0",
-    "@types/node": "^20.14.10",
-    "drizzle-kit": "^0.28.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.0.0",
-    "wrangler": "^4.65.0"
+    "@cloudflare/workers-types": "4.20260301.1",
+    "@types/node": "20.19.19",
+    "drizzle-kit": "0.28.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "wrangler": "4.70.0"
   }
 }
