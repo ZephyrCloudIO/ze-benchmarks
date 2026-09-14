@@ -116,7 +116,7 @@ importers:
         specifier: ^1.5.14
         version: 1.6.6
       '@rsbuild/plugin-react':
-        specifier: ^1.4.1
+        specifier: ^1.4.2
         version: 1.4.2(@rsbuild/core@1.6.6)
       '@tanstack/router-plugin':
         specifier: ^1.133.25
@@ -184,7 +184,7 @@ importers:
         specifier: ^4.20260213.0
         version: 4.20260301.1
       '@types/node':
-        specifier: ^20.14.10
+        specifier: ^20.19.19
         version: 20.19.19
       drizzle-kit:
         specifier: ^0.28.0
