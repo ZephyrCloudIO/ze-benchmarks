@@ -17,27 +17,45 @@ program
 
 program
   .command('mint:snapshot')
-  .description('Combine specialist template with benchmark results to create a snapshot')
+  .description('Combine specialist template with benchmark results to create a snapshot (benchmarks are optional)')
   .argument('<template-path>', 'Path to the specialist template JSON5 file (relative to cwd)')
   .requiredOption('--output <path>', 'Output directory for the snapshot (relative to cwd)')
-  .requiredOption('--batch-id <id>', 'Batch ID from ze-benchmarks to load all runs from')
+  .option('--batch-id <id>', 'Batch ID from ze-benchmarks to load all runs from')
+  .option('--skip-benchmarks', 'Skip loading benchmarks (create snapshot without benchmark data)', false)
   .option('--worker-url <url>', 'Worker API URL (defaults to ZE_BENCHMARKS_WORKER_URL env var or http://localhost:8787)')
-  .action(async (templatePath: string, options: { output: string; batchId: string; workerUrl?: string }) => {
+  .option('--auto-enrich', 'Automatically enrich template if enriched version not found', false)
+  .option('--json', 'Output metadata as JSON to stdout (for programmatic use)', false)
+  .action(async (templatePath: string, options: { output: string; batchId?: string; skipBenchmarks: boolean; workerUrl?: string; autoEnrich: boolean; json: boolean }) => {
     try {
-      log.debug(chalk.blue('\n🔨 Starting snapshot minting process...\n'));
+      // Suppress colored logs if JSON output is requested
+      if (!options.json) {
+        log.debug(chalk.blue('\n🔨 Starting snapshot minting process...\n'));
+      }
 
       const result = await mintSnapshot(templatePath, options.output, {
         batchId: options.batchId,
-        workerUrl: options.workerUrl
+        workerUrl: options.workerUrl,
+        skipBenchmarks: options.skipBenchmarks,
+        autoEnrich: options.autoEnrich
       });
 
-      log.debug(chalk.green('\n✅ Snapshot minted successfully!'));
-      log.debug(chalk.gray(`   Snapshot ID: ${result.snapshotId}`));
-      log.debug(chalk.gray(`   Output path: ${result.outputPath}`));
-      log.debug(chalk.gray(`   Template version: ${result.templateVersion}\n`));
+      // Output metadata as JSON if requested, otherwise show colored summary
+      if (options.json) {
+        console.log(JSON.stringify(result.metadata, null, 2));
+      } else {
+        log.debug(chalk.green('\n✅ Snapshot minted successfully!'));
+        log.debug(chalk.gray(`   Snapshot ID: ${result.snapshotId}`));
+        log.debug(chalk.gray(`   Output path: ${result.outputPath}`));
+        log.debug(chalk.gray(`   Template version: ${result.templateVersion}`));
+        log.debug(chalk.gray(`   Metadata file: ${result.metadata.output.metadata_file}\n`));
+      }
     } catch (error) {
-      log.error(chalk.red('\n❌ Error minting snapshot:'));
-      log.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
+      if (options.json) {
+        console.error(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+      } else {
+        log.error(chalk.red('\n❌ Error minting snapshot:'));
+        log.error(chalk.red(`   ${error instanceof Error ? error.message : String(error)}\n`));
+      }
       process.exit(1);
     }
   });

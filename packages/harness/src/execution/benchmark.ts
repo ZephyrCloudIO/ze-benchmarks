@@ -145,7 +145,7 @@ export async function executeBenchmark(
 			benchmarkLogger.failRun('Prompt file not found', 'prompt');
 			if (!quiet) logger.execution.error('✗ Prompt file not found');
 			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Prompt file not found`);
-			return;
+			return null;
 		}
 
 	// Stage 1.5: Warmup (if configured and not skipped)
@@ -164,7 +164,7 @@ export async function executeBenchmark(
 				}
 			}
 			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Warmup failed`);
-			return;
+			return null;
 		}
 		if (!quiet) {
 			logger.execution.success('[Benchmark] ✓ Warmup completed successfully');
@@ -194,7 +194,7 @@ export async function executeBenchmark(
 			benchmarkLogger.failRun('Workspace preparation failed', 'workspace');
 			if (!quiet) logger.execution.error('✗ Workspace preparation failed');
 			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: Workspace preparation failed`);
-			return;
+			return null;
 		}
 
 		workspaceDir = workspacePrep.workspaceDir;
@@ -530,7 +530,7 @@ export async function executeBenchmark(
 			benchmarkLogger.failRun(error instanceof Error ? error.message : String(error), 'agent');
 			if (!quiet) logger.execution.error('✗ Agent execution failed');
 			if (quiet) logger.execution.error(`[X] ${suite}/${scenario} (${tier}) ${agentDisplay}${model ? ` [${model}]` : ''} - FAILED: ${error instanceof Error ? error.message : String(error)}`);
-			return; // Early exit - don't continue to evaluation
+			return null; // Early exit - don't continue to evaluation
 		}
 	} else if (!promptContent) {
 		logger.execution.debug(chalk.magenta('🔍 DEBUG: Skipping agent execution - no prompt content'));
@@ -697,7 +697,26 @@ export async function executeBenchmark(
 			displayHeuristicChecks(result);
 			displayLLMJudgeScores(result, scenarioCfg);
 		}
-		return;
+
+		// Return run data for caching (quiet mode path)
+		return {
+			runId: runData.runId,
+			batchId: runData.batchId,
+			suite: runData.suite,
+			scenario: runData.scenario,
+			tier: runData.tier,
+			agent: runData.agent,
+			model: runData.model || '',
+			status: 'completed' as const,
+			startedAt: runData.startedAt,
+			completedAt: new Date().toISOString(),
+			totalScore,
+			weightedScore: result.totals?.weighted,
+			isSuccessful,
+			specialistEnabled: !!specialist,
+			telemetry: telemetryData,
+			evaluations: evaluationsData,
+		};
 	}
 
 	logger.execution.raw(`\n${chalk.bold.underline('Benchmark Results')}`);
@@ -756,6 +775,26 @@ export async function executeBenchmark(
 
 	// Show completion outro
 	logger.execution.raw(`\n${chalk.green('✓')} Benchmark completed successfully`);
+
+	// Return run data for caching
+	return {
+		runId: runData.runId,
+		batchId: runData.batchId,
+		suite: runData.suite,
+		scenario: runData.scenario,
+		tier: runData.tier,
+		agent: runData.agent,
+		model: runData.model || '',
+		status: 'completed' as const,
+		startedAt: runData.startedAt,
+		completedAt: new Date().toISOString(),
+		totalScore,
+		weightedScore: result.totals?.weighted,
+		isSuccessful,
+		specialistEnabled: !!specialist,
+		telemetry: telemetryData,
+		evaluations: evaluationsData,
+	};
 
 	} catch (error) {
 		// Catch-all for unexpected errors

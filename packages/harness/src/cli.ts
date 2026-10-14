@@ -48,6 +48,7 @@ import { executeBenchmark } from './execution/benchmark.ts';
 
 // Lib module imports
 import { formatStats, displayRunInfo } from './lib/display.ts';
+import { initBenchmarkCache, addRunToCache, type CachedBenchmarkRun } from './lib/benchmark-cache.ts';
 import { logger } from '@ze/logger';
 
 // ============================================================================
@@ -438,7 +439,7 @@ async function run() {
 		return;
 	}
 
-	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, iterations } = parsedArgs;
+	const { cmd, suite, scenario, tier, agent, model, specialist, skipWarmup, warmupOnly, quiet, llmJudgeOnly, enrichTemplate, mintSnapshot, snapshotOutput, iterations } = parsedArgs;
 	if (cmd !== 'bench' || !suite || !scenario) {
 		showHelp();
 		process.exit(1);
@@ -529,9 +530,12 @@ async function run() {
 
 	// Initialize batch tracking (same as interactive mode)
 	const benchmarkLogger = BenchmarkLogger.getInstance();
-	
+
 	// Always create new batch using proper format (batch-{timestamp}-{random})
 	const actualBatchId = await benchmarkLogger.startBatch();
+
+	// Initialize benchmark cache for offline access
+	initBenchmarkCache(actualBatchId);
 
 	if (iterations > 1 && !quiet) {
 		logger.cli.info(chalk.blue(`Running ${iterations} iterations with batch ID: ${actualBatchId}`));
@@ -548,7 +552,42 @@ async function run() {
 			logger.cli.info(chalk.cyan(`\n--- Iteration ${i + 1}/${iterations} ---`));
 		}
 
-		await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+		const result = await executeBenchmark(suite, scenario, tier, agent, model, actualBatchId, quiet, specialist, skipWarmup, llmJudgeOnly);
+
+		// Cache the benchmark result for offline access
+		if (result) {
+			try {
+				const cachedRun: CachedBenchmarkRun = {
+					runId: result.runId,
+					batchId: actualBatchId,
+					suite,
+					scenario,
+					tier,
+					agent: agent || (specialist ? 'auto-detect' : 'echo'),
+					model: result.model || model || '',
+					status: result.status,
+					startedAt: result.startedAt,
+					completedAt: result.completedAt,
+					totalScore: result.totalScore,
+					weightedScore: result.weightedScore,
+					isSuccessful: result.isSuccessful,
+					specialistEnabled: result.specialistEnabled,
+					telemetry: result.telemetry ? {
+						toolCalls: result.telemetry.toolCalls,
+						tokensIn: result.telemetry.tokensIn,
+						tokensOut: result.telemetry.tokensOut,
+						costUsd: result.telemetry.costUsd,
+						durationMs: result.telemetry.durationMs
+					} : undefined,
+					evaluations: result.evaluations
+				};
+
+				addRunToCache(cachedRun);
+				logger.cli.debug(`Cached benchmark run: ${result.runId}`);
+			} catch (error) {
+				logger.cli.warn(`Failed to cache benchmark: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
 	}
 
 	// Complete batch with statistics
@@ -620,6 +659,40 @@ async function run() {
 			logger.cli.error(`   ${error instanceof Error ? error.message : String(error)}`);
 			if (!quiet) {
 				logger.cli.warn('\n💡 Tip: Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env');
+			}
+			process.exit(1);
+		}
+	}
+
+	// After benchmarks complete, mint snapshot if requested
+	if (mintSnapshot) {
+		if (!quiet) {
+			logger.cli.info(chalk.blue(`\n🔨 Minting snapshot from batch ${actualBatchId}...`));
+		}
+
+		try {
+			const { mintSnapshot: mintSnapshotFunc } = await import('@ze/specialist-mint');
+
+			const result = await mintSnapshotFunc(mintSnapshot, snapshotOutput, {
+				batchId: actualBatchId,
+				workerUrl: process.env.ZE_BENCHMARKS_WORKER_URL
+			});
+
+			if (!quiet) {
+				logger.cli.success('\n✅ Snapshot minted successfully!');
+				logger.cli.debug(`   Snapshot ID: ${result.snapshotId}`);
+				logger.cli.debug(`   Output path: ${result.outputPath}`);
+				logger.cli.debug(`   Template version: ${result.templateVersion}`);
+				if (result.metadata?.benchmarks?.comparison) {
+					const comp = result.metadata.benchmarks.comparison;
+					logger.cli.debug(`   Improvement: ${comp.improvement >= 0 ? '+' : ''}${comp.improvement.toFixed(3)} (${comp.improvement_pct.toFixed(1)}%)`);
+				}
+			}
+		} catch (error) {
+			logger.cli.error(chalk.red('\n❌ Error minting snapshot:'));
+			logger.cli.error(`   ${error instanceof Error ? error.message : String(error)}`);
+			if (!quiet) {
+				logger.cli.warn('\n💡 Tip: Make sure the template path is correct and Worker API is accessible');
 			}
 			process.exit(1);
 		}

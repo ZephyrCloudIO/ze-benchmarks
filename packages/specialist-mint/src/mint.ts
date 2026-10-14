@@ -1,15 +1,17 @@
 import chalk from 'chalk';
 import { resolve, join } from 'path';
-import type { SpecialistTemplate, SpecialistSnapshot, MintResult, BenchmarkResults, BenchmarkRun, BenchmarkComparison, ModelComparison } from './types.js';
+import type { SpecialistTemplate, SpecialistSnapshot, MintResult, BenchmarkRun, BenchmarkComparison, ModelComparison } from './types.js';
 import {
   loadJSON5,
   writeJSON5,
+  writeJSON,
   validateTemplateSchema,
   validateSnapshotSchema,
   getNextSnapshotId
 } from './utils.js';
-import { loadBenchmarkResults, loadBenchmarkBatch } from './benchmark-loader.js';
+import { loadBenchmarkBatch } from './benchmark-loader.js';
 import { resolveTemplatePath } from './template-resolver.js';
+import { generateMetadata } from './metadata-generator.js';
 import { logger } from '@ze/logger';
 
 const log = logger.specialistMint;
@@ -21,14 +23,23 @@ export async function mintSnapshot(
   templatePath: string,
   outputDir: string,
   options?: {
+    // Option A: Fetch from Worker API using batch ID
     batchId?: string;
     workerUrl?: string;
+
+    // Option B: Pass benchmark data directly (bypasses Worker API)
+    benchmarkRuns?: BenchmarkRun[];
+
+    skipBenchmarks?: boolean;
+    autoEnrich?: boolean;
   }
 ): Promise<MintResult> {
   log.debug(chalk.blue('📋 Step 1: Loading and validating template...'));
 
   // Resolve template path (automatically use enriched version if available)
-  const { path: resolvedTemplatePath, isEnriched } = resolveTemplatePath(templatePath);
+  const { path: resolvedTemplatePath, isEnriched } = await resolveTemplatePath(templatePath, {
+    autoEnrich: options?.autoEnrich || false
+  });
   const template: SpecialistTemplate = loadJSON5(resolvedTemplatePath);
 
   log.debug(chalk.gray(`   Template: ${template.name} v${template.version}`));
@@ -51,17 +62,21 @@ export async function mintSnapshot(
 
   let benchmarkRuns: BenchmarkRun[] | null = null;
 
-  if (options?.batchId) {
-    // Batch mode: load all runs from the batch via Worker API
+  if (options?.skipBenchmarks) {
+    // Explicitly skip benchmarks
+    log.debug(chalk.yellow('   ⚠️  Skipping benchmarks (--skip-benchmarks flag)'));
+  } else if (options?.benchmarkRuns) {
+    // Option B: Use directly provided benchmark data (bypasses Worker API)
+    benchmarkRuns = options.benchmarkRuns;
+    log.debug(chalk.green(`   ✓ Using ${benchmarkRuns.length} benchmark run(s) provided directly`));
+  } else if (options?.batchId) {
+    // Option A: Fetch from Worker API using batch ID
     log.debug(chalk.gray(`   Loading batch: ${options.batchId}`));
     benchmarkRuns = await loadBenchmarkBatch(options.batchId, options.workerUrl);
   } else {
-    // Legacy mode: load single most recent result via Worker API
-    log.debug(chalk.gray('   Loading most recent result (legacy mode)'));
-    const singleResult = await loadBenchmarkResults(options?.workerUrl);
-    if (singleResult) {
-      benchmarkRuns = [singleResult];
-    }
+    // No benchmark data provided and not explicitly skipping - inform user
+    log.debug(chalk.yellow('   ⚠️  No benchmark data provided, continuing without benchmarks'));
+    log.debug(chalk.gray('   Use --batch-id to fetch from Worker, pass benchmarkRuns directly, or use --skip-benchmarks'));
   }
 
   // Create snapshot by combining template and benchmark results
@@ -116,10 +131,29 @@ export async function mintSnapshot(
 
   log.debug(chalk.green('   ✓ Snapshot written successfully'));
 
+  // Generate and write metadata
+  log.debug(chalk.blue('\n📊 Step 7: Generating metadata...'));
+
+  const metadata = generateMetadata(snapshot, {
+    snapshotId,
+    snapshotPath: outputPath,
+    templatePath: resolvedTemplatePath,
+    isEnriched,
+    batchId: options?.batchId,
+    skipBenchmarks: options?.skipBenchmarks
+  });
+
+  const metadataPath = outputPath.replace(/\.json5$/, '.meta.json');
+  writeJSON(metadataPath, metadata);
+
+  log.debug(chalk.green('   ✓ Metadata written successfully'));
+  log.debug(chalk.gray(`   Metadata path: ${metadataPath}`));
+
   return {
     snapshotId,
     outputPath,
-    templateVersion: template.version
+    templateVersion: template.version,
+    metadata
   };
 }
 
@@ -178,6 +212,18 @@ function createBenchmarksSection(
         log.debug(chalk.gray(`   Improvement: ${sign}${comparison.improvement.toFixed(3)} (${sign}${comparison.improvement_pct?.toFixed(1)}%)`));
       }
     }
+
+    // Calculate aggregated scores
+    const aggregatedScores = calculateAggregatedScores(benchmarkRuns);
+    benchmarksSection.aggregated_scores = aggregatedScores;
+
+    // Log benchmark summary
+    log.debug(chalk.blue('\n📈 Benchmark Summary:'));
+    log.debug(chalk.gray(`   Total runs: ${benchmarkRuns.length}`));
+    log.debug(chalk.gray(`   Average score: ${aggregatedScores.avg_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Min score: ${aggregatedScores.min_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Max score: ${aggregatedScores.max_score.toFixed(3)}`));
+    log.debug(chalk.gray(`   Std deviation: ${aggregatedScores.std_dev.toFixed(3)}`));
   } else {
     // No benchmark results available - create a placeholder test suite
     log.debug(chalk.yellow('   ⚠️  No benchmark results found'));
@@ -269,4 +315,79 @@ function calculateComparison(
   });
 
   return comparison;
+}
+
+/**
+ * Calculate aggregated scores across all runs
+ */
+function calculateAggregatedScores(runs: BenchmarkRun[]) {
+  const scores = runs.map(r => r.overall_score);
+
+  return {
+    total_runs: runs.length,
+    avg_score: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+    min_score: Math.min(...scores),
+    max_score: Math.max(...scores),
+    std_dev: calculateStdDev(scores),
+    by_suite: groupScoresBySuite(runs),
+    by_model: groupScoresByModel(runs)
+  };
+}
+
+/**
+ * Calculate standard deviation of scores
+ */
+function calculateStdDev(scores: number[]): number {
+  const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+  const variance = scores.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / scores.length;
+  return Math.sqrt(variance);
+}
+
+/**
+ * Group scores by suite/scenario
+ */
+function groupScoresBySuite(runs: BenchmarkRun[]) {
+  const grouped = new Map<string, number[]>();
+
+  runs.forEach(run => {
+    const key = `${run.suite}/${run.scenario}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(run.overall_score);
+  });
+
+  const result: Record<string, { avg: number; count: number }> = {};
+  grouped.forEach((scores, key) => {
+    result[key] = {
+      avg: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+      count: scores.length
+    };
+  });
+
+  return result;
+}
+
+/**
+ * Group scores by model
+ */
+function groupScoresByModel(runs: BenchmarkRun[]) {
+  const grouped = new Map<string, number[]>();
+
+  runs.forEach(run => {
+    if (!grouped.has(run.model)) {
+      grouped.set(run.model, []);
+    }
+    grouped.get(run.model)!.push(run.overall_score);
+  });
+
+  const result: Record<string, { avg: number; count: number }> = {};
+  grouped.forEach((scores, model) => {
+    result[model] = {
+      avg: scores.reduce((sum, s) => sum + s, 0) / scores.length,
+      count: scores.length
+    };
+  });
+
+  return result;
 }
